@@ -73,6 +73,7 @@
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
 				{:else}
+					<Button on:click={() => goto('/dashboard')}>Dashboard</Button>
 					<DropdownMenu.Root>
 						<DropdownMenu.Trigger asChild let:builder>
 							<Button variant="ghost" builders={[builder]} class="relative h-8 w-8 rounded-full">

@@ -1,7 +1,7 @@
 // lib/server/lucia.ts
 import { Lucia, TimeSpan } from 'lucia';
 import { DrizzlePostgreSQLAdapter } from '@lucia-auth/adapter-drizzle';
-import { userTable, sessionTable } from '$lib/server/database/drizzle-schemas';
+import { userTable, sessionTable } from '$lib/server/database/schemas/auth';
 import db from '$lib/server/database/drizzle';
 import { dev } from '$app/environment';
 import { Google } from 'arctic';
@@ -31,7 +31,9 @@ export const lucia = new Lucia(adapter, {
 			role: attributes.role,
 			verified: attributes.verified,
 			receiveEmail: attributes.receiveEmail,
-			token: attributes.token
+			token: attributes.token,
+			completedOnboarding: attributes.completedOnboarding,
+			blacklisted: attributes.blacklisted
 		};
 	}
 });
@@ -55,6 +57,8 @@ interface DatabaseUserAttributes {
 	verified: boolean;
 	receiveEmail: boolean;
 	token: string;
+	completedOnboarding: boolean;
+	blacklisted: boolean;
 }
 
 /*interface DatabaseSessionAttributes {

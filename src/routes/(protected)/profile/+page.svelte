@@ -8,6 +8,7 @@
 	import { Loader2 } from 'lucide-svelte';
 	import { AlertCircle } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
+	import type { PageData } from './$types';
 	export let data: any;
 
 	const profileSchema = userSchema.pick({

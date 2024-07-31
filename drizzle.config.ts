@@ -7,11 +7,10 @@ if (!DATABASE_URL) {
 	throw new Error('No url');
 }
 export default {
-	schema: './src/lib/server/database/drizzle-schemas.ts',
+	schema: './src/lib/server/database/schemas/*',
 	out: './src/lib/server/database/migrations',
-	driver: 'pg',
+	dialect: 'postgresql',
 	dbCredentials: {
-		connectionString: DATABASE_URL
+		url: DATABASE_URL
 	}
 } satisfies Config;
-

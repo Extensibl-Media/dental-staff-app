@@ -4,13 +4,25 @@ import { BASE_URL, APP_NAME } from '$lib/config/constants';
 // Send an email to verify the user's address
 export const sendVerificationEmail = async (email: string, token: string) => {
 	const verifyEmailURL = `${BASE_URL}/auth/verify/email-${token}`;
-	const textEmail = `Please visit the link below to verify your email address for your ${APP_NAME} account.\n\n  
+	const textEmail = `Please visit the link below to verify your email address for your ${APP_NAME} account.\n\n
     ${verifyEmailURL} \n\nIf you did not create this account, you can disregard this email.`;
 	const htmlEmail = `<p>Please click this <a href="${verifyEmailURL}">link</a> to verify your email address for your ${APP_NAME} account.</p>  <p>You can also visit the link below.</p><p>${verifyEmailURL}</p><p>If you did not create this account, you can disregard this email.</p>`;
 	const subject = `Please confirm your email address for ${APP_NAME}`;
 	const resultSend = sendEmail(email, subject, htmlEmail, textEmail);
 	return resultSend;
 };
+
+// TODO: Complete This email invite flow
+// // Send an email to invite client staff users
+// export const sendClientStaffInviteEmail = async (email: string, token: string) => {
+// 	const signInUrl = `${BASE_URL}/auth/verify/email-${token}`;
+// 	const textEmail = `You have been invited by your employer to their workspace in ${APP_NAME}.\n\n
+//     ${verifyEmailURL} \n\nIf you did not create this account, you can disregard this email.`;
+// 	const htmlEmail = `<p>Please click this <a href="${verifyEmailURL}">link</a> to verify your email address for your ${APP_NAME} account.</p>  <p>You can also visit the link below.</p><p>${verifyEmailURL}</p><p>If you did not create this account, you can disregard this email.</p>`;
+// 	const subject = `Please confirm your email address for ${APP_NAME}`;
+// 	const resultSend = sendEmail(email, subject, htmlEmail, textEmail);
+// 	return resultSend;
+// };
 
 // Send an email to welcome the new user
 export const sendWelcomeEmail = async (email: string) => {
@@ -24,9 +36,9 @@ export const sendWelcomeEmail = async (email: string) => {
 // Send an email to reset the user's password
 export const sendPasswordResetEmail = async (email: string, token: string) => {
 	const updatePasswordURL = `${BASE_URL}/auth/password/update-${token}`;
-	const textEmail = `Please visit the link below to change your password for ${APP_NAME}.\n\n  
+	const textEmail = `Please visit the link below to change your password for ${APP_NAME}.\n\n
     ${updatePasswordURL} \n\nIf you did not request to change your password, you can disregard this email.`;
-	const htmlEmail = `<p>Please click this <a href="${updatePasswordURL}">link</a> to change your password for ${APP_NAME}.</p>  
+	const htmlEmail = `<p>Please click this <a href="${updatePasswordURL}">link</a> to change your password for ${APP_NAME}.</p>
 	<p>You can also visit the link below.</p><p>${updatePasswordURL}</p><p>If you did not request to change your password, you can disregard this email.</p>`;
 	const subject = `Change your password for ${APP_NAME}`;
 	const resultSend = sendEmail(email, subject, htmlEmail, textEmail);

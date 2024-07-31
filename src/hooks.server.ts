@@ -1,8 +1,12 @@
+/* eslint-disable no-fallthrough */
 import { lucia } from '$lib/server/lucia';
 import { redirect, type Handle } from '@sveltejs/kit';
 import type { HandleServerError } from '@sveltejs/kit';
 
 import log from '$lib/server/log';
+import { checkIsAdmin } from '$lib/_helpers/checkIsAdmin';
+// import { USER_ROLES } from '$lib/config/constants';
+// import { getClientProfilebyUserId } from '$lib/server/database/queries/clients';
 
 export const handleError: HandleServerError = async ({ error, event }) => {
 	const errorId = crypto.randomUUID();
@@ -54,8 +58,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 		if (!user) redirect(302, '/auth/sign-in');
 		if (!user.verified) redirect(302, '/auth/verify/email');
 	}
-	if (event.route.id?.startsWith('/(admin)')) {
-		if (user?.role !== 'ADMIN') redirect(302, '/auth/sign-in');
+	if (event.route.id?.startsWith('/(protected)/admin')) {
+		if (!checkIsAdmin(user?.role)) redirect(302, '/');
 	}
 
 	const response = await resolve(event);
