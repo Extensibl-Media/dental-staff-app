@@ -1,6 +1,6 @@
 import { USER_ROLES } from '$lib/config/constants.js';
 import { getCalendarEventsForAdmin } from '$lib/server/database/queries/admin';
-import { getCalendarEventsForClient } from '$lib/server/database/queries/clients';
+import { getCalendarEventsForClient, getClientProfileByStaffUserId, getClientProfilebyUserId } from '$lib/server/database/queries/clients';
 import { redirect } from '@sveltejs/kit';
 
 export const load = async ({ locals }) => {
@@ -20,7 +20,21 @@ export const load = async ({ locals }) => {
 	}
 
 	if (user?.role === USER_ROLES.CLIENT) {
-		const events = await getCalendarEventsForClient(user.id);
+		const profile = await getClientProfilebyUserId(user.id)
+		const events = await getCalendarEventsForClient(profile.id);
+
+		console.log(events);
+
+		return {
+			user,
+			events
+		};
+	}
+
+
+	if (user?.role === USER_ROLES.CLIENT_STAFF) {
+		const client = await getClientProfileByStaffUserId(user.id)
+		const events = await getCalendarEventsForClient(client?.id);
 
 		console.log(events);
 

@@ -3,7 +3,7 @@ import { setFlash } from 'sveltekit-flash-message/server';
 import { setError, superValidate } from 'sveltekit-superforms/server';
 
 import { clientCompanySchema } from '$lib/config/zod-schemas';
-import { createClientCompany, createClientProfile } from '$lib/server/database/queries/clients.js';
+import { createClientCompany, createClientProfile, getClientCompanyByClientId, getClientProfilebyUserId } from '$lib/server/database/queries/clients.js';
 
 const companySchema = clientCompanySchema.pick({
 	companyName: true
@@ -15,8 +15,18 @@ export const load = async (event) => {
 		redirect(302, '/auth/sign-in');
 	}
 
+	const client = await getClientProfilebyUserId(user.id)
+
+	const existingCompany = await getClientCompanyByClientId(client.id)
+
+	// if company exists, then client is in next step of onboarding
+	if (existingCompany) {
+		redirect(302, '/onboarding/client/location')
+	}
+
 	const form = await superValidate(event, companySchema);
 	return {
+		user,
 		form
 	};
 };

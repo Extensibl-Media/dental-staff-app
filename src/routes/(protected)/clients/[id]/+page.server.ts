@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import {
-	getClientLocationsByCompanyId,
+	getAllClientLocationsByCompanyId,
 	getClientProfileById
 } from '$lib/server/database/queries/clients';
 import { redirect } from '@sveltejs/kit';
@@ -14,7 +14,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const { id } = params;
 
 	const result = await getClientProfileById(id);
-	const locations = result.company ? await getClientLocationsByCompanyId(result.company.id) : [];
+	const locations = result.company ? await getAllClientLocationsByCompanyId(result.company.id) : [];
 
 	return result
 		? {

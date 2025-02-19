@@ -9,6 +9,7 @@ import {
 	type UpdateRegion,
 	type UpdateSubregion
 } from '../schemas/region';
+import type { PaginateOptions } from '$lib/types';
 
 export type RegionRaw = {
 	id: string;
@@ -22,11 +23,7 @@ export async function getPaginatedRegions({
 	limit = 25,
 	offset = 0,
 	orderBy = undefined
-}: {
-	limit: number;
-	offset: number;
-	orderBy?: { column: string; direction: string };
-}) {
+}: PaginateOptions) {
 	try {
 		const orderSelector = orderBy ? `r.${orderBy.column}` : null;
 
@@ -39,11 +36,10 @@ export async function getPaginatedRegions({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-    ORDER BY ${
-			orderBy.direction === 'asc'
-				? sql`${sql.raw(orderSelector)} ASC`
-				: sql`${sql.raw(orderSelector)} DESC`
-		}
+    ORDER BY ${orderBy.direction === 'asc'
+					? sql`${sql.raw(orderSelector)} ASC`
+					: sql`${sql.raw(orderSelector)} DESC`
+				}
   `);
 		} else {
 			query.append(sql`

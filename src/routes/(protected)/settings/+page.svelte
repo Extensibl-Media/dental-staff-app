@@ -1,9 +1,32 @@
 <script lang="ts">
-	import { cn } from '$lib/utils';
-	import type PageData from './$types';
+	import { SETTINGS_MENU_OPTIONS, USER_ROLES } from '$lib/config/constants';
+	import ClientSettingsView from '$lib/views/client/clientSettingsView.svelte';
+	import type { SuperValidated } from 'sveltekit-superforms';
+	import type { UserSchema, UserUpdatePasswordSchema } from '$lib/config/zod-schemas';
+	import ClientStaffSettingsView from '$lib/views/client/clientStaffSettingsView.svelte';
 
-	let selectedTab = 'ACCOUNT';
-	export let data: PageData;
+	export let data: any;
+	export let userProfileForm: SuperValidated<UserSchema>;
+	export let passwordForm: SuperValidated<UserUpdatePasswordSchema>;
+	export let subscriptionForm;
+	export let companyForm;
+
+	$: userProfileForm = data.userProfileForm;
+	$: passwordForm = data.passwordForm;
+	$: subscriptionForm = data.subscriptionForm;
+	$: companyForm = data.companyForm;
+	$: billingInfo = data.billingInfo;
+
+	$: user = data.user;
+
+	$: defaultTab =
+		user.role === USER_ROLES.CLIENT
+			? SETTINGS_MENU_OPTIONS.CLIENT.PROFILE
+			: user.role === USER_ROLES.CLIENT_STAFF
+				? SETTINGS_MENU_OPTIONS.CLIENT_STAFF.PROFILE
+				: SETTINGS_MENU_OPTIONS.ADMIN.PROFILE;
+
+	$: selectedTab = defaultTab;
 </script>
 
 <section class="grow h-screen overflow-y-auto">
@@ -11,5 +34,17 @@
 		<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">
 			Account Settings
 		</h1>
+		{#if user.role === USER_ROLES.CLIENT}
+			<ClientSettingsView
+				bind:selectedTab
+				{companyForm}
+				{userProfileForm}
+				{passwordForm}
+				{billingInfo}
+			/>
+		{/if}
+		{#if user.role === USER_ROLES.CLIENT_STAFF}
+			<ClientStaffSettingsView bind:selectedTab {userProfileForm} {passwordForm} {companyForm} />
+		{/if}
 	</div>
 </section>

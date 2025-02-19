@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LogOut, Moon, Sun, SunMoon, UserRound } from 'lucide-svelte';
+	import { Cog, LogOut, Moon, Sun, SunMoon, UserRound } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -44,14 +44,13 @@
 		</DropdownMenu.Label>
 		<DropdownMenu.Separator />
 		<DropdownMenu.Group>
-			<DropdownMenu.Item on:click={() => goto('/profile')}>
-				<UserRound class="mr-2 h-4 w-4" />
-				Profile
-				<DropdownMenu.Shortcut>⇧⌘P</DropdownMenu.Shortcut>
+			<DropdownMenu.Item on:click={() => goto('/settings')}>
+				<Cog class="mr-2 h-4 w-4" />
+				Settings
 			</DropdownMenu.Item>
 		</DropdownMenu.Group>
 
-		<DropdownMenu.Sub>
+		<!-- <DropdownMenu.Sub>
 			<DropdownMenu.SubTrigger>
 				<Sun class="mr-2 h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
 				<Moon
@@ -70,7 +69,7 @@
 					><SunMoon class="mr-2 h-4 w-4" />System
 				</DropdownMenu.Item>
 			</DropdownMenu.SubContent>
-		</DropdownMenu.Sub>
+		</DropdownMenu.Sub> -->
 		<DropdownMenu.Separator />
 		<DropdownMenu.Item on:click={signOut}>
 			<LogOut class="mr-2 h-4 w-4" />

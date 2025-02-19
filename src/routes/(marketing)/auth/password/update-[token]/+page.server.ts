@@ -1,10 +1,10 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { setError, superValidate } from 'sveltekit-superforms/server';
-import { userUpdatePasswordSchema } from '$lib/config/zod-schemas';
+import { userResetPasswordSchema } from '$lib/config/zod-schemas';
 import { getUserByToken, updateUser } from '$lib/server/database/queries/users';
 import { Argon2id } from 'oslo/password';
 export const load = async (event) => {
-	const form = await superValidate(event, userUpdatePasswordSchema);
+	const form = await superValidate(event, userResetPasswordSchema);
 	return {
 		form
 	};
@@ -12,7 +12,7 @@ export const load = async (event) => {
 
 export const actions = {
 	default: async (event) => {
-		const form = await superValidate(event, userUpdatePasswordSchema);
+		const form = await superValidate(event, userResetPasswordSchema);
 
 		if (!form.valid) {
 			return fail(400, {

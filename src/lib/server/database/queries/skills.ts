@@ -10,6 +10,7 @@ import {
 	type ExperienceLevel,
 	type UpdateExperienceLevel
 } from '../schemas/skill';
+import type { PaginateOptions } from '$lib/types';
 
 export type SkillsWithCategoryRaw = {
 	id: string;
@@ -30,11 +31,7 @@ export async function getPaginatedSkills({
 	limit = 25,
 	offset = 0,
 	orderBy = undefined
-}: {
-	limit: number;
-	offset: number;
-	orderBy?: { column: string; direction: string };
-}) {
+}: PaginateOptions) {
 	try {
 		const orderSelector = orderBy
 			? orderBy.column === 'category_name'
@@ -52,11 +49,10 @@ export async function getPaginatedSkills({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-    ORDER BY ${
-			orderBy.direction === 'asc'
-				? sql`${sql.raw(orderSelector)} ASC`
-				: sql`${sql.raw(orderSelector)} DESC`
-		}
+    ORDER BY ${orderBy.direction === 'asc'
+					? sql`${sql.raw(orderSelector)} ASC`
+					: sql`${sql.raw(orderSelector)} DESC`
+				}
   `);
 		} else {
 			query.append(sql`
@@ -106,11 +102,7 @@ export async function getPaginatedSkillGategories({
 	limit = 25,
 	offset = 0,
 	orderBy = undefined
-}: {
-	limit: number;
-	offset: number;
-	orderBy?: { column: string; direction: string };
-}) {
+}: PaginateOptions) {
 	try {
 		const orderSelector = orderBy ? `${orderBy.column}` : null;
 
@@ -123,11 +115,10 @@ export async function getPaginatedSkillGategories({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-    ORDER BY ${
-			orderBy.direction === 'asc'
-				? sql`${sql.raw(orderSelector)} ASC`
-				: sql`${sql.raw(orderSelector)} DESC`
-		}
+    ORDER BY ${orderBy.direction === 'asc'
+					? sql`${sql.raw(orderSelector)} ASC`
+					: sql`${sql.raw(orderSelector)} DESC`
+				}
   `);
 		} else {
 			query.append(sql`
@@ -185,11 +176,7 @@ export async function getPaginatedExperienceLevels({
 	limit = 10,
 	offset = 0,
 	orderBy = undefined
-}: {
-	limit: number;
-	offset: number;
-	orderBy?: { column: string; direction: string };
-}) {
+}: PaginateOptions) {
 	try {
 		const orderSelector = orderBy ? `e.${orderBy.column}` : null;
 
@@ -202,10 +189,9 @@ export async function getPaginatedExperienceLevels({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-				ORDER BY ${
-					orderBy.direction === 'asc'
-						? sql`${sql.raw(orderSelector)} ASC`
-						: sql`${sql.raw(orderSelector)} DESC`
+				ORDER BY ${orderBy.direction === 'asc'
+					? sql`${sql.raw(orderSelector)} ASC`
+					: sql`${sql.raw(orderSelector)} DESC`
 				}
 			`);
 		} else {

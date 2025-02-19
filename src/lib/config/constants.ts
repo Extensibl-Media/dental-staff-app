@@ -1,7 +1,7 @@
 // Comment out the next two lines to seed db
 
-// import { dev } from '$app/environment';
-// export const BASE_URL = dev ? 'http://localhost:5173' : 'https://dentalstaff.us';
+import { dev } from '$app/environment';
+export const BASE_URL = dev ? 'http://localhost:3000' : 'https://dentalstaff.us';
 
 export const APP_NAME = 'DentalStaff.us';
 export const CONTACT_EMAIL = 'brett@dentalstaff.us';
@@ -107,7 +107,7 @@ export const dentalStaffDisciplines = [
 	{ discipline: 'Orthodontist', abbreviation: 'Ortho' },
 	{ discipline: 'Periodontist', abbreviation: 'Perio' },
 	{ discipline: 'Prosthodontist', abbreviation: 'Pros' },
-	{ discipline: 'Pediatric Dentist', abbreviation: 'Pedo' },
+	{ discipline: 'Pediatric Dentist', abbreviation: 'Pedi' },
 	{ discipline: 'Oral Surgeon', abbreviation: 'OS' },
 	{ discipline: 'Oral Pathologist', abbreviation: 'OP' },
 	{ discipline: 'Oral Radiologist', abbreviation: 'OR' },
@@ -262,3 +262,32 @@ export const TIMEZONES: Timezone[] = [
 		offsetNum: -4
 	}
 ];
+
+export const SETTINGS_MENU_OPTIONS = {
+	ADMIN: {
+		PROFILE: 'ADMIN-PROFILE',
+		PASSWORD: 'ADMIN-PASSWORD',
+		NOTIFICATIONS: 'ADMIN-NOTIFICATIONS',
+		BILLING: 'ADMIN-BILLING',
+		TEAM: 'ADMIN-TEAM',
+	},
+	CLIENT: {
+		PROFILE: 'CLIENT-PROFILE',
+		COMPANY: 'COMPANY-PROFILE',
+		PASSWORD: 'CLIENT-PASSWORD',
+		NOTIFICATIONS: 'CLIENT-NOTIFICATIONS',
+		BILLING: 'CLIENT-BILLING',
+	},
+	CLIENT_STAFF: {
+		PROFILE: 'STAFF-PROFILE',
+		COMPANY: 'STAFF-COMPANY',
+		PASSWORD: 'STAFF-PASSWORD',
+		NOTIFICATIONS: 'STAFF-NOTIFICATIONS',
+	}
+};
+
+export const STAFF_ROLE_ENUM = {
+	CLIENT_ADMIN: 'Admin',
+	CLIENT_MANAGER: 'Manager',
+	CLIENT_EMPLOYEE: 'Employee'
+} as const;

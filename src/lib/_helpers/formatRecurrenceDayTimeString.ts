@@ -1,4 +1,5 @@
 import moment from 'moment';
+import 'moment-timezone';
 
 export const formatRecurrenceDayTimeString = (timeString: string, date: string) => {
 	const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;

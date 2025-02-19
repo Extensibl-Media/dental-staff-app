@@ -34,7 +34,7 @@ export const userSchema = z.object({
 
 export type UserSchema = typeof userSchema;
 
-export const userUpdatePasswordSchema = userSchema
+export const userResetPasswordSchema = userSchema
 	.pick({ password: true, confirmPassword: true })
 	.superRefine(({ confirmPassword, password }, ctx) => {
 		if (confirmPassword !== password) {
@@ -51,10 +51,28 @@ export const userUpdatePasswordSchema = userSchema
 		}
 	});
 
+export type UserResetPasswordSchema = typeof userResetPasswordSchema;
+
+export const userUpdatePasswordSchema = z
+	.object({ password: z.string(), newPassword: z.string(), confirmPassword: z.string() })
+	.superRefine(({ confirmPassword, newPassword }, ctx) => {
+		if (confirmPassword !== newPassword) {
+			ctx.addIssue({
+				code: 'custom',
+				message: 'Password and Confirm Password must match',
+				path: ['confirmPassword']
+			});
+		}
+	});
+
 export type UserUpdatePasswordSchema = typeof userUpdatePasswordSchema;
 
 export const clientCompanySchema = z.object({
-	companyName: z.string().min(1, { message: 'Company Name is required' }).trim()
+	companyName: z.string().min(1, { message: 'Company Name is required' }).trim(),
+	companyDescription: z.string(),
+	baseLocation: z.string(),
+	operatingHours: z.string(),
+	companyLogo: z.string()
 });
 
 export type ClientCompanySchema = typeof clientCompanySchema;
@@ -118,14 +136,15 @@ export const clientRequisitionSchema = z.object({
 	clientId: z.string(),
 	locationId: z.string(),
 	disciplineId: z.string(),
+	hourlyRate: z.string(),
 	experienceLevelId: z.string().optional(),
 	jobDescription: z.string(),
-	specialInstructions: z.string().optional()
+	specialInstructions: z.string().optional(),
+	permanentPosition: z.boolean().default(false)
 });
 
-export type ClientRequisitionSchema = typeof adminRequisitionSchema;
-
-export const newRecurrenceDaySchema = z.object({
+export type ClientRequisitionSchema = typeof clientRequisitionSchema;
+const singleDaySchema = z.object({
 	requisitionId: z.string(),
 	date: z.string(),
 	dayStartTime: z.string(),
@@ -135,18 +154,28 @@ export const newRecurrenceDaySchema = z.object({
 	timezoneOffset: z.string()
 });
 
+const recurrenceDayData = z.object({
+	requisitionId: z.number(),
+	date: z.string(),
+	dayStartTime: z.string(),
+	dayEndTime: z.string(),
+	lunchStartTime: z.string(),
+	lunchEndTime: z.string(),
+	timezoneOffset: z.string().optional()
+});
+
+export const newRecurrenceDaySchema = z.object({
+	recurrenceDays: z.string().transform((str) => {
+		const parsed = JSON.parse(str);
+		return z.array(recurrenceDayData).parse(Array.isArray(parsed) ? parsed : [parsed]);
+	})
+});
+
+export type RecurrenceDayData = z.infer<typeof recurrenceDayData>;
 export type NewRecurrenceDaySchema = typeof newRecurrenceDaySchema;
-
-export const editRecurrenceDaySchema = newRecurrenceDaySchema.extend({
-	id: z.string()
-});
-
+export const editRecurrenceDaySchema = singleDaySchema.extend({ id: z.string() });
 export type EditRecurrenceDaySchema = typeof editRecurrenceDaySchema;
-
-export const deleteRecurrenceDaySchema = z.object({
-	id: z.string()
-});
-
+export const deleteRecurrenceDaySchema = z.object({ id: z.string() });
 export type DeleteRecurrenceDaySchema = typeof deleteRecurrenceDaySchema;
 
 export const changeStatusSchema = z.object({
@@ -168,3 +197,17 @@ export const newMessageSchema = z.object({
 });
 
 export type NewMessageSchema = typeof newMessageSchema;
+
+export const newSupportTicketSchema = z.object({
+	title: z.string({ required_error: 'This field is required' }).min(1, 'This field is required.'),
+	actualResults: z
+		.string({ required_error: 'This field is required' })
+		.min(1, 'This field is required.'),
+	expectedResults: z
+		.string({ required_error: 'This field is required' })
+		.min(1, 'This field is required.'),
+	stepsToReproduce: z.string().optional(),
+	reportedById: z.string()
+});
+
+export type NewSupportTicketSchema = typeof newSupportTicketSchema;

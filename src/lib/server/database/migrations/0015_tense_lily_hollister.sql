@@ -1,0 +1,24 @@
+ALTER TABLE "candidate_discipline_experience" ALTER COLUMN "created_at" SET DEFAULT '2024-08-13T04:19:18.176Z';--> statement-breakpoint
+ALTER TABLE "candidate_discipline_experience" ALTER COLUMN "updated_at" SET DEFAULT '2024-08-13T04:19:18.176Z';--> statement-breakpoint
+ALTER TABLE "candidate_profiles" ALTER COLUMN "created_at" SET DEFAULT '2024-08-13T04:19:18.176Z';--> statement-breakpoint
+ALTER TABLE "candidate_profiles" ALTER COLUMN "updated_at" SET DEFAULT '2024-08-13T04:19:18.176Z';--> statement-breakpoint
+ALTER TABLE "candidate_ratings" ALTER COLUMN "created_at" SET DEFAULT '2024-08-13T04:19:18.176Z';--> statement-breakpoint
+ALTER TABLE "candidate_ratings" ALTER COLUMN "updated_at" SET DEFAULT '2024-08-13T04:19:18.176Z';--> statement-breakpoint
+ALTER TABLE "client_companies" ALTER COLUMN "created_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "client_companies" ALTER COLUMN "updated_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "client_profiles" ALTER COLUMN "created_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "client_profiles" ALTER COLUMN "updated_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "client_ratings" ALTER COLUMN "created_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "client_ratings" ALTER COLUMN "updated_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "client_staff_locations" ALTER COLUMN "created_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "client_staff_locations" ALTER COLUMN "updated_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "client_staff" ALTER COLUMN "created_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "client_staff" ALTER COLUMN "updated_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "client_subscriptions" ALTER COLUMN "created_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "client_subscriptions" ALTER COLUMN "updated_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "company_office_locations" ALTER COLUMN "created_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "company_office_locations" ALTER COLUMN "updated_at" SET DEFAULT now();--> statement-breakpoint
+ALTER TABLE "conversations" ALTER COLUMN "created_at" SET DEFAULT '2024-08-13T04:19:18.179Z';--> statement-breakpoint
+ALTER TABLE "conversations" ALTER COLUMN "updated_at" SET DEFAULT '2024-08-13T04:19:18.179Z';--> statement-breakpoint
+ALTER TABLE "messages" ALTER COLUMN "created_at" SET DEFAULT '2024-08-13T04:19:18.180Z';--> statement-breakpoint
+ALTER TABLE "requisitions" ADD COLUMN "archived" boolean DEFAULT false;

@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { User2 } from 'lucide-svelte';
-	export let size: string;
+	import img from '$lib/assets/dental-staff-emblem.svg';
 </script>
 
-<User2 {size} />
+<img src={img} alt="Dental Staff Emblem" />

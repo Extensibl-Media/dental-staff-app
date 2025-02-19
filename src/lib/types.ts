@@ -7,3 +7,9 @@ export type CalendarEvent = {
 	id: string;
 	extendedProps: Record<string, any>;
 };
+
+export type PaginateOptions = {
+	limit: number;
+	offset: number;
+	orderBy?: { column: string; direction: string };
+}

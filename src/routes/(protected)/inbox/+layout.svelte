@@ -2,6 +2,7 @@
 	import { page } from '$app/stores';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import { Input } from '$lib/components/ui/input';
+	import { cn } from '$lib/utils';
 	import type { LayoutData } from './$types';
 
 	import { PenBox, Search } from 'lucide-svelte';
@@ -12,17 +13,10 @@
 	$: user = data.user;
 	$: isNestedRoute = pageObj.params.chatId !== undefined;
 	$: conversations = data.conversations.map((conv) => ({
-		conversation: { ...conv.conversation },
-		participants: conv.participants.filter((p: any) => p.userId !== user.id),
-		lastMessage: conv.lastMessage
+	    ...conv,
+		participants: conv.participants.filter((p) => p.userId !== user.id),
 	}));
 
-	$: console.log(conversations);
-	// $: conversations = searchTerm?.length
-	// 	? data.conversations.filter((convs) =>
-	// 			convs.from_name.toLowerCase().includes(searchTerm.toLowerCase())
-	// 		)
-	// 	: data.conversations;
 </script>
 
 <section class="grow h-screen overflow-hidden grid grid-cols-5">
@@ -43,18 +37,20 @@
 				/>
 			</div>
 		</div>
-		<div class="grow overflow-y-scroll flex flex-col">
-			{#each conversations as chat}
-				<a href={`/inbox/${chat.conversation.id}`}>
+		<div class={cn('grow overflow-y-scroll flex flex-col', isNestedRoute && 'hidden lg:flex')}>
+			{#each conversations as conversation}
+			<a href={`/inbox/${conversation.id}`}>
 					<div
 						class="px-8 py-6 border-b border-b-gray-200 hover:bg-gray-50 flex items-center gap-4 bg-white"
 					>
 						<Avatar.Root class="h-14 w-14">
-							<Avatar.Image src={chat.participants[0].avatarUrl} />
+							<Avatar.Image src={conversation?.participants[0]?.user?.avatarUrl} />
 						</Avatar.Root>
 						<div>
-							<p class="text-xl font-semibold">{chat.participants[0].firstName}</p>
-							<p class="text-sm text-gray-500 line-clamp-1">{chat.lastMessage.body}</p>
+							<p class="text-xl font-semibold">{conversation?.participants[0]?.user?.firstName}</p>
+							{#if conversation.lastMessage}
+							  <p class="text-sm text-gray-500 line-clamp-1">{conversation.lastMessage.body}</p>
+							{/if}
 						</div>
 					</div>
 				</a>

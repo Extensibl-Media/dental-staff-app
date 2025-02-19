@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, boolean, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, boolean, pgEnum, integer } from 'drizzle-orm/pg-core';
+import { int } from 'drizzle-orm/sqlite-core';
 
 export const userRolesEnum = pgEnum('user_roles', [
 	'SUPERADMIN',
@@ -30,7 +31,9 @@ export const userTable = pgTable('users', {
 		mode: 'date'
 	}).notNull(),
 	completedOnboarding: boolean('completed_onboarding').default(false),
-	blacklisted: boolean('blacklisted').default(false)
+	onboardingStep: integer('onboarding_step').default(1),
+	blacklisted: boolean('blacklisted').default(false),
+	stripeCustomerId: text('stripe-_customer_id').unique()
 });
 
 export const sessionTable = pgTable('sessions', {
@@ -66,9 +69,21 @@ export const userInviteTable = pgTable('user_invites', {
 	}).notNull(),
 	referrerRole: userRolesEnum('referrer_role').notNull(),
 	referrerId: text('referrer_id').notNull(),
-	invitedRole: text('user_role').notNull()
+	invitedRole: text('user_role').notNull(),
+	staffRole: text('staff_role'),
+	companyId: text('company_id')
 });
 
-export type User = typeof userTable.$inferInsert;
+export const companyStaffInviteLocations = pgTable('staff_invite_locations', {
+	token: text('token').unique(),
+	locationId: text('location_id').notNull(),
+	isPrimary: boolean('is_primary').notNull().default(true)
+});
+
+export type User = typeof userTable.$inferSelect;
+export type NewUser = typeof userTable.$inferInsert;
 export type UpdateUser = Partial<typeof userTable.$inferInsert>;
-export type Session = typeof sessionTable.$inferInsert;
+export type Session = typeof sessionTable.$inferSelect;
+export type NewSession = typeof sessionTable.$inferInsert;
+export type NewUserInvite = typeof userInviteTable.$inferInsert;
+export type NewStaffLocationInvite = typeof companyStaffInviteLocations.$inferInsert;

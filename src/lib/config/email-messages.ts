@@ -12,17 +12,66 @@ export const sendVerificationEmail = async (email: string, token: string) => {
 	return resultSend;
 };
 
-// TODO: Complete This email invite flow
-// // Send an email to invite client staff users
-// export const sendClientStaffInviteEmail = async (email: string, token: string) => {
-// 	const signInUrl = `${BASE_URL}/auth/verify/email-${token}`;
-// 	const textEmail = `You have been invited by your employer to their workspace in ${APP_NAME}.\n\n
-//     ${verifyEmailURL} \n\nIf you did not create this account, you can disregard this email.`;
-// 	const htmlEmail = `<p>Please click this <a href="${verifyEmailURL}">link</a> to verify your email address for your ${APP_NAME} account.</p>  <p>You can also visit the link below.</p><p>${verifyEmailURL}</p><p>If you did not create this account, you can disregard this email.</p>`;
-// 	const subject = `Please confirm your email address for ${APP_NAME}`;
-// 	const resultSend = sendEmail(email, subject, htmlEmail, textEmail);
-// 	return resultSend;
-// };
+export const sendClientStaffInviteEmail = async (
+	email: string,
+	token: string,
+	companyName: string
+) => {
+	const verifyEmailURL = `${BASE_URL}/auth/invite/${token}`;
+
+	const textEmail = `
+			You have been invited by your employer to join ${companyName}'s workspace in ${APP_NAME}.
+			
+			Click the link below to accept the invitation and set up your account:
+			${verifyEmailURL}
+			
+			This invitation will expire in 7 days.
+			
+			If you weren't expecting this invitation, you can safely ignore this email.
+			
+			Best regards,
+			The ${APP_NAME} Team
+	`.trim();
+
+	const htmlEmail = `
+			<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+					<h2>Welcome to ${APP_NAME}</h2>
+					<p>You have been invited by your employer to join ${companyName}'s workspace in ${APP_NAME}.</p>
+					
+					<p style="margin: 24px 0;">
+							<a href="${verifyEmailURL}" 
+								 style="background-color: #4F46E5; color: white; padding: 12px 24px; 
+												text-decoration: none; border-radius: 4px; display: inline-block;">
+									Accept Invitation
+							</a>
+					</p>
+					
+					<p>Or copy and paste this link into your browser:</p>
+					<p style="background-color: #F3F4F6; padding: 12px; border-radius: 4px; word-break: break-all;">
+							${verifyEmailURL}
+					</p>
+					
+					<p style="color: #6B7280; font-size: 14px;">This invitation will expire in 7 days.</p>
+					
+					<p style="color: #6B7280; font-size: 14px; margin-top: 24px;">
+							If you weren't expecting this invitation, you can safely ignore this email.
+					</p>
+			</div>
+	`.trim();
+
+	const subject = `You're invited to join ${companyName} on ${APP_NAME}`;
+
+	try {
+		const result = await sendEmail(email, subject, htmlEmail, textEmail);
+		return { success: true, result };
+	} catch (error) {
+		console.error('Failed to send invite email:', error);
+		return {
+			success: false,
+			error: error instanceof Error ? error.message : 'Failed to send email'
+		};
+	}
+};
 
 // Send an email to welcome the new user
 export const sendWelcomeEmail = async (email: string) => {

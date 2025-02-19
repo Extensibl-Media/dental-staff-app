@@ -1,6 +1,7 @@
 import { count, desc, eq, sql } from 'drizzle-orm';
 import db from '../drizzle';
 import { disciplineTable, type Discipline, type UpdateDiscipline } from '../schemas/skill';
+import type { PaginateOptions } from '$lib/types';
 
 export type DisciplinesRaw = {
 	id: string;
@@ -18,11 +19,7 @@ export async function getPaginatedDisciplines({
 	limit = 25,
 	offset = 0,
 	orderBy = undefined
-}: {
-	limit: number;
-	offset: number;
-	orderBy?: { column: string; direction: string };
-}) {
+}: PaginateOptions) {
 	try {
 		const orderSelector = orderBy ? `d.${orderBy.column}` : null;
 
@@ -35,11 +32,10 @@ export async function getPaginatedDisciplines({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-    ORDER BY ${
-			orderBy.direction === 'asc'
-				? sql`${sql.raw(orderSelector)} ASC`
-				: sql`${sql.raw(orderSelector)} DESC`
-		}
+    ORDER BY ${orderBy.direction === 'asc'
+					? sql`${sql.raw(orderSelector)} ASC`
+					: sql`${sql.raw(orderSelector)} DESC`
+				}
   `);
 		} else {
 			query.append(sql`

@@ -6,7 +6,8 @@ import { clientCompanyLocationSchema } from '$lib/config/zod-schemas';
 import {
 	createCompanyLocation,
 	getClientCompanyByClientId,
-	getClientProfilebyUserId
+	getClientProfilebyUserId,
+	getPrimaryLocationForCompany
 } from '$lib/server/database/queries/clients.js';
 import { getRegionByAbbreviation } from '$lib/server/database/queries/regions.js';
 
@@ -24,7 +25,25 @@ const companyLocationSchema = clientCompanyLocationSchema.pick({
 
 export const load = async (event) => {
 	const form = await superValidate(event, companyLocationSchema);
+
+	const user = event.locals.user
+
+	if (!user) {
+		redirect(302, '/auth/sign-in')
+	}
+
+	const client = await getClientProfilebyUserId(user.id)
+
+	const company = await getClientCompanyByClientId(client.id)
+
+	if (!company) redirect(302, "/onboarding/client/company")
+
+	const location = await getPrimaryLocationForCompany(company.id)
+
+	if (location) redirect(302, '/onboarding/client/staff')
+
 	return {
+		user,
 		form
 	};
 };
@@ -32,7 +51,6 @@ export const load = async (event) => {
 export const actions = {
 	default: async (event) => {
 		const form = await superValidate(event, companyLocationSchema);
-		// console.log(form);
 
 		if (!form.valid) {
 			return fail(400, {
@@ -49,7 +67,6 @@ export const actions = {
 				id: locationId,
 				createdAt: new Date(),
 				updatedAt: new Date(),
-				clientId: client.id,
 				companyId: company.id,
 				name: form.data.name,
 				streetOne: form.data.streetOne || null,

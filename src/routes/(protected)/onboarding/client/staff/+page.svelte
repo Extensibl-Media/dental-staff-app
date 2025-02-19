@@ -5,8 +5,8 @@
 	import * as Alert from '$lib/components/ui/alert';
 	import { Input } from '$lib/components/ui/input';
 	import { Select } from 'flowbite-svelte';
-
-	import { Loader2, AlertCircle } from 'lucide-svelte';
+	import { Loader2, AlertCircle, TrashIcon } from 'lucide-svelte';
+	import { superForm } from 'sveltekit-superforms/client';
 
 	type StaffInvite = {
 		email: string;
@@ -29,86 +29,144 @@
 	];
 
 	let inviteEmail = '';
-	let inviteRole: typeof CLIENT_STAFF_ROLES | '' = '';
-	let staffInvites: StaffInvite[] = [];
+	let inviteRole = '';
 	let submitting = false;
+	export let data;
 
-	$: console.log({ inviteEmail, inviteRole });
+	const { form, errors, enhance } = superForm(data.form, {
+		resetForm: false,
+		onSubmit: ({ formData }) => {
+			// Log what's being sent
+			console.log('Current form invitees:', $form.invitees);
 
-	$: console.log({ staffInvites });
+			// Add the invitees array as JSON to the formData
+			formData.set('invitees', JSON.stringify($form.invitees));
+
+			submitting = true;
+			return true;
+		},
+		onResult: () => {
+			submitting = false;
+		}
+	});
+
+	// Initialize form.invitees if it doesn't exist
+	$: if (!$form.invitees) {
+		$form.invitees = [];
+	}
 
 	const handleAddInvite = (email: string) => {
 		const emailExpression = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/g;
-		const includes = staffInvites.find((invite) => invite.email === email);
+		const includes = $form.invitees.find((invite) => invite.email === email);
 		const isEmail = emailExpression.test(email);
 
-		if (!includes && isEmail) {
-			staffInvites = [{ email, staffRole: CLIENT_STAFF_ROLES.CLIENT_EMPLOYEE }, ...staffInvites];
+		if (!includes && isEmail && inviteRole) {
+			$form.invitees = [
+				{
+					email,
+					staffRole: inviteRole as keyof typeof CLIENT_STAFF_ROLES
+				},
+				...$form.invitees
+			];
 			inviteEmail = '';
 			inviteRole = '';
 		}
 	};
 
 	const handleRemoveInvite = (email: string) => {
-		staffInvites = staffInvites.filter((invite) => invite.email !== email);
+		$form.invitees = $form.invitees.filter((invite) => invite.email !== email);
 	};
 
 	const handleSelectRole = (email: string, role: string) => {
-		const inviteeIndex = staffInvites.findIndex((invitee) => invitee.email === email);
-		console.log(inviteeIndex);
-
+		const inviteeIndex = $form.invitees.findIndex((invitee) => invitee.email === email);
 		if (inviteeIndex !== -1) {
-			staffInvites[inviteeIndex] = {
-				...staffInvites[inviteeIndex],
+			$form.invitees[inviteeIndex] = {
+				...$form.invitees[inviteeIndex],
 				staffRole: role as keyof typeof CLIENT_STAFF_ROLES
 			};
+			// Trigger reactivity
+			$form.invitees = [...$form.invitees];
 		}
 	};
 </script>
 
 <section class="flex flex-col items-center justify-center min-h-screen">
 	<div class="p-6 flex gap-2 w-full max-w-5xl mx-auto">
-		<Card.Root class="w-full">
-			<Card.Header>
-				<Card.Title class="text-2xl">Invite Staff</Card.Title>
-				<Card.Description
-					>Add your staff emails to send them invites to sign up with their own accounts.
-				</Card.Description>
-			</Card.Header>
-			<Card.Content>
-				<div class="grid grid-cols-6 gap-4">
-					<Input name="email" bind:value={inviteEmail} class="col-span-6 md:col-span-5" />
-					<Button
-						class="col-span-6 md:col-span-1"
-						type="button"
-						on:click={() => handleAddInvite(inviteEmail)}>Add</Button
-					>
-				</div>
-				<div class="mt-8 flex flex-col divide-y">
-					{#each staffInvites as invitee}
-						<div class="flex justify-between gap-4 py-4">
-							<p>{invitee.email}</p>
-							<div class="flex gap-2 items-center">
-								<Select
-									placeholder="Employee"
-									on:change={(e) => handleSelectRole(invitee.email, e.target?.value)}
-								>
-									{#each StaffRoleMap as role}
-										<option label={role.name} value={role.value}>{role.name}</option>
-									{/each}
-								</Select>
+		<form class="w-full" method="POST" use:enhance>
+			<Card.Root class="w-full">
+				<Card.Header>
+					<Card.Title class="text-2xl">Invite Staff</Card.Title>
+					<Card.Description>
+						Add your staff emails to send them invites to sign up with their own accounts.
+					</Card.Description>
+				</Card.Header>
+				<Card.Content>
+					<div class="grid grid-cols-12 gap-4">
+						<Input
+							name="email"
+							bind:value={inviteEmail}
+							class="col-span-12 md:col-span-6"
+							placeholder="Email address"
+						/>
+						<Select
+							class="col-span-12 md:col-span-4"
+							bind:value={inviteRole}
+							placeholder="Select Role"
+						>
+							{#each StaffRoleMap as role}
+								<option value={role.value}>{role.name}</option>
+							{/each}
+						</Select>
+						<Button
+							class="col-span-12 md:col-span-2 bg-green-400 hover:bg-green-500"
+							type="button"
+							disabled={!inviteEmail || !inviteRole}
+							on:click={() => handleAddInvite(inviteEmail)}
+						>
+							Add
+						</Button>
+					</div>
+
+					<div class="mt-8 flex flex-col divide-y">
+						{#each $form.invitees as invitee}
+							<div class="flex justify-between gap-4 py-4">
+								<p>{invitee.email}</p>
+								<div class="flex gap-2 items-center">
+									<Select
+										value={invitee.staffRole}
+										on:change={(e) => handleSelectRole(invitee.email, e.target?.value)}
+									>
+										{#each StaffRoleMap as role}
+											<option value={role.value}>{role.name}</option>
+										{/each}
+									</Select>
+									<Button on:click={() => handleRemoveInvite(invitee.email)} variant="destructive">
+										<TrashIcon />
+									</Button>
+								</div>
 							</div>
-						</div>
+						{/each}
+					</div>
+					{#each $form.invitees as invitee, i}
+						<input type="hidden" name={`invitees[${i}][email]`} value={invitee.email} />
+						<input type="hidden" name={`invitees[${i}][staffRole]`} value={invitee.staffRole} />
 					{/each}
-				</div>
-			</Card.Content>
-			<Card.Footer>
-				<Button class="ml-auto" disabled={submitting}
-					>{#if submitting}
-						<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-					{:else}Next{/if}
-				</Button>
-			</Card.Footer>
-		</Card.Root>
+				</Card.Content>
+				<Card.Footer>
+					<Button
+						type="submit"
+						class="ml-auto bg-blue-800 hover:bg-blue-900"
+						disabled={submitting || $form.invitees.length === 0}
+					>
+						{#if submitting}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							Sending Invites...
+						{:else}
+							Send Invites
+						{/if}
+					</Button>
+				</Card.Footer>
+			</Card.Root>
+		</form>
 	</div>
 </section>

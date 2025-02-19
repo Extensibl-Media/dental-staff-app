@@ -23,8 +23,9 @@
 
 <Dialog.Root>
 	<Dialog.Trigger
-		><Button class="w-fit lg:w-full max-w-[400px] lg:mx-auto gap-2"
-			><Plus size={20} /> Add Date</Button
+		><Button
+			class="w-fit lg:w-full max-w-[400px] lg:mx-auto gap-2 bg-blue-900 text-white hover:bg-blue-800"
+			><Plus size={20} /> Add Workday</Button
 		></Dialog.Trigger
 	>
 	<Dialog.Content>

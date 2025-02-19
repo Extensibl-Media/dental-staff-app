@@ -6,7 +6,8 @@ import {
 	date,
 	pgEnum,
 	boolean,
-	primaryKey
+	primaryKey,
+	uuid
 } from 'drizzle-orm/pg-core';
 import { userTable } from './auth';
 import { disciplineTable, experienceLevelTable } from './skill';
@@ -45,7 +46,8 @@ export const candidateProfileTable = pgTable('candidate_profiles', {
 	birthday: date('birthday'),
 	avgRating: smallint('avg_rating').default(0),
 	regionId: text('region_id').references(() => regionTable.id, { onDelete: 'set null' }),
-	featureMe: boolean('feature_me').default(false)
+	featureMe: boolean('feature_me').default(false),
+	approved: boolean('approved').default(false)
 });
 
 export const candidateRatingTable = pgTable('candidate_ratings', {
@@ -71,6 +73,29 @@ export const candidateRatingTable = pgTable('candidate_ratings', {
 	notes: text('notes'),
 	rating: smallint('rating').notNull()
 });
+
+export const candidateBlacklistTable = pgTable(
+	'candidate_blacklists',
+	{
+		candidateId: text('candidate_id')
+			.notNull()
+			.references(() => candidateProfileTable.id, { onDelete: 'cascade' }),
+		companyId: text('company_id')
+			.notNull()
+			.references(() => clientCompanyTable.id, { onDelete: 'cascade' }),
+		createdAt: timestamp('created_at', {
+			withTimezone: true,
+			mode: 'date'
+		})
+			.notNull()
+			.defaultNow()
+	},
+	(table) => {
+		return {
+			pk: primaryKey({ columns: [table.candidateId, table.companyId] })
+		};
+	}
+);
 
 export const candidateDisciplineExperienceTable = pgTable(
 	'candidate_discipline_experience',
@@ -100,6 +125,29 @@ export const candidateDisciplineExperienceTable = pgTable(
 	(t) => ({ pk: primaryKey({ columns: [t.candidateId, t.disciplineId] }) })
 );
 
+export const candidateDocumentUploadsTable = pgTable('candidate_document_uploads', {
+	id: uuid('id').notNull().primaryKey(),
+	createdAt: timestamp('created_at', {
+		withTimezone: true,
+		mode: 'date'
+	})
+		.notNull()
+		.default(new Date()),
+	updatedAt: timestamp('updated_at', {
+		withTimezone: true,
+		mode: 'date'
+	})
+		.notNull()
+		.default(new Date()),
+	candidateId: text("candidate_id").references(() => candidateProfileTable.id).notNull(),
+	uploadUrl: text("upload_url").notNull(),
+	expiryDate: timestamp('expiry_date', {
+		withTimezone: true,
+		mode: 'date'
+	})
+})
+
 export type CandidateProfile = typeof candidateProfileTable.$inferInsert;
+export type CandidateProfileSelect = typeof candidateProfileTable.$inferSelect;
 export type UpdateCandidateProfile = Partial<typeof candidateProfileTable.$inferInsert>;
 export type CandidateRating = typeof candidateRatingTable.$inferInsert;

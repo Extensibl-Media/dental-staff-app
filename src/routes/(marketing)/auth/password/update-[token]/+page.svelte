@@ -2,14 +2,12 @@
 	import * as Form from '$lib/components/ui/form';
 	import * as Card from '$lib/components/ui/card';
 	import * as Alert from '$lib/components/ui/alert';
-	import { userUpdatePasswordSchema } from '$lib/config/zod-schemas';
+	import { userResetPasswordSchema, type UserResetPasswordSchema } from '$lib/config/zod-schemas';
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import { Loader2 } from 'lucide-svelte';
 	import { AlertCircle } from 'lucide-svelte';
 
-	type UserUpdatePasswordSchema = typeof userUpdatePasswordSchema;
-
-	export let form: SuperValidated<UserUpdatePasswordSchema>;
+	export let form: SuperValidated<UserResetPasswordSchema>;
 </script>
 
 <div class="flex items-center justify-center mx-auto max-w-2xl">
@@ -18,7 +16,7 @@
 		let:errors
 		method="POST"
 		{form}
-		schema={userUpdatePasswordSchema}
+		schema={userResetPasswordSchema}
 		let:config
 	>
 		<Card.Root>

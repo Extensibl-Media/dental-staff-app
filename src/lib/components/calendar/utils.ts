@@ -104,7 +104,6 @@ export function convertRecurrenceDayToEvent(
 	const isoDate = parseISO(date);
 	console.log({ date, eventDate });
 	const dateString = format(isoDate, 'yyyy-MM-dd');
-	console.log({ recurrenceDay, requisition, dateString });
 
 	return {
 		start: `${dateString} ${dayStartTime}`,

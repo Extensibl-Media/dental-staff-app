@@ -2,8 +2,6 @@
 	import * as Avatar from '$lib/components/ui/avatar';
 	import Input from '$lib/components/ui/input/input.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Form from '$lib/components/ui/form';
-	import { newMessageSchema } from '$lib/config/zod-schemas.js';
 	import { Loader2 } from 'lucide-svelte';
 	import { afterUpdate, onMount } from 'svelte';
 	import { superForm } from 'sveltekit-superforms/client';
@@ -12,11 +10,24 @@
 
 	let shouldScroll = false;
 
+	const { enhance, submitting, form, reset } = superForm(data.form, {
+      resetForm: true,
+      clearOnSubmit: 'message',
+      onResult: ({result}) => {
+        console.log({result})
+        reset({
+          data: {
+            body: $form.body
+          }
+        })
+      }
+	});
+
 	$: user = data.user;
-	$: chat = data.chat;
-	$: form = data.form;
-	$: ({ messages, chatUser } = chat);
-	let messageText: string = '';
+	$: conversation = data.conversation;
+	$: ({ messages } = conversation);
+	$: ({participants} = conversation)
+	$: [chatUser] = participants.filter(u => u.userId !== user.id)
 
 	$: if (messages) {
 		shouldScroll = true;
@@ -28,7 +39,6 @@
 
 	afterUpdate(() => {
 		if (shouldScroll) {
-			messageText = '';
 			scrollToBottom();
 			shouldScroll = false;
 		}
@@ -98,29 +108,23 @@
 			{/if}
 		</div>
 	</div>
-	<Form.Root
-		let:submitting
-		let:errors
-		let:config
+	<form
 		method="POST"
-		{form}
 		action="?/sendNewMessage"
-		schema={newMessageSchema}
+		use:enhance
 	>
 		<div class="p-6 flex gap-4 border-t border-t-gray-200 bg-white">
-			<Form.Field {config} name="body">
-				<Form.Input
-					class="grow-1"
-					value={messageText}
-					on:change={(e) => (messageText = e.currentTarget.value)}
-					placeholder="New Message..."
-				/>
-			</Form.Field>
-			<Form.Button
-				>{#if submitting}
+            <Input
+                class="grow-1"
+                placeholder="New Message..."
+                name="body"
+                bind:value={$form.body}
+            />
+			<Button type="submit">
+			    {#if $submitting}
 					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-				{:else}Send{/if}</Form.Button
-			>
+				{:else}Send{/if}
+			</Button>
 		</div>
-	</Form.Root>
+	</form>
 </div>

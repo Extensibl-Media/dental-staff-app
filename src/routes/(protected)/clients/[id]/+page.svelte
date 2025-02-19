@@ -5,12 +5,10 @@
 	import * as Avatar from '$lib/components/ui/avatar';
 	import convertNameToInitials from '$lib/_helpers/convertNameToInitials';
 	import { Button } from '$lib/components/ui/button';
-	import { cn } from '$lib/utils';
 	import Calendar from '$lib/components/calendar/calendar.svelte';
 	import { TabItem, Tabs } from 'flowbite-svelte';
 	import { PencilIcon } from 'lucide-svelte';
 	import * as Table from '$lib/components/ui/table';
-	// import { format } from 'date-fns';
 
 	import {
 		getCoreRowModel,
@@ -77,6 +75,33 @@
 	});
 
 	const locationTable = createSvelteTable(locationOptions);
+
+	type DaySchedule = {
+  openTime: string;
+  closeTime: string;
+  isClosed: boolean;
+  timezone: string;
+};
+
+type OperatingHours = {
+  [key: number]: DaySchedule;
+};
+
+const getDayName = (dayIndex: number): string => {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[dayIndex];
+};
+
+const formatTime = (time: string): string => {
+  const [hours, minutes] = time.split(':');
+  const date = new Date();
+  date.setHours(parseInt(hours), parseInt(minutes));
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
 </script>
 
 {#if client}
@@ -142,8 +167,24 @@
 											<!-- <p class="text-sm">Cell Phone: {client.profile.cellPhone}</p> -->
 										</div>
 										<div class="mt-4">
-											<p class="text-sm font-semibold">Date of Birth:</p>
-											<!-- <p class="text-sm">{format(birthdate, 'P')}</p> -->
+											<p class="text-sm font-semibold">Hours of Operation:</p>
+											{#each Array.from({ length: 7 }, (_, i) => i) as dayIndex}
+                                            <div class="flex justify-between py-2 border-b border-gray-100 last:border-0">
+                                                <span class="font-medium text-gray-700 w-32">
+                                                {getDayName(dayIndex)}
+                                                </span>
+                                                <span class="text-gray-600">
+                                                {#if client?.company?.operatingHours?.[dayIndex].isClosed}
+                                                    <span class="text-gray-500">Closed</span>
+                                                {:else}
+                                                    {formatTime(client?.company?.operatingHours?.[dayIndex].openTime)} - {formatTime(client?.company?.operatingHours?.[dayIndex].closeTime)}
+                                                {/if}
+                                                </span>
+                                            </div>
+                                            {/each}
+                                            <div class="mt-4 text-sm text-gray-500">
+                                            All times shown in {client?.company?.operatingHours?.[1].timezone.replace('_', ' ')}
+                                            </div>
 										</div>
 									</div>
 									<div class="col-span-3 md:col-span-1">
@@ -213,7 +254,7 @@
 						</div>
 					</TabItem>
 					<TabItem title="Requisitions">
-						<Calendar events={[]} />
+						<Calendar events={[]} selectEvent={() => {}} />
 					</TabItem>
 					<TabItem title="Documents"></TabItem>
 					<TabItem title="Support Tickets"></TabItem>

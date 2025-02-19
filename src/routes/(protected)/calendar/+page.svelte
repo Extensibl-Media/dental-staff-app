@@ -2,14 +2,14 @@
 	import Calendar from '$lib/components/calendar/calendar.svelte';
 	import '@event-calendar/core/index.css';
 	import { onMount } from 'svelte';
-	import { createEvents } from '$lib/components/calendar/utils';
+	// import { createEvents } from '$lib/components/calendar/utils';
 	import type { PageData } from './$types';
 	import * as Dialog from '$lib/components/ui/dialog';
-	import type { CalendarEvent } from '$lib/types';
-	import { formatRecurrenceDayTimeString } from '$lib/_helpers/formatRecurrenceDayTimeString';
-	import { Avatar } from '$lib/components/ui/avatar';
-	import { CalendarDays, Clock } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
+	import type { CalendarEvent } from '$lib/types';
+	// import { formatRecurrenceDayTimeString } from '$lib/_helpers/formatRecurrenceDayTimeString';
+	// import { Avatar } from '$lib/components/ui/avatar';
+	import { CalendarDays, Clock } from 'lucide-svelte';
 
 	export let mounted = false;
 	export let data: PageData;

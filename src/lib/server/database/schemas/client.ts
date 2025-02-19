@@ -1,7 +1,27 @@
-import { pgTable, text, timestamp, boolean, pgEnum, date, smallint } from 'drizzle-orm/pg-core';
+import {
+	pgTable,
+	text,
+	timestamp,
+	boolean,
+	pgEnum,
+	date,
+	smallint,
+	jsonb
+} from 'drizzle-orm/pg-core';
 import { userTable } from './auth';
 import { regionTable } from './region';
 import { candidateProfileTable } from './candidate';
+
+export type DaySchedule = {
+	openTime: string; // ISO time with timezone e.g. "09:00:00-05"
+	closeTime: string; // ISO time with timezone e.g. "17:00:00-05"
+	isClosed: boolean;
+	timezone: string; // IANA timezone e.g. "America/New_York"
+};
+
+export type OperatingHours = {
+	[key: number]: DaySchedule;
+};
 
 export const clientProfileTable = pgTable('client_profiles', {
 	id: text('id').notNull().primaryKey(),
@@ -11,11 +31,15 @@ export const clientProfileTable = pgTable('client_profiles', {
 	createdAt: timestamp('created_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	updatedAt: timestamp('updated_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	birthday: date('birthday')
 	// stripeCustomerId: text('stripe_customer_id')
 });
@@ -28,11 +52,15 @@ export const clientSubscriptionTable = pgTable('client_subscriptions', {
 	createdAt: timestamp('created_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	updatedAt: timestamp('updated_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	status: text('subscription_status'),
 	stripeCustomerId: text('stripe_customer_id'),
 	priceId: text('price_id')
@@ -46,14 +74,66 @@ export const clientCompanyTable = pgTable('client_companies', {
 	createdAt: timestamp('created_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	updatedAt: timestamp('updated_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	companyName: text('company_name'),
 	licenseNumber: text('license_number').unique(),
-	companyLogo: text('company_logo')
+	companyLogo: text('company_logo'),
+	companyDescription: text('company_description'),
+	baseLocation: text('base_location'),
+	operatingHours: jsonb('operating_hours')
+		.$type<OperatingHours>()
+		.default({
+			0: {
+				openTime: '00:00:00-05',
+				closeTime: '00:00:00-05',
+				isClosed: true,
+				timezone: 'America/New_York'
+			},
+			1: {
+				openTime: '09:00:00-05',
+				closeTime: '17:00:00-05',
+				isClosed: false,
+				timezone: 'America/New_York'
+			},
+			2: {
+				openTime: '09:00:00-05',
+				closeTime: '17:00:00-05',
+				isClosed: false,
+				timezone: 'America/New_York'
+			},
+			3: {
+				openTime: '09:00:00-05',
+				closeTime: '17:00:00-05',
+				isClosed: false,
+				timezone: 'America/New_York'
+			},
+			4: {
+				openTime: '09:00:00-05',
+				closeTime: '17:00:00-05',
+				isClosed: false,
+				timezone: 'America/New_York'
+			},
+			5: {
+				openTime: '09:00:00-05',
+				closeTime: '17:00:00-05',
+				isClosed: false,
+				timezone: 'America/New_York'
+			},
+			6: {
+				openTime: '09:00:00-05',
+				closeTime: '17:00:00-05',
+				isClosed: false,
+				timezone: 'America/New_York'
+			}
+		})
 });
 
 export const companyOfficeLocationTable = pgTable('company_office_locations', {
@@ -64,11 +144,15 @@ export const companyOfficeLocationTable = pgTable('company_office_locations', {
 	createdAt: timestamp('created_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	updatedAt: timestamp('updated_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	name: text('location_name').notNull(),
 	streetOne: text('street_one'),
 	streetTwo: text('street_two'),
@@ -93,11 +177,15 @@ export const clientStaffProfileTable = pgTable('client_staff', {
 	createdAt: timestamp('created_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	updatedAt: timestamp('updated_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	userId: text('user_id')
 		.notNull()
 		.references(() => userTable.id, { onDelete: 'cascade' }),
@@ -116,15 +204,22 @@ export const clientStaffLocationTable = pgTable('client_staff_locations', {
 	createdAt: timestamp('created_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	updatedAt: timestamp('updated_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	companyId: text('company_id')
 		.notNull()
 		.references(() => clientCompanyTable.id, { onDelete: 'cascade' }),
-	locationId: text('primary_location_id')
+	staffId: text('staff_id')
+		.notNull()
+		.references(() => clientStaffProfileTable.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+	locationId: text('location_id')
 		.notNull()
 		.references(() => companyOfficeLocationTable.id, { onDelete: 'cascade' }),
 	isPrimary: boolean('is_primary_location').default(false)
@@ -141,11 +236,15 @@ export const clientRatingTable = pgTable('client_ratings', {
 	createdAt: timestamp('created_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	updatedAt: timestamp('updated_at', {
 		withTimezone: true,
 		mode: 'date'
-	}).notNull(),
+	})
+		.notNull()
+		.defaultNow(),
 	notes: text('notes'),
 	rating: smallint('rating').notNull()
 });
@@ -154,7 +253,8 @@ export type ClientProfile = typeof clientProfileTable.$inferInsert;
 export type ClientCompany = typeof clientCompanyTable.$inferInsert;
 export type ClientCompanyLocation = typeof companyOfficeLocationTable.$inferInsert;
 export type ClientCompanyStaffProfile = typeof clientStaffProfileTable.$inferInsert;
-export type ClientCompanyStaffLocation = typeof clientStaffLocationTable.$inferInsert;
+export type ClientCompanyStaffLocation = typeof clientStaffLocationTable.$inferSelect;
+export type NewClientCompanyStaffLocation = typeof clientStaffLocationTable.$inferInsert;
 export type ClientRating = typeof clientRatingTable.$inferInsert;
 
 export type UpdateClientProfile = Partial<typeof clientProfileTable.$inferInsert>;

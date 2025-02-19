@@ -13,7 +13,7 @@ const adapter = new DrizzlePostgreSQLAdapter(db, sessionTable, userTable);
 
 export const lucia = new Lucia(adapter, {
 	sessionCookie: {
-		name: 'session',
+		name: 'client-session',
 		expires: false, // session cookies have very long lifespan (2 years)
 		attributes: {
 			secure: !dev

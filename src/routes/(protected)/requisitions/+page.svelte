@@ -1,12 +1,18 @@
 <script lang="ts">
 	import AdminRequisitionForm from '$lib/views/admin/requisitions/newRequisitionFormAdmin.svelte';
+	import CompanyRequisitionForm from '$lib/views/client/companyRequisitionForm.svelte';
 	import { Tabs, TabItem } from 'flowbite-svelte';
 	import type { PageData } from './$types';
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { cn } from '$lib/utils';
 	import { USER_ROLES } from '$lib/config/constants';
-	import { adminRequisitionSchema, type AdminRequisitionSchema } from '$lib/config/zod-schemas';
+	import {
+		adminRequisitionSchema,
+		// clientRequisitionSchema,
+		type AdminRequisitionSchema,
+		type ClientRequisitionSchema
+	} from '$lib/config/zod-schemas';
 	import { ArrowUpNarrowWide, ArrowDownWideNarrow } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
@@ -20,7 +26,7 @@
 	} from '@tanstack/svelte-table';
 	import { writable } from 'svelte/store';
 	import * as Table from '$lib/components/ui/table';
-	import { getContext, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import ViewLink from '$lib/components/tables/ViewLink.svelte';
 	import type {
 		RequisitionDetailsRaw,
@@ -29,6 +35,7 @@
 
 	export let data: PageData;
 	export let adminForm: SuperValidated<AdminRequisitionSchema>;
+	export let clientForm: SuperValidated<ClientRequisitionSchema>;
 	const total = 10;
 
 	let drawerExpanded: boolean = false;
@@ -36,7 +43,7 @@
 
 	$: user = data.user;
 	$: requisitions = data.requisitions;
-	$: console.log(data);
+
 	$: count = data.count;
 	$: sortOn = $page.url.searchParams.get('sortOn');
 	$: sortBy = $page.url.searchParams.get('sortBy');
@@ -66,9 +73,11 @@
 
 	const resetQueryParams = (clearAll = false) => {
 		const query = new URLSearchParams($page.url.searchParams.toString());
+		const thisPage = window.location.pathname;
 		query.delete('sortBy');
 		query.delete('sortOn');
 		clearAll && query.delete('skip');
+		goto(thisPage);
 	};
 
 	const handlePrev = () => {
@@ -127,6 +136,7 @@
 			accessorFn: (original) => original.id,
 			cell: (original) =>
 				flexRender(ViewLink, {
+					value: original.getValue(),
 					href: `/requisitions/${original.getValue()}`
 				})
 		},
@@ -139,19 +149,26 @@
 		{ header: 'Office', id: 'location_name', accessorKey: 'location_name' },
 		{ header: 'Region', id: 'region_abbreviation', accessorKey: 'region_abbreviation' }
 	];
+
 	const clientColumns: ColumnDef<RequisitionDetailsRaw>[] = [
 		{
-			header: '',
+			header: 'Req #',
 			id: 'id',
 			accessorFn: (original) => original.id,
 			cell: (original) =>
 				flexRender(ViewLink, {
+					value: original.getValue(),
 					href: `/requisitions/${original.getValue()}`
 				})
 		},
 		{ header: 'Title', id: 'name', accessorKey: 'name' },
 		{ header: 'Office', id: 'location_name', accessorKey: 'location_name' },
-		{ header: 'Region', id: 'region_abbreviation', accessorKey: 'region_abbreviation' }
+		{ header: 'Region', id: 'region_abbreviation', accessorKey: 'region_abbreviation' },
+		{
+			header: 'Type',
+			id: 'permanent_position',
+			accessorFn: (original) => (original.permanent_position ? 'Permanent' : 'Temporary')
+		}
 	];
 
 	const pendingOptions = writable<TableOptions<RequisitionDetailsRaw>>({
@@ -160,24 +177,28 @@
 		getCoreRowModel: getCoreRowModel(),
 		getSortedRowModel: getSortedRowModel()
 	});
+
 	const filledOptions = writable<TableOptions<RequisitionDetailsRaw>>({
 		data: tableData.filter((req) => req.status === 'FILLED'),
 		columns: user?.role === USER_ROLES.SUPERADMIN ? adminColumns : clientColumns,
 		getCoreRowModel: getCoreRowModel(),
 		getSortedRowModel: getSortedRowModel()
 	});
+
 	const unfulfilledOptions = writable<TableOptions<RequisitionDetailsRaw>>({
 		data: tableData.filter((req) => req.status === 'UNFULFILLED'),
 		columns: user?.role === USER_ROLES.SUPERADMIN ? adminColumns : clientColumns,
 		getCoreRowModel: getCoreRowModel(),
 		getSortedRowModel: getSortedRowModel()
 	});
+
 	const canceledOptions = writable<TableOptions<RequisitionDetailsRaw>>({
 		data: tableData.filter((req) => req.status === 'CANCELED'),
 		columns: user?.role === USER_ROLES.SUPERADMIN ? adminColumns : clientColumns,
 		getCoreRowModel: getCoreRowModel(),
 		getSortedRowModel: getSortedRowModel()
 	});
+
 	const openOptions = writable<TableOptions<RequisitionDetailsRaw>>({
 		data: tableData.filter((req) => req.status === 'OPEN'),
 		columns: user?.role === USER_ROLES.SUPERADMIN ? adminColumns : clientColumns,
@@ -216,7 +237,9 @@
 <section class="grow h-screen overflow-y-auto p-6 flex flex-col gap-6">
 	<div class=" flex items-center justify-between flex-wrap">
 		<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">Requisitions</h1>
-		<Button on:click={() => (drawerExpanded = true)}>New Requisition</Button>
+		<Button class="bg-blue-900 hover:bg-blue-800" on:click={() => (drawerExpanded = true)}
+			>New Requisition</Button
+		>
 	</div>
 	<div class="">
 		<Tabs
@@ -225,7 +248,7 @@
 			inactiveClasses="p-4 text-gray-500 rounded-t-lg hover:text-gray-600 hover:bg-gray-50"
 			activeClasses="border-b-2 border-b-blue-500 p-4 text-primary-600 bg-gray-100 rounded-t-lg"
 		>
-			<TabItem open title="Pending">
+			<TabItem open title="Pending" on:click={() => resetQueryParams(true)}>
 				<div class="p-4">
 					<div class="column">
 						{#if user?.role === USER_ROLES.SUPERADMIN}
@@ -269,7 +292,7 @@
 								</Table.TableBody>
 							</Table.Root>
 						{/if}
-						{#if user?.role === USER_ROLES.CLIENT}
+						{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
 							<Table.Root class="table">
 								<Table.TableHeader>
 									{#each $pendingTable.getHeaderGroups() as headerGroup}
@@ -319,7 +342,7 @@
 					>
 				</div>
 			</TabItem>
-			<TabItem title="Open">
+			<TabItem title="Open" on:click={() => resetQueryParams(true)}>
 				<div class="p-4">
 					<div class="column">
 						{#if user?.role === USER_ROLES.SUPERADMIN}
@@ -363,7 +386,7 @@
 								</Table.TableBody>
 							</Table.Root>
 						{/if}
-						{#if user?.role === USER_ROLES.CLIENT}
+						{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
 							<Table.Root class="table">
 								<Table.TableHeader>
 									{#each $openTable.getHeaderGroups() as headerGroup}
@@ -413,7 +436,7 @@
 					>
 				</div>
 			</TabItem>
-			<TabItem title="Filled">
+			<TabItem title="Filled" on:click={() => resetQueryParams(true)}>
 				<div class="p-4">
 					<div class="column">
 						{#if user?.role === USER_ROLES.SUPERADMIN}
@@ -457,7 +480,7 @@
 								</Table.TableBody>
 							</Table.Root>
 						{/if}
-						{#if user?.role === USER_ROLES.CLIENT}
+						{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
 							<Table.Root class="table">
 								<Table.TableHeader>
 									{#each $filledTable.getHeaderGroups() as headerGroup}
@@ -507,7 +530,7 @@
 					>
 				</div>
 			</TabItem>
-			<TabItem title="Canceled">
+			<TabItem title="Canceled" on:click={() => resetQueryParams(true)}>
 				<div class="p-4">
 					<div class="column">
 						{#if user?.role === USER_ROLES.SUPERADMIN}
@@ -551,7 +574,7 @@
 								</Table.TableBody>
 							</Table.Root>
 						{/if}
-						{#if user?.role === USER_ROLES.CLIENT}
+						{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
 							<Table.Root class="table">
 								<Table.TableHeader>
 									{#each $canceledTable.getHeaderGroups() as headerGroup}
@@ -601,7 +624,7 @@
 					>
 				</div>
 			</TabItem>
-			<TabItem title="Unfullfilled">
+			<TabItem title="Unfullfilled" on:click={() => resetQueryParams(true)}>
 				<div class="p-4">
 					<div class="column">
 						{#if user?.role === USER_ROLES.SUPERADMIN}
@@ -645,7 +668,7 @@
 								</Table.TableBody>
 							</Table.Root>
 						{/if}
-						{#if user?.role === USER_ROLES.CLIENT}
+						{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
 							<Table.Root class="table">
 								<Table.TableHeader>
 									{#each $unfulfilledTable.getHeaderGroups() as headerGroup}
@@ -709,7 +732,14 @@
 	<div class="p-4 border-b border-b-gray-200">
 		<p class="text-xl font-bold">Create New Requisition</p>
 	</div>
-	{#if user?.role === USER_ROLES.SUPERADMIN}
-		<AdminRequisitionForm form={adminForm} schema={adminRequisitionSchema} bind:drawerExpanded />
+	{#if drawerExpanded}
+		{#if user?.role === USER_ROLES.SUPERADMIN}
+			<AdminRequisitionForm form={adminForm} schema={adminRequisitionSchema} bind:drawerExpanded />
+		{/if}
+		{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
+			<CompanyRequisitionForm form={clientForm} bind:drawerExpanded />
+		{/if}
+	{:else}
+		<div></div>
 	{/if}
 </div>

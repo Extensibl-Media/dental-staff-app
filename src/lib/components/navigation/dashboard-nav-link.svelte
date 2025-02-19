@@ -35,7 +35,7 @@
 	<li class="w-full">
 		<button
 			on:click={handleLinkDropdown}
-			class="w-full text-left flex gap-x-4 p-2 text-white hover:bg-gray-600 cursor-pointer rounded-sm items-center transition-all duration-100"
+			class="w-full text-left flex gap-x-4 p-2 text-white hover:bg-blue-800 cursor-pointer rounded-sm items-center transition-all duration-100"
 		>
 			<slot />
 			<span class={cn('grow origin-left text-white text-lg leading-none', !expanded && 'hidden')}
@@ -67,7 +67,7 @@
 	<li>
 		<button
 			on:click={() => link?.path && handleLinkClick(link.path)}
-			class="w-full text-left flex gap-x-4 p-2 text-white hover:bg-gray-600 cursor-pointer rounded-sm items-center transition-all duration-100"
+			class="w-full text-left flex gap-x-4 p-2 text-white hover:bg-blue-800 cursor-pointer rounded-sm items-center transition-all duration-100"
 		>
 			<slot />
 			<span

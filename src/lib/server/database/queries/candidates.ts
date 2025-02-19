@@ -10,6 +10,7 @@ import {
 import { disciplineTable, type Discipline } from '../schemas/skill';
 import type { CANDIDATE_STATUS } from '$lib/config/constants';
 import { regionTable, subRegionTable, type Region, type Subregion } from '../schemas/region';
+import type { PaginateOptions } from '$lib/types';
 
 export type CandidateWithProfile = {
 	user: User;
@@ -63,11 +64,7 @@ export async function getPaginatedCandidateProfiles({
 	limit = 25,
 	offset = 0,
 	orderBy = undefined
-}: {
-	limit: number;
-	offset: number;
-	orderBy?: { column: string; direction: string };
-}) {
+}: PaginateOptions) {
 	try {
 		const userCols = ['email', 'first_name', 'last_name'];
 		const disciplineCols = ['discipline_name'];
@@ -91,11 +88,10 @@ export async function getPaginatedCandidateProfiles({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-    ORDER BY ${
-			orderBy.direction === 'asc'
-				? sql`${sql.raw(orderSelector)} ASC`
-				: sql`${sql.raw(orderSelector)} DESC`
-		}
+    ORDER BY ${orderBy.direction === 'asc'
+					? sql`${sql.raw(orderSelector)} ASC`
+					: sql`${sql.raw(orderSelector)} DESC`
+				}
   `);
 		} else {
 			query.append(sql`
@@ -227,16 +223,16 @@ export async function getCandidateByEmail(email: string) {
 	return result[0];
 }
 
-export function createCandidateProfile(userId: string, profile: CandidateProfile) {}
+export function createCandidateProfile(userId: string, profile: CandidateProfile) { }
 
-export function updateCandidateProfile(candidateId: string, data: UpdateCandidateProfile) {}
+export function updateCandidateProfile(candidateId: string, data: UpdateCandidateProfile) { }
 
-export function deleteCandidateProfileByUid(userId: string) {}
+export function deleteCandidateProfileByUid(userId: string) { }
 
-export function deleteCandidateProfileById(candidateId: string) {}
+export function deleteCandidateProfileById(candidateId: string) { }
 
-export function updateCandidateStatus(candidateId: string, status: typeof CANDIDATE_STATUS) {}
+export function updateCandidateStatus(candidateId: string, status: typeof CANDIDATE_STATUS) { }
 
-export async function getAllCandidateWorkHistory(candidateId: string) {}
+export async function getAllCandidateWorkHistory(candidateId: string) { }
 
-export async function getCandidateWorkHistoryForClient(candidateId: string, clientId: string) {}
+export async function getCandidateWorkHistoryForClient(candidateId: string, clientId: string) { }

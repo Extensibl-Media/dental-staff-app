@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import db from '$lib/server/database/drizzle';
-import { userTable } from '$lib/server/database/schemas/auth';
-import type { User, UpdateUser } from '$lib/server/database/schemas/auth';
+import { userInviteTable, userTable } from '$lib/server/database/schemas/auth';
+import type { User, UpdateUser, NewUserInvite } from '$lib/server/database/schemas/auth';
 
 export const getUserByEmail = async (email: string) => {
 	const user = await db.select().from(userTable).where(eq(userTable.email, email));
@@ -30,11 +30,34 @@ export const updateUser = async (id: string, user: UpdateUser) => {
 	}
 };
 
-export const createUser = async (user: User) => {
-	const result = await db.insert(userTable).values(user).onConflictDoNothing().returning();
-	if (result.length === 0) {
-		return null;
-	} else {
-		return result[0];
+export const createUser = async (values: User, tx?: any) => {
+	try {
+		const query = tx || db; // Use transaction if provided, otherwise use db
+
+		const [user] = await query
+			.insert(userTable)
+			.values(values)
+			.returning();
+
+		return user;
+	} catch (err) {
+		console.log(err)
+		throw new Error(`Error creating new user: ${err}`)
+	}
+};
+
+export const getUserById = async (userId: string) => {
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const { password, ...rest } = userTable;
+	try {
+		const user = await db
+			.select({ user: { ...rest } })
+			.from(userTable)
+			.where(eq(userTable.id, userId))
+			.limit(1);
+
+		return user[0] || null;
+	} catch (err) {
+		console.log(err);
 	}
 };
