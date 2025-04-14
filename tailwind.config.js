@@ -2,7 +2,6 @@ import { fontFamily } from 'tailwindcss/defaultTheme';
 
 /** @type {import('tailwindcss').Config} */
 const config = {
-	darkMode: ['false'],
 	content: [
 		'./src/**/*.{html,js,svelte,ts}',
 		'./node_modules/flowbite-svelte/**/*.{html,js,svelte,ts}'
@@ -13,7 +12,6 @@ const config = {
 			charts: true
 		})
 	],
-	safelist: ['dark'],
 	theme: {
 		container: {
 			center: true,

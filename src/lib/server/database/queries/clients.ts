@@ -13,7 +13,12 @@ import {
 	type NewClientCompanyStaffLocation,
 	type UpdateClientProfile
 } from '../schemas/client';
-import { companyStaffInviteLocations, userInviteTable, userTable, type NewUserInvite } from '../schemas/auth';
+import {
+	companyStaffInviteLocations,
+	userInviteTable,
+	userTable,
+	type NewUserInvite
+} from '../schemas/auth';
 import { convertRecurrenceDayToEvent } from '$lib/components/calendar/utils';
 import { recurrenceDayTable, requisitionTable } from '../schemas/requisition';
 import { error } from '@sveltejs/kit';
@@ -80,7 +85,6 @@ export type ClientStaffWithLocationRaw = {
 };
 
 export type ClientStaffResults = ClientStaffWithLocationRaw[];
-
 
 export type StaffLocation = {
 	id: string;
@@ -163,9 +167,10 @@ export async function getPaginatedClientProfiles({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-		   ORDER BY ${orderBy.direction === 'asc'
-					? sql`${sql.raw(orderSelector)} ASC`
-					: sql`${sql.raw(orderSelector)} DESC`
+		   ORDER BY ${
+					orderBy.direction === 'asc'
+						? sql`${sql.raw(orderSelector)} ASC`
+						: sql`${sql.raw(orderSelector)} DESC`
 				}
 		 `);
 		} else {
@@ -231,7 +236,7 @@ export async function getClientProfileById(clientId: string) {
 }
 
 export async function getClientProfilebyUserId(userId: string | undefined) {
-	if (!userId) throw new Error("User ID required")
+	if (!userId) throw new Error('User ID required');
 	const [result] = await db
 		.select()
 		.from(clientProfileTable)
@@ -262,7 +267,7 @@ export async function getClientIdByCompanyId(companyId: string) {
 }
 
 export async function getClientProfileByStaffUserId(userId: string | undefined) {
-	if (!userId) return error(400, 'Missing user id')
+	if (!userId) return error(400, 'Missing user id');
 	const staff = await db
 		.select({ clientId: clientStaffProfileTable.clientId })
 		.from(clientStaffProfileTable)
@@ -278,7 +283,7 @@ export async function getClientProfileByStaffUserId(userId: string | undefined) 
 }
 
 export async function getClientCompanyByClientId(clientId: string | undefined) {
-	if (!clientId) return error(400, 'Missing client id')
+	if (!clientId) return error(400, 'Missing client id');
 	const [result] = await db
 		.select()
 		.from(clientCompanyTable)
@@ -287,7 +292,7 @@ export async function getClientCompanyByClientId(clientId: string | undefined) {
 	return result;
 }
 export async function getClientCompanyById(companyId: string | null) {
-	if (!companyId) return error(400, 'Must provide company id')
+	if (!companyId) return error(400, 'Must provide company id');
 	const [result] = await db
 		.select()
 		.from(clientCompanyTable)
@@ -305,8 +310,8 @@ export async function getClientStaffProfilebyUserId(userId: string) {
 
 		return result || null;
 	} catch (err) {
-		console.log(err)
-		return error(500, 'Error fetching client staff profile')
+		console.log(err);
+		return error(500, 'Error fetching client staff profile');
 	}
 }
 
@@ -337,7 +342,7 @@ export async function getAllClientStaffProfiles(companyId: string, currentLocati
 				lastName: userTable.lastName,
 				email: userTable.email,
 				avatarUrl: userTable.avatarUrl
-			},
+			}
 		})
 		.from(clientStaffProfileTable)
 		.innerJoin(userTable, eq(clientStaffProfileTable.userId, userTable.id))
@@ -345,7 +350,8 @@ export async function getAllClientStaffProfiles(companyId: string, currentLocati
 			and(
 				eq(clientStaffProfileTable.companyId, companyId),
 				notExists(
-					db.select()
+					db
+						.select()
 						.from(clientStaffLocationTable)
 						.where(
 							and(
@@ -362,11 +368,8 @@ export async function getAllClientStaffProfiles(companyId: string, currentLocati
 
 export async function getPaginatedClientStaffProfiles(
 	companyId: string,
-	{
-		limit = 25,
-		offset = 0,
-		orderBy = undefined
-	}: PaginateOptions) {
+	{ limit = 25, offset = 0, orderBy = undefined }: PaginateOptions
+) {
 	const userCols = ['email', 'first_name', 'last_name'];
 	const locationCols = ['location_name'];
 	const companyCols = ['company_name'];
@@ -491,11 +494,7 @@ export async function getAllClientLocationsByCompanyId(companyId: string) {
 
 export async function getPaginatedLocationsByCompanyId(
 	companyId: string,
-	{
-		limit = 25,
-		offset = 0,
-		orderBy = undefined
-	}: PaginateOptions
+	{ limit = 25, offset = 0, orderBy = undefined }: PaginateOptions
 ) {
 	const orderSelector = orderBy ? orderBy.column : null;
 	try {
@@ -510,9 +509,10 @@ export async function getPaginatedLocationsByCompanyId(
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-		   ORDER BY ${orderBy.direction === 'asc'
-					? sql`${sql.raw(orderSelector)} ASC`
-					: sql`${sql.raw(orderSelector)} DESC`
+		   ORDER BY ${
+					orderBy.direction === 'asc'
+						? sql`${sql.raw(orderSelector)} ASC`
+						: sql`${sql.raw(orderSelector)} DESC`
 				}
 		 `);
 		} else {
@@ -539,9 +539,9 @@ export async function getPaginatedLocationsByCompanyId(
 	}
 }
 
-export async function getClientStaffLocations(userId: string) { }
+export async function getClientStaffLocations(userId: string) {}
 
-export async function getClientSubscription(clientId: string) { }
+export async function getClientSubscription(clientId: string) {}
 
 export async function createCompanyLocation(values: ClientCompanyLocation) {
 	const result = await db
@@ -599,7 +599,7 @@ export async function getLocationsForStaffUser(staffId: string): Promise<StaffLo
 				hoursOfOperation: companyOfficeLocationTable.hoursOfOperation,
 				email: companyOfficeLocationTable.email,
 				regionId: companyOfficeLocationTable.regionId,
-				isPrimary: clientStaffLocationTable.isPrimary,
+				isPrimary: clientStaffLocationTable.isPrimary
 			})
 			.from(clientStaffLocationTable)
 			.innerJoin(
@@ -610,8 +610,8 @@ export async function getLocationsForStaffUser(staffId: string): Promise<StaffLo
 
 		return locations;
 	} catch (err) {
-		console.log(err)
-		error(500, "Error getting locations for staff user")
+		console.log(err);
+		error(500, 'Error getting locations for staff user');
 	}
 }
 
@@ -623,15 +623,15 @@ export async function createClientCompany(values: ClientCompany) {
 			.onConflictDoNothing()
 			.returning();
 
-		return result || null
+		return result || null;
 	} catch (err) {
-		console.log(err)
-		throw error(500, "Error creating company")
+		console.log(err);
+		throw error(500, 'Error creating company');
 	}
 }
 
 export async function getCalendarEventsForClient(clientId: string | undefined) {
-	if (!clientId) return error(400, "Missing Client Id")
+	if (!clientId) return error(400, 'Missing Client Id');
 	const clientCompanyResult = await db
 		.select({
 			client: { ...clientProfileTable },
@@ -669,27 +669,32 @@ export async function getCalendarEventsForClient(clientId: string | undefined) {
 
 export async function getRequisitionsForClientWithLimit(clientId: string, count: number) {
 	try {
-		const company = await getClientCompanyByClientId(clientId)
+		const company = await getClientCompanyByClientId(clientId);
 		const result = await db
 			.select()
 			.from(requisitionTable)
-			.where(and(eq(requisitionTable.companyId, company.id), ne(requisitionTable.status, 'PENDING')))
+			.where(
+				and(eq(requisitionTable.companyId, company.id), ne(requisitionTable.status, 'PENDING'))
+			)
 			.limit(count)
-			.orderBy(desc(requisitionTable.createdAt))
-		return result
+			.orderBy(desc(requisitionTable.createdAt));
+		return result;
 	} catch (err) {
-		console.log(err)
-		throw error(500, `${err}`)
+		console.log(err);
+		throw error(500, `${err}`);
 	}
 }
 
-export async function getClientDashboardData(clientId: string | undefined, userId: string | undefined) {
-	if (!clientId) throw error(400, 'Client ID required')
-	if (!userId) throw error(400, 'User ID required')
+export async function getClientDashboardData(
+	clientId: string | undefined,
+	userId: string | undefined
+) {
+	if (!clientId) throw error(400, 'Client ID required');
+	if (!userId) throw error(400, 'User ID required');
 
-	const company = await getClientCompanyByClientId(clientId)
+	const company = await getClientCompanyByClientId(clientId);
 
-	if (!company) throw error(400, 'No company associated with that client id')
+	if (!company) throw error(400, 'No company associated with that client id');
 
 	const [
 		requisitions,
@@ -707,7 +712,7 @@ export async function getClientDashboardData(clientId: string | undefined, userI
 		await getSupportTicketsForUserWithLimit(userId, 5),
 		await getRecentRequisitionApplications(company.id),
 		await getRecentTimesheetsDueForClient(clientId)
-	])
+	]);
 
 	return {
 		requisitions,
@@ -717,7 +722,7 @@ export async function getClientDashboardData(clientId: string | undefined, userI
 		supportTickets,
 		newApplicationsCount,
 		positionApplications: requisitionApplications
-	}
+	};
 }
 
 export async function getPrimaryLocationForCompany(companyId: string) {
@@ -727,12 +732,12 @@ export async function getPrimaryLocationForCompany(companyId: string) {
 			.from(companyOfficeLocationTable)
 			.where(eq(companyOfficeLocationTable.companyId, companyId))
 			.orderBy(desc(companyOfficeLocationTable.createdAt))
-			.limit(1)
+			.limit(1);
 
-		return result
+		return result;
 	} catch (err) {
-		console.log(err)
-		return error(500, 'Error getting primary location for company')
+		console.log(err);
+		return error(500, 'Error getting primary location for company');
 	}
 }
 
@@ -742,12 +747,12 @@ export async function addStaffToLocation(values: NewClientCompanyStaffLocation) 
 			.insert(clientStaffLocationTable)
 			.values(values)
 			.onConflictDoNothing()
-			.returning()
+			.returning();
 
-		return result
+		return result;
 	} catch (err) {
-		console.log(err)
-		return error(500, 'Error adding staff to location')
+		console.log(err);
+		return error(500, 'Error adding staff to location');
 	}
 }
 
@@ -808,7 +813,7 @@ export async function inviteStaffUsersToAccount(locationId: string, invitees: Ne
 						await sendClientStaffInviteEmail(
 							invitee.email,
 							token,
-							company.name || "unknown company"
+							company.name || 'unknown company'
 						);
 
 						return {
@@ -841,15 +846,15 @@ export async function inviteStaffUsersToAccount(locationId: string, invitees: Ne
 	);
 
 	// Check if any invites failed to create
-	const dbFailures = inviteResults.filter(result => !result.success);
+	const dbFailures = inviteResults.filter((result) => !result.success);
 	if (dbFailures.length > 0) {
-		throw new Error(`Failed to create invites for: ${dbFailures.map(f => f.email).join(', ')}`);
+		throw new Error(`Failed to create invites for: ${dbFailures.map((f) => f.email).join(', ')}`);
 	}
 
 	// Log any email sending failures
-	const emailFailures = inviteResults.filter(result => result.success && !result.emailSent);
+	const emailFailures = inviteResults.filter((result) => result.success && !result.emailSent);
 	if (emailFailures.length > 0) {
-		console.warn(`Failed to send emails for: ${emailFailures.map(f => f.email).join(', ')}`);
+		console.warn(`Failed to send emails for: ${emailFailures.map((f) => f.email).join(', ')}`);
 	}
 
 	return inviteResults;

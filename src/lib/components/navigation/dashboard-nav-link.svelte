@@ -38,7 +38,7 @@
 			class="w-full text-left flex gap-x-4 p-2 text-white hover:bg-blue-800 cursor-pointer rounded-sm items-center transition-all duration-100"
 		>
 			<slot />
-			<span class={cn('grow origin-left text-white text-lg leading-none', !expanded && 'hidden')}
+			<span class={cn('grow origin-left text-white text-sm leading-none', !expanded && 'hidden')}
 				>{link.name}</span
 			>
 			<ChevronDown
@@ -58,7 +58,7 @@
 			{#each link.children as childLink}
 				<button
 					on:click={() => childLink?.path && handleLinkClick(childLink.path)}
-					class="text-left text-md text-white">{childLink.name}</button
+					class="text-left text-sm text-white">{childLink.name}</button
 				>
 			{/each}
 		</div>
@@ -72,7 +72,7 @@
 			<slot />
 			<span
 				class={cn(
-					'grow origin-left text-white text-lg leading-none',
+					'grow origin-left text-white text-sm leading-none',
 					!expanded ? 'hidden' : 'block'
 				)}>{link.name}</span
 			>

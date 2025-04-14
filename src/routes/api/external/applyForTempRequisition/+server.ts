@@ -7,14 +7,12 @@ import {
 } from '$lib/server/database/schemas/candidate';
 import {
 	requisitionTable,
-	requisitionApplicationTable,
 	workdayTable,
 	recurrenceDayTable
 } from '$lib/server/database/schemas/requisition';
 import { authenticateUser } from '$lib/server/serverUtils';
 import { and, eq } from 'drizzle-orm';
 import { env } from '$env/dynamic/private';
-import { getClientIdByCompanyId } from '$lib/server/database/queries/clients';
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': env.CANDIDATE_APP_DOMAIN,
@@ -42,7 +40,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// Authenticate user
 		const user = await authenticateUser(request);
-		console.log('User attempting to claim shift:', { userId: user.id });
+		// console.log('User attempting to claim shift:', { userId: user.id });
 		if (!user) {
 			return json(
 				{ success: false, message: 'Unauthorized' },

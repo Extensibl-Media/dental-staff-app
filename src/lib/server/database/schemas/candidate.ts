@@ -125,6 +125,13 @@ export const candidateDisciplineExperienceTable = pgTable(
 	(t) => ({ pk: primaryKey({ columns: [t.candidateId, t.disciplineId] }) })
 );
 
+export const candidateDocumentTypeEnum = pgEnum('candidate_document_type', [
+	'RESUME',
+	'LICENSE',
+	'CERTIFICATE',
+	'OTHER'
+]);
+
 export const candidateDocumentUploadsTable = pgTable('candidate_document_uploads', {
 	id: uuid('id').notNull().primaryKey(),
 	createdAt: timestamp('created_at', {
@@ -139,15 +146,33 @@ export const candidateDocumentUploadsTable = pgTable('candidate_document_uploads
 	})
 		.notNull()
 		.default(new Date()),
-	candidateId: text("candidate_id").references(() => candidateProfileTable.id).notNull(),
-	uploadUrl: text("upload_url").notNull(),
+	candidateId: text('candidate_id')
+		.references(() => candidateProfileTable.id)
+		.notNull(),
+	uploadUrl: text('upload_url').notNull(),
 	expiryDate: timestamp('expiry_date', {
 		withTimezone: true,
 		mode: 'date'
-	})
-})
+	}),
+	type: candidateDocumentTypeEnum('type').notNull(),
+	filename: text('filename')
+});
 
 export type CandidateProfile = typeof candidateProfileTable.$inferInsert;
 export type CandidateProfileSelect = typeof candidateProfileTable.$inferSelect;
 export type UpdateCandidateProfile = Partial<typeof candidateProfileTable.$inferInsert>;
 export type CandidateRating = typeof candidateRatingTable.$inferInsert;
+export type CandidateRatingSelect = typeof candidateRatingTable.$inferSelect;
+export type CandidateBlacklist = typeof candidateBlacklistTable.$inferInsert;
+export type CandidateBlacklistSelect = typeof candidateBlacklistTable.$inferSelect;
+export type CandidateDisciplineExperience = typeof candidateDisciplineExperienceTable.$inferInsert;
+export type CandidateDisciplineExperienceSelect =
+	typeof candidateDisciplineExperienceTable.$inferSelect;
+export type UpdateCandidateDisciplineExperience = Partial<
+	typeof candidateDisciplineExperienceTable.$inferInsert
+>;
+export type CandidateDocumentUploads = typeof candidateDocumentUploadsTable.$inferInsert;
+export type CandidateDocumentUploadsSelect = typeof candidateDocumentUploadsTable.$inferSelect;
+export type UpdateCandidateDocumentUploads = Partial<
+	typeof candidateDocumentUploadsTable.$inferInsert
+>;

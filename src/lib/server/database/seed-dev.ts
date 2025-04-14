@@ -77,7 +77,13 @@ async function generateClientRecords(count: number) {
 			receiveEmail: true,
 			verified: true,
 			createdAt: new Date(),
-			updatedAt: new Date()
+			updatedAt: new Date(),
+			provider: '',
+			providerId: '',
+			completedOnboarding: false,
+			onboardingStep: null,
+			blacklisted: false,
+			stripeCustomerId: null
 		});
 		clientRecords.push({
 			id: clientId,
@@ -163,7 +169,13 @@ async function generateStaffRecords(count: number, companyId: string, clientId: 
 			receiveEmail: true,
 			verified: true,
 			createdAt: new Date(),
-			updatedAt: new Date()
+			updatedAt: new Date(),
+			provider: '',
+			providerId: '',
+			completedOnboarding: false,
+			onboardingStep: null,
+			blacklisted: false,
+			stripeCustomerId: null
 		});
 
 		staffRecords.push({
@@ -199,7 +211,13 @@ async function generateCandidateRecords(count: number, regionId: string) {
 			receiveEmail: true,
 			verified: true,
 			createdAt: new Date(),
-			updatedAt: new Date()
+			updatedAt: new Date(),
+			provider: '',
+			providerId: '',
+			completedOnboarding: false,
+			onboardingStep: null,
+			blacklisted: false,
+			stripeCustomerId: null
 		});
 
 		candidateRecords.push({
@@ -363,7 +381,14 @@ async function seed() {
 				updatedAt: new Date(),
 				role: USER_ROLES.SUPERADMIN,
 				verified: true,
-				receiveEmail: true
+				receiveEmail: true,
+				provider: '',
+				providerId: '',
+				avatarUrl: null,
+				completedOnboarding: true,
+				onboardingStep: null,
+				blacklisted: false,
+				stripeCustomerId: null
 			},
 			{
 				id: crypto.randomUUID(),
@@ -376,7 +401,14 @@ async function seed() {
 				updatedAt: new Date(),
 				role: USER_ROLES.SUPERADMIN,
 				verified: true,
-				receiveEmail: true
+				receiveEmail: true,
+				provider: '',
+				providerId: '',
+				avatarUrl: null,
+				completedOnboarding: true,
+				onboardingStep: null,
+				blacklisted: false,
+				stripeCustomerId: null
 			},
 			{
 				id: crypto.randomUUID(),
@@ -389,7 +421,14 @@ async function seed() {
 				updatedAt: new Date(),
 				role: USER_ROLES.SUPERADMIN,
 				verified: true,
-				receiveEmail: true
+				receiveEmail: true,
+				provider: '',
+				providerId: '',
+				avatarUrl: null,
+				completedOnboarding: true,
+				onboardingStep: null,
+				blacklisted: false,
+				stripeCustomerId: null
 			},
 			{
 				id: crypto.randomUUID(),
@@ -402,7 +441,14 @@ async function seed() {
 				updatedAt: new Date(),
 				role: USER_ROLES.SUPERADMIN,
 				verified: true,
-				receiveEmail: true
+				receiveEmail: true,
+				provider: '',
+				providerId: '',
+				avatarUrl: null,
+				completedOnboarding: true,
+				onboardingStep: null,
+				blacklisted: false,
+				stripeCustomerId: null
 			}
 		];
 

@@ -11,7 +11,7 @@ import {
 } from '$lib/server/database/schemas/requisition';
 import { authenticateUser } from '$lib/server/serverUtils';
 import { type RequestHandler, error, json } from '@sveltejs/kit';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, notInArray, or, isNull, isNotNull } from 'drizzle-orm';
 
 export const GET: RequestHandler = async ({ request }) => {
 	const user = await authenticateUser(request);
@@ -41,6 +41,19 @@ export const GET: RequestHandler = async ({ request }) => {
 			.where(eq(companyOfficeLocationTable.regionId, candidateRegionId));
 
 		const officeLocationIds = officeLocations.map((location) => location.id);
+
+		// First, fetch the dates this candidate already has accepted workdays for
+		// to avoid showing other opportunities on the same days
+		const acceptedWorkdays = await db
+			.select({
+				date: recurrenceDayTable.date
+			})
+			.from(workdayTable)
+			.innerJoin(recurrenceDayTable, eq(workdayTable.recurrenceDayId, recurrenceDayTable.id))
+			.where(eq(workdayTable.candidateId, candidateProfile.id));
+
+		// Create an array of dates the candidate is already working
+		const bookedDates = acceptedWorkdays.map((day) => day.date);
 
 		// Fetch recurrence days with requisition and workday information
 		const recurrenceDays = await db
@@ -97,9 +110,28 @@ export const GET: RequestHandler = async ({ request }) => {
 			.where(
 				and(
 					inArray(requisitionTable.locationId, officeLocationIds),
-					eq(requisitionTable.status, 'OPEN'),
+					// eq(requisitionTable.status, 'OPEN'),
+					notInArray(recurrenceDayTable.status, ['CANCELED']),
 					eq(requisitionTable.archived, false),
-					eq(requisitionTable.permanentPosition, false)
+					eq(requisitionTable.permanentPosition, false),
+					// Add this condition to only include recurrence days that:
+					// 1. Have no workday assigned (are available) OR
+					// 2. Have a workday assigned to the current candidate
+					or(
+						// Check if no workday record exists (no candidate claimed it)
+						isNull(workdayTable.id),
+						// Or check if the workday is for the current candidate
+						eq(workdayTable.candidateId, candidateProfile.id)
+					),
+					// KEY CHANGE: Filter out recurrence days that fall on dates
+					// the candidate already has a workday UNLESS it's the workday
+					// they've already accepted
+					or(
+						// Either the recurrence day is not on a date they're already booked
+						notInArray(recurrenceDayTable.date, bookedDates),
+						// OR it's a workday they have already claimed (so we still show their bookings)
+						isNotNull(workdayTable.id)
+					)
 				)
 			);
 

@@ -2,6 +2,7 @@
 import { lucia } from '$lib/server/lucia';
 import { redirect, type Handle } from '@sveltejs/kit';
 import type { HandleServerError } from '@sveltejs/kit';
+import { processPastRecurrenceDaysJob, processOutdatedRequisitionsJob } from '$lib/server/jobs';
 
 import log from '$lib/server/log';
 import { checkIsAdmin } from '$lib/_helpers/checkIsAdmin';
@@ -90,3 +91,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	log(response.status, event);
 	return response;
 };
+
+// Sheduled CRON Jobs
+processPastRecurrenceDaysJob();
+processOutdatedRequisitionsJob();

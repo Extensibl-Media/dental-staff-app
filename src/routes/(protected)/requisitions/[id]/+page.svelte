@@ -47,6 +47,7 @@
 	$: company = data.company
 	$: requisition = data.requisition;
 	$: recurrenceDays = data.recurrenceDays;
+
 	// $: {
 	// 	console.log(recurrenceDays);
 	// }
@@ -243,14 +244,16 @@
 					src={requisition?.company?.companyLogo}
 					alt="company logo"
 				/>
-				<div class="md:flex flex-wrap gap-2 grow-0 items-center hidden">
+				<div class="space-y-2 hidden md:block">
+                    <p class="text-sm font-semibold text-gray-500">Requisition Status</p>
+                    <div class="flex flex-wrap gap-2 grow-0 items-center">
 					<div
 						class="py-2.5 px-3 text-sm w-fit border border-gray-300 bg-white rounded-md flex items-center gap-2"
 					>
 						<span
 							class={cn(
 								'h-3 w-3 rounded-full',
-								status === 'PENDING' && 'bg-yellow-300',
+								// status === 'PENDING' && 'bg-yellow-300',
 								status === 'OPEN' && 'bg-blue-500',
 								status === 'FILLED' && 'bg-green-400',
 								status === 'UNFULFILLED' && 'bg-orange-400',
@@ -266,7 +269,7 @@
 						<Dropdown class="w-40">
 							<form use:statusEnhance method="POST" action="?/changeStatus">
 								<input type="hidden" name="requisitionId" value={requisition?.id} />
-								<DropdownItem type="submit" name="status" value="PENDING">Pending</DropdownItem>
+								<!-- <DropdownItem type="submit" name="status" value="PENDING">Pending</DropdownItem> -->
 								<DropdownItem type="submit" name="status" value="OPEN">Open</DropdownItem>
 								<DropdownItem type="submit" name="status" value="FILLED">Filled</DropdownItem>
 								<DropdownItem type="submit" name="status" value="UNFULFILLED"
@@ -277,43 +280,48 @@
 						</Dropdown>
 					{/if}
 				</div>
+				</div>
 			</div>
 			<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">
 				{requisition?.title}
 			</h1>
 			<p class="text-lg font-semibold text-gray-500">{requisition?.company.companyName}</p>
 		</div>
-		<div class="flex flex-wrap gap-2 grow-0 items-center md:hidden">
-			<div
-				class="py-2.5 px-3 text-sm w-fit border border-gray-300 bg-white rounded-md flex items-center gap-2"
-			>
-				<span
-					class={cn(
-						'h-3 w-3 rounded-full',
-						status === 'PENDING' && 'bg-yellow-300',
-						status === 'OPEN' && 'bg-blue-500',
-						status === 'FILLED' && 'bg-green-400',
-						status === 'UNFULFILLED' && 'bg-orange-400',
-						status === 'CANCELED' && 'bg-red-500'
-					)}
-				></span>
-				{requisition?.status}
-			</div>
-			{#if hasRequisitionRights}
-				<FBButton class=" text-black bg-white border border-gray-300"
-					>Update Status<ChevronDown class="w-6 h-6 ms-2 text-black" /></FBButton
-				>
-				<Dropdown class="w-40">
-					<form use:statusEnhance method="POST" action="?/changeStatus">
-						<input type="hidden" name="requisitionId" value={requisition?.id} />
-						<DropdownItem type="submit" name="status" value="PENDING">Pending</DropdownItem>
-						<DropdownItem type="submit" name="status" value="OPEN">Open</DropdownItem>
-						<DropdownItem type="submit" name="status" value="FILLED">Filled</DropdownItem>
-						<DropdownItem type="submit" name="status" value="UNFULFILLED">Unfulfilled</DropdownItem>
-						<DropdownItem type="submit" name="status" value="CANCELED">Canceled</DropdownItem>
-					</form>
-				</Dropdown>
-			{/if}
+		<div class="md:hidden space-y-2">
+    		<p class="text-sm font-semibold text-gray-500">Requisition Status</p>
+
+    		<div class="flex flex-wrap gap-2 grow-0 items-center">
+    			<div
+    				class="py-2.5 px-3 text-sm w-fit border border-gray-300 bg-white rounded-md flex items-center gap-2"
+    			>
+    				<span
+    					class={cn(
+    						'h-3 w-3 rounded-full',
+    						// status === 'PENDING' && 'bg-yellow-300',
+    						status === 'OPEN' && 'bg-blue-500',
+    						status === 'FILLED' && 'bg-green-400',
+    						status === 'UNFULFILLED' && 'bg-orange-400',
+    						status === 'CANCELED' && 'bg-red-500'
+    					)}
+    				></span>
+    				{requisition?.status}
+    			</div>
+    			{#if hasRequisitionRights}
+    				<FBButton class=" text-black bg-white border border-gray-300"
+    					>Update Status<ChevronDown class="w-6 h-6 ms-2 text-black" /></FBButton
+    				>
+    				<Dropdown class="w-40">
+    					<form use:statusEnhance method="POST" action="?/changeStatus">
+    						<input type="hidden" name="requisitionId" value={requisition?.id} />
+    						<!-- <DropdownItem type="submit" name="status" value="PENDING">Pending</DropdownItem> -->
+    						<DropdownItem type="submit" name="status" value="OPEN">Open</DropdownItem>
+    						<DropdownItem type="submit" name="status" value="FILLED">Filled</DropdownItem>
+    						<DropdownItem type="submit" name="status" value="UNFULFILLED">Unfulfilled</DropdownItem>
+    						<DropdownItem type="submit" name="status" value="CANCELED">Canceled</DropdownItem>
+    					</form>
+    				</Dropdown>
+    			{/if}
+    		</div>
 		</div>
 		<Tabs
 			class=""

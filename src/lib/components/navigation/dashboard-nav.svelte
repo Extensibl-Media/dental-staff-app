@@ -14,7 +14,10 @@
 		Users,
 		ScrollText,
 		LifeBuoy,
-		MessageCircleQuestion
+		MessageCircleQuestion,
+
+		FileClock
+
 	} from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import DashboardNavLink from './dashboard-nav-link.svelte';
@@ -60,7 +63,7 @@
 			DentalStaff.US
 		</p>
 	</div>
-	<ul class="flex flex-col gap-4 mt-8 grow overflow-y-auto">
+	<ul class="flex flex-col gap-2 mt-8 grow overflow-y-auto">
 		{#if user?.role === USER_ROLES.SUPERADMIN}
 			<DashboardNavLink bind:expanded link={{ name: 'Dashboard', path: '/dashboard' }}>
 				<LayoutGrid class="shrink-0" />
@@ -110,6 +113,9 @@
 			</DashboardNavLink>
 			<DashboardNavLink bind:expanded link={{ name: 'Staff', path: '/staff' }}>
 				<Users class="shrink-0" />
+			</DashboardNavLink>
+			<DashboardNavLink bind:expanded link={{ name: 'Timesheets', path: '/timesheets ' }}>
+				<FileClock class="shrink-0" />
 			</DashboardNavLink>
 			<DashboardNavLink bind:expanded link={{ name: 'Invoices', path: '/invoices' }}>
 				<ScrollText class="shrink-0" />

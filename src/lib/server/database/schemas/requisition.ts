@@ -19,6 +19,13 @@ import { clientCompanyTable, clientProfileTable, companyOfficeLocationTable } fr
 import { candidateProfileTable, type CandidateProfileSelect } from './candidate';
 import { disciplineTable, experienceLevelTable } from './skill';
 
+export type RawTimesheetHours = {
+	date: string;
+	hours: number;
+	startTime: string;
+	endTime: string;
+};
+
 export const timeCategoryEnum = pgEnum('time_category_enum', [
 	'R',
 	'PTO',
@@ -144,15 +151,8 @@ export const invoiceTable = pgTable(
 				onDelete: 'cascade',
 				onUpdate: 'cascade'
 			}),
-		recurrenceDayId: text('recurrence_day_id').references(() => recurrenceDayTable.id, {
-			onDelete: 'cascade',
-			onUpdate: 'cascade'
-		}),
 		clientId: text('client_id')
 			.references(() => clientProfileTable.id, { onDelete: 'cascade' })
-			.notNull(),
-		workdayId: text('workday_id')
-			.references(() => workdayTable.id, { onDelete: 'cascade' })
 			.notNull(),
 		timesheetId: text('timesheet_id')
 			.references(() => timeSheetTable.id, { onDelete: 'cascade' })
@@ -193,6 +193,14 @@ export const workdayTable = pgTable('workdays', {
 	})
 });
 
+export const timesheetStatusEnum = pgEnum('timesheet_status', [
+	'PENDING',
+	'APPROVED',
+	'DISCREPANCY',
+	'REJECTED',
+	'VOID'
+]);
+
 export const timeSheetTable = pgTable(
 	'timesheets',
 	{
@@ -215,13 +223,9 @@ export const timeSheetTable = pgTable(
 		totalHoursWorked: decimal('total_hours_worked'),
 		totalHoursBilled: decimal('total_hours_billed'),
 		awaitingClientSignature: boolean('awaiting_client_signature').default(true),
-		candidateRateBase: smallint('candidate_rate_base'),
-		candidateRateOT: smallint('candidate_rate_overtime'),
+		candidateRateBase: decimal('candidate_rate_base'),
+		candidateRateOT: decimal('candidate_rate_overtime'),
 		requisitionId: integer('requisition_id').references(() => requisitionTable.id, {
-			onDelete: 'set null',
-			onUpdate: 'set null'
-		}),
-		recurrenceDayId: text('recurrence_day_id').references(() => recurrenceDayTable.id, {
 			onDelete: 'set null',
 			onUpdate: 'set null'
 		}),
@@ -232,7 +236,8 @@ export const timeSheetTable = pgTable(
 			withTimezone: true,
 			mode: 'date'
 		}).notNull(),
-		hoursRaw: json('hours_raw').$type<Record<string, number>[]>().notNull().default([])
+		hoursRaw: json('hours_raw').$type<RawTimesheetHours[]>().notNull().default([]),
+		status: timesheetStatusEnum('status').default('PENDING').notNull()
 	},
 	(table) => ({
 		candidateIdx: index('timesheet_candidate_idx').on(table.associatedCandidateId),
@@ -327,6 +332,10 @@ export type TimeSheetSelect = typeof timeSheetTable.$inferSelect;
 export type WorkdaySelect = typeof workdayTable.$inferSelect;
 export type RequisitionApplicationSelect = typeof requisitionApplicationTable.$inferSelect;
 export type CandidateRequisitionSaveSelect = typeof candidateRequisitionSavesTable.$inferSelect;
+export type RecurrenceDayWithWorkdaySelect = {
+	recurrenceDay: RecurrenceDaySelect;
+	workday: WorkdaySelect;
+};
 
 type UserSelect = {
 	id: string;
@@ -339,10 +348,8 @@ type UserSelect = {
 export type TimesheetWithRelations = {
 	timesheet: TimeSheetSelect;
 	candidate: CandidateProfileSelect;
-	user: UserSelect;
-	requisition: RequisitionSelect | null; // null because of leftJoin
-	workday: WorkdaySelect;
-	recurrenceDay: RecurrenceDaySelect | null; // null because of leftJoin
+	user: Partial<UserSelect>;
+	requisition: RequisitionSelect | null; // null because of leftJoin // null because of leftJoin
 };
 
 export type InvoiceWithRelations = {
@@ -350,7 +357,5 @@ export type InvoiceWithRelations = {
 	candidate: CandidateProfileSelect;
 	user: UserSelect;
 	timesheet: TimeSheetSelect;
-	requisition: RequisitionSelect;
-	workday: WorkdaySelect;
-	recurrenceDay: RecurrenceDaySelect | null; // null because of leftJoin
+	requisition: RequisitionSelect; // null because of leftJoin
 };

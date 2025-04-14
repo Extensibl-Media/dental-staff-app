@@ -21,10 +21,11 @@
 	import * as Table from '$lib/components/ui/table';
 	import { onMount } from 'svelte';
 	import InviteNewStaffDrawer from '$lib/components/drawers/inviteNewStaffDrawer.svelte';
+	import type { PageData } from './$types';
 
 	let tableData: ClientStaffResults = [];
 
-	export let data;
+	export let data: PageData;
 	$: user = data.user;
 	$: staff = data.staff;
 	$: console.log({ staff });

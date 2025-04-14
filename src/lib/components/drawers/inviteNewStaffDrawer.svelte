@@ -7,6 +7,7 @@
 	import { Checkbox } from '../ui/checkbox';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { PlusIcon } from 'lucide-svelte';
+	import NewStaffInviteForm from '$lib/views/client/newStaffInviteForm.svelte';
 
 	export let inviteForm;
 

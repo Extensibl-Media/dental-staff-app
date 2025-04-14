@@ -11,6 +11,7 @@ import { disciplineTable, type Discipline } from '../schemas/skill';
 import type { CANDIDATE_STATUS } from '$lib/config/constants';
 import { regionTable, subRegionTable, type Region, type Subregion } from '../schemas/region';
 import type { PaginateOptions } from '$lib/types';
+import { error } from '@sveltejs/kit';
 
 export type CandidateWithProfile = {
 	user: User;
@@ -88,10 +89,11 @@ export async function getPaginatedCandidateProfiles({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-    ORDER BY ${orderBy.direction === 'asc'
-					? sql`${sql.raw(orderSelector)} ASC`
-					: sql`${sql.raw(orderSelector)} DESC`
-				}
+    ORDER BY ${
+			orderBy.direction === 'asc'
+				? sql`${sql.raw(orderSelector)} ASC`
+				: sql`${sql.raw(orderSelector)} DESC`
+		}
   `);
 		} else {
 			query.append(sql`
@@ -153,7 +155,7 @@ export async function getAllCandidateProfiles() {
 }
 
 export async function getCandidateProfileById(candidateId: string) {
-	const result = await db
+	const [result] = await db
 		.select({
 			profile: { ...candidateProfileTable },
 			user: {
@@ -180,7 +182,19 @@ export async function getCandidateProfileById(candidateId: string) {
 		.innerJoin(regionTable, eq(candidateProfileTable.regionId, regionTable.id))
 		.leftJoin(subRegionTable, eq(regionTable.id, subRegionTable.regionId));
 
-	return result[0] || null;
+	if (!result) throw error(404, 'Candidate Not Found');
+	return result;
+}
+
+export async function getCandidateProfileByUserId(userId: string) {
+	const [result] = await db
+		.select()
+		.from(candidateProfileTable)
+		.where(eq(candidateProfileTable.userId, userId));
+
+	if (!result) throw error(404, 'Candidate Not Found');
+
+	return result;
 }
 
 export async function getCandidatesByStatus(status: keyof typeof CANDIDATE_STATUS) {
@@ -204,7 +218,7 @@ export async function getCandidatesByStatus(status: keyof typeof CANDIDATE_STATU
 }
 
 export async function getCandidateByEmail(email: string) {
-	const result = await db
+	const [result] = await db
 		.select({
 			profile: { ...candidateProfileTable },
 			user: {
@@ -220,19 +234,21 @@ export async function getCandidateByEmail(email: string) {
 		.from(candidateProfileTable)
 		.where(eq(userTable.email, email));
 
-	return result[0];
+	if (!result) throw error(404, 'Candidate Not Found');
+
+	return result;
 }
 
-export function createCandidateProfile(userId: string, profile: CandidateProfile) { }
+export function createCandidateProfile(userId: string, profile: CandidateProfile) {}
 
-export function updateCandidateProfile(candidateId: string, data: UpdateCandidateProfile) { }
+export function updateCandidateProfile(candidateId: string, data: UpdateCandidateProfile) {}
 
-export function deleteCandidateProfileByUid(userId: string) { }
+export function deleteCandidateProfileByUid(userId: string) {}
 
-export function deleteCandidateProfileById(candidateId: string) { }
+export function deleteCandidateProfileById(candidateId: string) {}
 
-export function updateCandidateStatus(candidateId: string, status: typeof CANDIDATE_STATUS) { }
+export function updateCandidateStatus(candidateId: string, status: typeof CANDIDATE_STATUS) {}
 
-export async function getAllCandidateWorkHistory(candidateId: string) { }
+export async function getAllCandidateWorkHistory(candidateId: string) {}
 
-export async function getCandidateWorkHistoryForClient(candidateId: string, clientId: string) { }
+export async function getCandidateWorkHistoryForClient(candidateId: string, clientId: string) {}

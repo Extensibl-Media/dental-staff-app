@@ -316,6 +316,55 @@
       "when": 1738823053115,
       "tag": "0044_aromatic_sebastian_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "6",
+      "when": 1742493933871,
+      "tag": "0045_striped_thunderbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "6",
+      "when": 1742493986539,
+      "tag": "0046_young_joshua_kane",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1742594575542,
+      "tag": "0047_useful_mockingbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1743807687967,
+      "tag": "0048_slim_warstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "6",
+      "when": 1743807758933,
+      "tag": "0049_outgoing_mercury",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "6",
+      "when": 1744059612530,
+      "tag": "0050_woozy_dragon_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "6",
+      "when": 1744141071961,
+      "tag": "0051_ambiguous_silver_centurion",
+      "breakpoints": true
     }
   ]
 }

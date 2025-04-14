@@ -8,13 +8,8 @@
 		flexRender
 	} from '@tanstack/svelte-table';
 	import type { PageData } from './$types';
-	import * as Alert from '$lib/components/ui/alert';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Form from '$lib/components/ui/form';
-	import { buttonVariants } from '$lib/components/ui/button';
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import { newSupportTicketSchema, type NewSupportTicketSchema } from '$lib/config/zod-schemas';
-	import { AlertCircle, Loader2, PlusIcon, User } from 'lucide-svelte';
 	import { USER_ROLES } from '$lib/config/constants';
 	import type { SupportTicketResult } from '$lib/server/database/queries/support';
 	import { writable } from 'svelte/store';
@@ -54,6 +49,12 @@
 			header: 'Title',
 			id: 'title',
 			accessorFn: (original) => original.supportTicket.title
+		},
+		{
+			header: 'Date Created',
+			id: 'updatedAt',
+			accessorFn: (original) => original.supportTicket.updatedAt,
+			cell: (original) => format(original.getValue() as Date, 'PPp')
 		},
 		{
 			header: 'Date Created',

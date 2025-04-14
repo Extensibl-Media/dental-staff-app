@@ -1,7 +1,12 @@
 import { USER_ROLES } from '$lib/config/constants.js';
 import { redirect } from '@sveltejs/kit';
 import type { RequestEvent } from './$types';
-import { getClientDashboardData, getClientProfileByStaffUserId, getClientProfilebyUserId, getClientStaffProfilebyUserId } from '$lib/server/database/queries/clients';
+import {
+	getClientDashboardData,
+	getClientProfileByStaffUserId,
+	getClientProfilebyUserId,
+	getClientStaffProfilebyUserId
+} from '$lib/server/database/queries/clients';
 import { newSupportTicketSchema } from '$lib/config/zod-schemas';
 import { superValidate } from 'sveltekit-superforms/server';
 
@@ -25,14 +30,13 @@ export const load = async (event: RequestEvent) => {
 	}
 
 	if (user.role === USER_ROLES.CLIENT) {
-
 		const supportTicketForm = await superValidate(event, newSupportTicketSchema);
 
 		if (!user.completedOnboarding) {
 			redirect(302, '/onboarding/client/company');
 		}
 
-		const client = await getClientProfilebyUserId(user.id)
+		const client = await getClientProfilebyUserId(user.id);
 		const {
 			requisitions,
 			supportTickets,
@@ -41,7 +45,7 @@ export const load = async (event: RequestEvent) => {
 			discrepanciesCount,
 			positionApplications,
 			timesheetsDue
-		} = await getClientDashboardData(client?.id, user.id)
+		} = await getClientDashboardData(client?.id, user.id);
 
 		return {
 			user,
@@ -54,15 +58,14 @@ export const load = async (event: RequestEvent) => {
 			timesheetsDue,
 			timesheetsDueCount,
 			discrepanciesCount,
-			supportTicketForm,
+			supportTicketForm
 		};
 	}
 
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
 		const client = await getClientProfileByStaffUserId(user.id);
-		const profile = await getClientStaffProfilebyUserId(user.id)
+		const profile = await getClientStaffProfilebyUserId(user.id);
 		const supportTicketForm = await superValidate(event, newSupportTicketSchema);
-
 
 		const {
 			requisitions,
@@ -72,7 +75,7 @@ export const load = async (event: RequestEvent) => {
 			discrepanciesCount,
 			positionApplications,
 			timesheetsDue
-		} = await getClientDashboardData(client?.id, user.id)
+		} = await getClientDashboardData(client?.id, user.id);
 
 		return {
 			user,
@@ -85,7 +88,7 @@ export const load = async (event: RequestEvent) => {
 			timesheetsDue,
 			timesheetsDueCount,
 			discrepanciesCount,
-			supportTicketForm,
+			supportTicketForm
 		};
 	}
 

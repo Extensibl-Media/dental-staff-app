@@ -1,32 +1,92 @@
 <script lang="ts">
 	import { SETTINGS_MENU_OPTIONS } from '$lib/config/constants';
 	import { superForm } from 'sveltekit-superforms/client';
-	import { userSchema, type UserSchema } from '$lib/config/zod-schemas';
 	import { cn } from '$lib/utils';
-	import * as Form from '$lib/components/ui/form';
 	import * as Alert from '$lib/components/ui/alert';
 	import { AlertCircle, Loader } from 'lucide-svelte';
 	import { Label } from '$lib/components/ui/label';
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
-	import { Switch } from '$lib/components/ui/switch';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import { getLocalTimeZone } from '@internationalized/date';
 
 	export let userProfileForm;
 	export let passwordForm;
 	export let companyForm;
 	export let billingInfo;
+	export let selectedTab: string;
+
+	$: confirmPasswordError = $passwordErrors.confirmPassword;
+	$: localTimeZone = getLocalTimeZone();
+
 	const { form: userFormObj, enhance: userFormEnhance } = superForm(userProfileForm);
-	const { form: companyFormObj, enhance: companyFormEnhance } = superForm(companyForm);
+	const {
+		form: companyFormObj,
+		enhance: companyFormEnhance,
+		submitting: companyFormSubmitting
+	} = superForm(companyForm);
 	const {
 		form: passwordFormObj,
 		enhance: passwordFormEnhance,
 		errors: passwordErrors
 	} = superForm(passwordForm);
-	export let selectedTab: string;
 
-	$: confirmPasswordError = $passwordErrors.confirmPassword;
-	const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+	const days = [
+		{ id: '0', name: 'Sunday' },
+		{ id: '1', name: 'Monday' },
+		{ id: '2', name: 'Tuesday' },
+		{ id: '3', name: 'Wednesday' },
+		{ id: '4', name: 'Thursday' },
+		{ id: '5', name: 'Friday' },
+		{ id: '6', name: 'Saturday' }
+	];
+
+	if (!$companyFormObj.operatingHours) {
+		$companyFormObj.operatingHours = JSON.stringify({
+			'0': {
+				isClosed: true,
+				openTime: '00:00:00-05',
+				timezone: localTimeZone,
+				closeTime: '00:00:00-05'
+			},
+			'1': {
+				isClosed: false,
+				openTime: '09:00:00-05',
+				timezone: localTimeZone,
+				closeTime: '17:00:00-05'
+			},
+			'2': {
+				isClosed: false,
+				openTime: '09:00:00-05',
+				timezone: localTimeZone,
+				closeTime: '17:00:00-05'
+			},
+			'3': {
+				isClosed: false,
+				openTime: '09:00:00-05',
+				timezone: localTimeZone,
+				closeTime: '17:00:00-05'
+			},
+			'4': {
+				isClosed: false,
+				openTime: '09:00:00-05',
+				timezone: localTimeZone,
+				closeTime: '17:00:00-05'
+			},
+			'5': {
+				isClosed: false,
+				openTime: '09:00:00-05',
+				timezone: localTimeZone,
+				closeTime: '17:00:00-05'
+			},
+			'6': {
+				isClosed: false,
+				openTime: '09:00:00-05',
+				timezone: localTimeZone,
+				closeTime: '17:00:00-05'
+			}
+		});
+	}
 </script>
 
 <div class="bg-white border border-gray-200 rounded-lg p-6 grid grid-cols-5 md:grow">
@@ -54,7 +114,7 @@
 				selectedTab === SETTINGS_MENU_OPTIONS.CLIENT.PASSWORD ? 'bg-gray-50 border-gray-100' : ''
 			)}>Password</button
 		>
-		<button
+		<!-- <button
 			on:click={() => (selectedTab = SETTINGS_MENU_OPTIONS.CLIENT.NOTIFICATIONS)}
 			class={cn(
 				'rounded-md hover:bg-gray-50 p-3 border border-white text-left',
@@ -62,7 +122,7 @@
 					? 'bg-gray-50 border-gray-100'
 					: ''
 			)}>Notifications</button
-		>
+		> -->
 		<button
 			on:click={() => (selectedTab = SETTINGS_MENU_OPTIONS.CLIENT.BILLING)}
 			class={cn(
@@ -116,17 +176,17 @@
 		{/if}
 		{#if selectedTab === SETTINGS_MENU_OPTIONS.CLIENT.COMPANY}
 			<h2 class="text-3xl font-semibold">Company Details</h2>
-			<form use:companyFormEnhance method="POST" class="space-y-8">
+			<form use:companyFormEnhance method="POST" action="?/updateCompany" class="space-y-8">
 				<div class="grid grid-cols-2 gap-6">
 					<div class="col-span-2 md:col-span-1">
 						<Label for="companyName">Company Name</Label>
 						<Input name="companyName" bind:value={$companyFormObj.companyName} />
 					</div>
 
-					<div class="col-span-2 md:col-span-1">
+					<!-- <div class="col-span-2 md:col-span-1">
 						<Label for="companyLogo">Company Logo</Label>
 						<Input name="companyLogo" type="file" accept="image/*" />
-					</div>
+					</div> -->
 
 					<div class="col-span-2">
 						<Label for="companyDescription">Company Description</Label>
@@ -145,42 +205,92 @@
 					<!-- Operating Hours Section -->
 					<div class="col-span-2">
 						<h3 class="text-xl font-semibold mb-4">Operating Hours</h3>
+
+						<!-- Replace your current operating hours logic with this -->
 						<div class="space-y-4">
-							{#each days as day, index}
-								<!-- <div class="grid grid-cols-12 gap-4 items-center">
-                            <div class="col-span-3">
-                            <Label>{day}</Label>
-                            </div>
-                            <div class="col-span-2 flex items-center gap-2">
-                            <Switch
-                                id="closed-{index}"
-                                checked={!$companyFormObj.operatingHours[index].isClosed}
-                                on:change={() => $companyFormObj.operatingHours[index].isClosed = !$companyFormObj.operatingHours[index].isClosed}
-                            />
-                            <Label for="closed-{index}">Open</Label>
-                            </div>
-                            {#if !$companyFormObj.operatingHours[index].isClosed}
-                            <div class="col-span-3">
-                                <Input
-                                type="time"
-                                bind:value={$companyFormObj.operatingHours[index].openTime}
-                                />
-                            </div>
-                            <div class="col-span-3">
-                                <Input
-                                type="time"
-                                bind:value={$companyFormObj.operatingHours[index].closeTime}
-                                />
-                            </div>
-                            {/if}
-                        </div> -->
+							{#each days as day}
+								<div class="grid grid-cols-12 gap-4 items-center">
+									<div class="col-span-3">
+										<Label>{day.name}</Label>
+									</div>
+
+									<!-- Just use a regular checkbox instead of the Switch component -->
+									<div class="col-span-2 flex items-center gap-2">
+										<input
+											type="checkbox"
+											id="closed-{day.id}"
+											checked={!JSON.parse($companyFormObj.operatingHours)[day.id].isClosed}
+											on:change={(e) => {
+												// Get current hours
+												const hours = JSON.parse($companyFormObj.operatingHours);
+
+												// Set isClosed to opposite of checkbox (checkbox represents "open")
+												hours[day.id].isClosed = !e.target.checked;
+
+												// If day is closed, reset times to midnight
+												if (hours[day.id].isClosed) {
+													hours[day.id].openTime = '00:00:00-05';
+													hours[day.id].closeTime = '00:00:00-05';
+												}
+
+												// Update the form data
+												$companyFormObj.operatingHours = JSON.stringify(hours);
+											}}
+										/>
+										<Label for="closed-{day.id}">Open</Label>
+									</div>
+
+									<!-- Time inputs, only show if day is open -->
+									<div class="col-span-3">
+										<Input
+											disabled={JSON.parse($companyFormObj.operatingHours)[day.id].isClosed}
+											type="time"
+											value={JSON.parse($companyFormObj.operatingHours)[day.id].openTime.substring(
+												0,
+												5
+											)}
+											on:change={(e) => {
+												const hours = JSON.parse($companyFormObj.operatingHours);
+												hours[day.id].openTime = e.currentTarget.value + ':00-05';
+												$companyFormObj.operatingHours = JSON.stringify(hours);
+											}}
+										/>
+									</div>
+
+									<div class="col-span-3">
+										<Input
+											disabled={JSON.parse($companyFormObj.operatingHours)[day.id].isClosed}
+											type="time"
+											value={JSON.parse($companyFormObj.operatingHours)[day.id].closeTime.substring(
+												0,
+												5
+											)}
+											on:change={(e) => {
+												const hours = JSON.parse($companyFormObj.operatingHours);
+												hours[day.id].closeTime = e.currentTarget.value + ':00-05';
+												$companyFormObj.operatingHours = JSON.stringify(hours);
+											}}
+										/>
+									</div>
+								</div>
 							{/each}
 						</div>
+
+						<input
+							type="hidden"
+							name="operatingHours"
+							bind:value={$companyFormObj.operatingHours}
+						/>
 					</div>
 				</div>
-
 				<div class="mt-8">
-					<Button type="submit">Save Changes</Button>
+					<Button type="submit">
+						{#if $companyFormSubmitting}
+							<Loader class="mr-2 h-4 w-4 animate-spin" />
+						{:else}
+							Save Changes
+						{/if}
+					</Button>
 				</div>
 			</form>
 		{/if}
@@ -284,7 +394,7 @@
 					<div class="pt-4 mt-4 border-t">
 						{#if billingInfo?.clientSubscription?.stripeCustomerId}
 							<Button
-								class="w-full bg-blue-600 hover:bg-blue-700"
+								class="w-fit bg-blue-600 hover:bg-blue-700"
 								on:click={async () => {
 									try {
 										const response = await fetch('/api/stripe/create-portal-session', {

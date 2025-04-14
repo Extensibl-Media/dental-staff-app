@@ -11,6 +11,10 @@ $: invoices = data.invoices || [];
 
 </script>
 
+<svelte:head>
+    <title>Invoices | DentalStaff.US</title>
+</svelte:head>
+
 <section class="grow h-screen overflow-y-auto p-6 flex flex-col gap-6">
 	<div class=" flex items-center justify-between flex-wrap">
 		<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">Invoices</h1>

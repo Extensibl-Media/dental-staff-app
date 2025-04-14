@@ -52,10 +52,10 @@
 
 	$: {
 		tableData = (requisitions as RequisitionResults) ?? [];
-		pendingOptions.update((o) => ({
-			...o,
-			data: tableData.filter((req) => req.status === 'PENDING')
-		}));
+		// pendingOptions.update((o) => ({
+		// 	...o,
+		// 	data: tableData.filter((req) => req.status === 'PENDING')
+		// }));
 		filledOptions.update((o) => ({
 			...o,
 			data: tableData.filter((req) => req.status === 'FILLED')
@@ -171,12 +171,12 @@
 		}
 	];
 
-	const pendingOptions = writable<TableOptions<RequisitionDetailsRaw>>({
-		data: tableData.filter((req) => req.status === 'PENDING'),
-		columns: user?.role === USER_ROLES.SUPERADMIN ? adminColumns : clientColumns,
-		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel()
-	});
+	// const pendingOptions = writable<TableOptions<RequisitionDetailsRaw>>({
+	// 	data: tableData.filter((req) => req.status === 'PENDING'),
+	// 	columns: user?.role === USER_ROLES.SUPERADMIN ? adminColumns : clientColumns,
+	// 	getCoreRowModel: getCoreRowModel(),
+	// 	getSortedRowModel: getSortedRowModel()
+	// });
 
 	const filledOptions = writable<TableOptions<RequisitionDetailsRaw>>({
 		data: tableData.filter((req) => req.status === 'FILLED'),
@@ -208,10 +208,10 @@
 
 	onMount(() => {
 		tableData = (requisitions as RequisitionResults) ?? [];
-		pendingOptions.update((o) => ({
-			...o,
-			data: tableData.filter((req) => req.status === 'PENDING')
-		}));
+		// pendingOptions.update((o) => ({
+		// 	...o,
+		// 	data: tableData.filter((req) => req.status === 'PENDING')
+		// }));
 		filledOptions.update((o) => ({
 			...o,
 			data: tableData.filter((req) => req.status === 'FILLED')
@@ -227,7 +227,7 @@
 		}));
 	});
 
-	const pendingTable = createSvelteTable(pendingOptions);
+	// const pendingTable = createSvelteTable(pendingOptions);
 	const filledTable = createSvelteTable(filledOptions);
 	const unfulfilledTable = createSvelteTable(unfulfilledOptions);
 	const openTable = createSvelteTable(openOptions);
@@ -248,7 +248,7 @@
 			inactiveClasses="p-4 text-gray-500 rounded-t-lg hover:text-gray-600 hover:bg-gray-50"
 			activeClasses="border-b-2 border-b-blue-500 p-4 text-primary-600 bg-gray-100 rounded-t-lg"
 		>
-			<TabItem open title="Pending" on:click={() => resetQueryParams(true)}>
+			<!-- <TabItem open title="Pending" on:click={() => resetQueryParams(true)}>
 				<div class="p-4">
 					<div class="column">
 						{#if user?.role === USER_ROLES.SUPERADMIN}
@@ -341,8 +341,8 @@
 						>next</Button
 					>
 				</div>
-			</TabItem>
-			<TabItem title="Open" on:click={() => resetQueryParams(true)}>
+			</TabItem> -->
+			<TabItem open title="Open" on:click={() => resetQueryParams(true)}>
 				<div class="p-4">
 					<div class="column">
 						{#if user?.role === USER_ROLES.SUPERADMIN}

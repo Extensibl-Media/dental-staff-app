@@ -8,6 +8,7 @@
 	import NewSupportTicketDialog from '$lib/components/dialogs/newSupportTicketDialog.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { cn } from '$lib/utils';
+	import { format } from 'date-fns';
 
 	export let user;
 	export let data;
@@ -79,7 +80,7 @@
 				</Card.Content>
 			</Card.Root>
 		</div>
-		<div class="col-span-12 md:col-span-8">
+		<div class="col-span-12 lg:col-span-8">
 			<Card.Root>
 				<Card.Header class="flex flex-row justify-between items-center flex-wrap">
 					<Card.Title class="text-xl md:text-2xl">Requisitions</Card.Title>
@@ -129,7 +130,7 @@
 				</Card.Footer>
 			</Card.Root>
 		</div>
-		<div class="col-span-12 md:col-span-4">
+		<div class="col-span-12 lg:col-span-4">
 			<Card.Root>
 				<Card.Header class="flex flex-row justify-between items-center flex-wrap">
 					<Card.Title class="text-xl md:text-2xl">Support Tickets</Card.Title>
@@ -181,7 +182,7 @@
 				</Card.Footer>
 			</Card.Root>
 		</div>
-		<div class="col-span-12 md:col-span-6">
+		<div class="col-span-12 lg:col-span-6">
 			<Card.Root>
 				<Card.Header class="flex flex-row justify-between items-center flex-wrap">
 					<Card.Title class="text-xl md:text-2xl">Timesheets Due</Card.Title>
@@ -199,10 +200,10 @@
 							</Table.Row>
 						</Table.Header>
 						<Table.Body>
-							{#each timesheetsDue as timesheet, i (timesheet.id)}
+							{#each timesheetsDue as timesheet, i (timesheet.timesheet.id)}
 								<Table.Row
 									class="cursor-pointer"
-									on:click={() => goto(`/timesheets/${timesheet.id}`)}
+									on:click={() => goto(`/timesheets/${timesheet.timesheet.id}`)}
 								>
 									<Table.Cell>
 										<div class="flex flex-col">
@@ -211,21 +212,28 @@
 									</Table.Cell>
 
 									<Table.Cell>
-										<p>{user.firstName} {user.lastName}</p>
+										<p>{timesheet.candidate?.firstName} {timesheet.candidate?.lastName}</p>
 									</Table.Cell>
 									<Table.Cell>
 										<Badge
-											value={timesheet.status}
+											value={timesheet.timesheet.status}
 											class={cn(
-												timesheet.status === 'PENDING' && 'bg-yellow-300 hover:bg-yellow-400',
-												timesheet.status === 'NEW' && 'bg-green-400 hover:bg-bg-green-500',
-												timesheet.status === 'CLOSED' && 'bg-red-500 hover:bg-red-600'
-											)}
+                                                timesheet.timesheet.status === 'PENDING' && 'bg-yellow-300 hover:bg-yellow-400',
+                                                timesheet.timesheet.status === 'DISCREPANCY' && 'bg-orange-400 hover:bg-bg-orange-500',
+                                                timesheet.timesheet.status === 'APPROVED' && 'bg-green-400 hover:bg-green-600',
+                                                timesheet.timesheet.status === 'VOID' && 'bg-gray-200 hover:bg-gray-300',
+                                                timesheet.timesheet.status === 'REJECTED' && 'bg-red-500 hover:bg-red-500'
+                                            )}
 										/>
 									</Table.Cell>
 									<Table.Cell>
 										<span class="text-gray-500">
-											{formatTicketDate(timesheet.createdAt)}
+											{format(timesheet.timesheet.weekBeginDate, "PP")}
+										</span>
+									</Table.Cell>
+									<Table.Cell>
+										<span class="text-gray-500">
+											{timesheet.timesheet.totalHoursWorked}
 										</span>
 									</Table.Cell>
 								</Table.Row>
@@ -235,7 +243,7 @@
 				</Card.Content>
 			</Card.Root>
 		</div>
-		<div class="col-span-12 md:col-span-6">
+		<div class="col-span-12 lg:col-span-6">
 			<Card.Root>
 				<Card.Header class="flex flex-row justify-between items-center flex-wrap">
 					<Card.Title class="text-xl md:text-2xl">Recent Applications</Card.Title>
@@ -278,7 +286,7 @@
 									</Table.Cell>
 									<Table.Cell>
 										<span class="text-gray-500">
-											{formatTicketDate(application.createdAt)}
+											{format(application.createdAt, "PP")}
 										</span>
 									</Table.Cell>
 								</Table.Row>

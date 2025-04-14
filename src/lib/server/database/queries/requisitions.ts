@@ -17,7 +17,9 @@ import {
 	type Workday,
 	type InvoiceWithRelations,
 	type TimesheetWithRelations,
-	type TimeSheetSelect
+	type TimeSheetSelect,
+	type WorkdaySelect,
+	type RequisitionSelect
 } from '../schemas/requisition';
 import { userTable, type User } from '../schemas/auth';
 import {
@@ -35,12 +37,14 @@ import { regionTable, subRegionTable } from '../schemas/region';
 import {
 	candidateProfileTable,
 	candidateDisciplineExperienceTable,
-	type CandidateProfile
+	type CandidateProfile,
+	type CandidateProfileSelect
 } from '../schemas/candidate';
 import { error } from '@sveltejs/kit';
 import { writeActionHistory } from './admin';
-import { parseISO, differenceInMinutes } from 'date-fns';
+import { parseISO, differenceInMinutes, format, getDay } from 'date-fns';
 import type { PaginateOptions } from '$lib/types';
+import { normalizeDate } from '$lib/_helpers';
 
 // Types and Interfaces
 export interface TimesheetDiscrepancy {
@@ -59,13 +63,15 @@ export enum TimesheetDiscrepancyType {
 	HOURS_MISMATCH = 'HOURS_MISMATCH',
 	MISSING_RATE = 'MISSING_RATE',
 	INVALID_HOURS = 'INVALID_HOURS',
-	VALIDATION_MISSING = 'VALIDATION_MISSING',
-	SIGNATURE_MISSING = 'SIGNATURE_MISSING',
+	// VALIDATION_MISSING = 'VALIDATION_MISSING',
+	// SIGNATURE_MISSING = 'SIGNATURE_MISSING',
 	UNAUTHORIZED_WORKDAY = 'UNAUTHORIZED_WORKDAY'
 }
 
-interface Timesheet {
+export interface Timesheet {
 	timeSheetId?: string;
+	createdAt?: Date;
+	updatedAt?: Date;
 	totalHoursWorked?: string | null;
 	totalHoursBilled?: string | null;
 	weekBeginDate: Date;
@@ -73,12 +79,19 @@ interface Timesheet {
 	clientCompanyName: string | null;
 	validated: boolean | null;
 	awaitingClientSignature: boolean | null;
-	candidateRateBase: number | null;
-	candidateRateOT: number | null;
-	hoursRaw: Record<string, number>[];
+	candidateRateBase: string | null;
+	candidateRateOT: string | null;
+	hoursRaw: { date: string; startTime: string; endTime: string; hours: number }[];
 	workdayId: string | null;
-	recurrenceDayId?: string | null;
-	candidateId: string;
+	status: string;
+	candidate:
+		| (CandidateProfileSelect & {
+				email: string;
+				firstName: string;
+				lastName: string;
+				avatarUrl: string | null;
+		  })
+		| null;
 }
 
 export type RequisitionDetailsRaw = {
@@ -169,9 +182,10 @@ export async function getPaginatedRequisitionsAdmin({
 		// sorting segment
 		if (orderSelector && orderBy) {
 			query.append(sql`
-				ORDER BY ${orderBy.direction === 'asc'
-					? sql`${sql.raw(orderSelector)} ASC`
-					: sql`${sql.raw(orderSelector)} DESC`
+				ORDER BY ${
+					orderBy.direction === 'asc'
+						? sql`${sql.raw(orderSelector)} ASC`
+						: sql`${sql.raw(orderSelector)} DESC`
 				}
 			`);
 		} else {
@@ -238,9 +252,10 @@ export async function getPaginatedRequisitionsforClient(
 		// sorting segment
 		if (orderSelector && orderBy) {
 			query.append(sql`
-				ORDER BY ${orderBy.direction === 'asc'
-					? sql`${sql.raw(orderSelector)} ASC`
-					: sql`${sql.raw(orderSelector)} DESC`
+				ORDER BY ${
+					orderBy.direction === 'asc'
+						? sql`${sql.raw(orderSelector)} ASC`
+						: sql`${sql.raw(orderSelector)} DESC`
 				}
 			`);
 		} else {
@@ -386,17 +401,17 @@ export async function changeRequisitionStatus(
 			.where(eq(requisitionTable.id, original.id))
 			.returning();
 
-		await writeActionHistory({
-			table: requisitionTable,
-			userId,
-			action: 'UPDATE',
-			entityId: id.toString(),
-			beforeState: original,
-			afterState: update,
-			metadata: {
-				updatedField: 'STATUS'
-			}
-		});
+		// await writeActionHistory({
+		// 	table: requisitionTable,
+		// 	userId,
+		// 	action: 'UPDATE',
+		// 	entityId: id.toString(),
+		// 	beforeState: original,
+		// 	afterState: update,
+		// 	metadata: {
+		// 		updatedField: 'STATUS'
+		// 	}
+		// });
 
 		return update;
 	} else {
@@ -528,10 +543,7 @@ export const getRecentRequisitionApplications = async (companyId: string | undef
 				eq(candidateDisciplineExperienceTable.experienceLevelId, experienceLevelTable.id)
 			)
 			.where(
-				and(
-					eq(requisitionTable.permanentPosition, true),
-					eq(requisitionTable.companyId, companyId)
-				)
+				and(eq(requisitionTable.permanentPosition, true), eq(requisitionTable.companyId, companyId))
 			)
 			.orderBy(desc(requisitionApplicationTable.createdAt))
 			.limit(5);
@@ -686,11 +698,19 @@ export async function getRecentTimesheetsDueForClient(clientId: string) {
 			.select({
 				timesheet: { ...timeSheetTable },
 				requisition: { ...requisitionTable },
-				recurrenceDay: { ...recurrenceDayTable }
+				candidate: {
+					...candidateProfileTable,
+					firstName: userTable.firstName,
+					lastName: userTable.lastName
+				}
 			})
 			.from(timeSheetTable)
 			.leftJoin(requisitionTable, eq(requisitionTable.id, timeSheetTable.requisitionId))
-			.leftJoin(recurrenceDayTable, eq(recurrenceDayTable.id, timeSheetTable.recurrenceDayId))
+			.innerJoin(
+				candidateProfileTable,
+				eq(candidateProfileTable.id, timeSheetTable.associatedCandidateId)
+			)
+			.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
 			.where(
 				and(
 					eq(timeSheetTable.associatedClientId, clientId),
@@ -704,7 +724,36 @@ export async function getRecentTimesheetsDueForClient(clientId: string) {
 		return error(500, 'Error feching timesheets due count');
 	}
 }
+export async function getAllTimesheetsForClient(clientId: string | undefined) {
+	if (!clientId) throw new Error('Client ID required');
+	try {
+		const result = await db
+			.select({
+				timesheet: { ...timeSheetTable },
+				requisition: { ...requisitionTable },
+				candidate: {
+					...candidateProfileTable,
+					firstName: userTable.firstName,
+					lastName: userTable.lastName
+				}
+			})
+			.from(timeSheetTable)
+			.leftJoin(requisitionTable, eq(requisitionTable.id, timeSheetTable.requisitionId))
+			.innerJoin(
+				candidateProfileTable,
+				eq(candidateProfileTable.id, timeSheetTable.associatedCandidateId)
+			)
+			.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
+			.where(and(eq(timeSheetTable.associatedClientId, clientId)));
+
+		return result;
+	} catch (err) {
+		console.log(err);
+		return error(500, 'Error feching timesheets');
+	}
+}
 export async function getTimesheetsDueCount(clientId: string) {
+	console.log('getting timesheets count');
 	try {
 		const [result] = await db
 			.select({ count: count() })
@@ -718,15 +767,19 @@ export async function getTimesheetsDueCount(clientId: string) {
 
 		return result.count;
 	} catch (err) {
+		console.log('error getting timesheet count');
 		console.log(err);
 		return error(500, 'Error feching timesheets due count');
 	}
 }
 
+//admin
 export async function getAllTimesheetDiscrepancies(): Promise<TimesheetDiscrepancy[]> {
 	const timesheets = await db
 		.select({
 			timeSheetId: timeSheetTable.id,
+			createdAt: timeSheetTable.createdAt,
+			updatedAt: timeSheetTable.updatedAt,
 			totalHoursWorked: timeSheetTable.totalHoursWorked,
 			totalHoursBilled: timeSheetTable.totalHoursBilled,
 			weekBeginDate: timeSheetTable.weekBeginDate,
@@ -738,19 +791,25 @@ export async function getAllTimesheetDiscrepancies(): Promise<TimesheetDiscrepan
 			candidateRateOT: timeSheetTable.candidateRateOT,
 			hoursRaw: timeSheetTable.hoursRaw,
 			workdayId: timeSheetTable.workdayId,
-			recurrenceDayId: timeSheetTable.recurrenceDayId,
-			candidateId: timeSheetTable.associatedCandidateId
+			status: timeSheetTable.status,
+			candidate: {
+				...candidateProfileTable,
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				avatarUrl: userTable.avatarUrl,
+				email: userTable.email
+			}
 		})
 		.from(timeSheetTable)
 		.innerJoin(requisitionTable, eq(timeSheetTable.requisitionId, requisitionTable.id))
 		.innerJoin(clientProfileTable, eq(timeSheetTable.associatedClientId, clientProfileTable.id))
 		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
 		.leftJoin(workdayTable, eq(timeSheetTable.workdayId, workdayTable.id))
-		.leftJoin(recurrenceDayTable, eq(timeSheetTable.recurrenceDayId, recurrenceDayTable.id))
 		.leftJoin(
 			candidateProfileTable,
 			eq(timeSheetTable.associatedCandidateId, candidateProfileTable.id)
-		);
+		)
+		.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId));
 
 	const allDiscrepancies: TimesheetDiscrepancy[] = [];
 
@@ -770,6 +829,8 @@ export async function getClientCompanyTimesheetDiscrepancies(
 	const timesheets = await db
 		.select({
 			timeSheetId: timeSheetTable.id,
+			createdAt: timeSheetTable.createdAt,
+			updatedAt: timeSheetTable.updatedAt,
 			totalHoursWorked: timeSheetTable.totalHoursWorked,
 			totalHoursBilled: timeSheetTable.totalHoursBilled,
 			weekBeginDate: timeSheetTable.weekBeginDate,
@@ -781,19 +842,24 @@ export async function getClientCompanyTimesheetDiscrepancies(
 			candidateRateOT: timeSheetTable.candidateRateOT,
 			hoursRaw: timeSheetTable.hoursRaw,
 			workdayId: timeSheetTable.workdayId,
-			recurrenceDayId: timeSheetTable.recurrenceDayId,
-			candidateId: timeSheetTable.associatedCandidateId
+			candidate: {
+				...candidateProfileTable,
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				avatarUrl: userTable.avatarUrl,
+				email: userTable.email
+			}
 		})
 		.from(timeSheetTable)
 		.innerJoin(requisitionTable, eq(timeSheetTable.requisitionId, requisitionTable.id))
 		.innerJoin(clientProfileTable, eq(timeSheetTable.associatedClientId, clientProfileTable.id))
 		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
 		.leftJoin(workdayTable, eq(timeSheetTable.workdayId, workdayTable.id))
-		.leftJoin(recurrenceDayTable, eq(timeSheetTable.recurrenceDayId, recurrenceDayTable.id))
 		.leftJoin(
 			candidateProfileTable,
 			eq(timeSheetTable.associatedCandidateId, candidateProfileTable.id)
 		)
+		.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
 		.where(eq(clientProfileTable.id, clientProfileId));
 
 	const allDiscrepancies: TimesheetDiscrepancy[] = [];
@@ -804,11 +870,13 @@ export async function getClientCompanyTimesheetDiscrepancies(
 		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
 		allDiscrepancies.push(...discrepancies);
 	}
-
+	// console.log({ allDiscrepancies });
 	return allDiscrepancies;
 }
 
-async function getRecurrenceDaysForTimesheet(timesheet: any): Promise<RecurrenceDay[]> {
+export async function getRecurrenceDaysForTimesheet(timesheet: any): Promise<RecurrenceDay[]> {
+	console.log(timesheet);
+	console.log(timesheet.weekBeginDate);
 	const weekStart = new Date(timesheet.weekBeginDate);
 	const weekEnd = new Date(weekStart);
 	weekEnd.setDate(weekEnd.getDate() + 6);
@@ -834,60 +902,218 @@ async function getRecurrenceDaysForTimesheet(timesheet: any): Promise<Recurrence
 		);
 }
 
-async function getWorkdaysForTimesheet(timesheet: any) {
+export async function getTimesheetDetails(timesheetId: string, clientId: string | undefined) {
+	if (!clientId) throw error(400, 'Client ID required');
+	const [timesheet] = await db
+		.select({
+			timeSheetId: timeSheetTable.id,
+			createdAt: timeSheetTable.createdAt,
+			updatedAt: timeSheetTable.updatedAt,
+			totalHoursWorked: timeSheetTable.totalHoursWorked,
+			totalHoursBilled: timeSheetTable.totalHoursBilled,
+			weekBeginDate: timeSheetTable.weekBeginDate,
+			requisitionId: requisitionTable.id,
+			clientCompanyName: clientCompanyTable.companyName,
+			validated: timeSheetTable.validated,
+			awaitingClientSignature: timeSheetTable.awaitingClientSignature,
+			candidateRateBase: timeSheetTable.candidateRateBase,
+			candidateRateOT: timeSheetTable.candidateRateOT,
+			hoursRaw: timeSheetTable.hoursRaw,
+			workdayId: timeSheetTable.workdayId,
+			status: timeSheetTable.status,
+			candidate: {
+				...candidateProfileTable,
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				avatarUrl: userTable.avatarUrl,
+				email: userTable.email
+			}
+		})
+		.from(timeSheetTable)
+		.innerJoin(requisitionTable, eq(timeSheetTable.requisitionId, requisitionTable.id))
+		.innerJoin(clientProfileTable, eq(timeSheetTable.associatedClientId, clientProfileTable.id))
+		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
+		.leftJoin(workdayTable, eq(timeSheetTable.workdayId, workdayTable.id))
+		.leftJoin(
+			candidateProfileTable,
+			eq(timeSheetTable.associatedCandidateId, candidateProfileTable.id)
+		)
+		.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
+		.where(and(eq(timeSheetTable.id, timesheetId), eq(clientProfileTable.id, clientId)));
+
+	if (!timesheet) throw error(404, 'Timesheet not found');
+
+	return timesheet;
+}
+
+export async function getWorkdaysForTimesheet(timesheet: any) {
+	console.log({ timesheet });
 	return await db
 		.select()
 		.from(workdayTable)
 		.where(
 			and(
 				eq(workdayTable.requisitionId, timesheet.requisitionId),
-				eq(workdayTable.candidateId, timesheet.candidateId)
+				eq(workdayTable.candidateId, timesheet.candidate.id)
 			)
 		);
 }
 
-function validateTimesheet(
+export const getWorkdayDetails = async (
+	recurrenceDayId: string | undefined,
+	companyId: string | undefined
+) => {
+	if (!companyId) return error(400, 'Missing company id');
+	if (!recurrenceDayId) return error(400, 'Missing recurrence day id');
+
+	try {
+		const [result] = await db
+			.select({
+				// Workday details
+				workday: workdayTable,
+
+				// Candidate information
+				candidate: {
+					id: candidateProfileTable.id,
+					firstName: userTable.firstName,
+					lastName: userTable.lastName,
+					email: userTable.email,
+					phoneNumber: candidateProfileTable.cellPhone,
+					avatarUrl: userTable.avatarUrl
+				},
+				// Timesheet information
+				timesheet: {
+					id: timeSheetTable.id,
+					totalHoursWorked: timeSheetTable.totalHoursWorked,
+					totalHoursBilled: timeSheetTable.totalHoursBilled,
+					validated: timeSheetTable.validated,
+					awaitingClientSignature: timeSheetTable.awaitingClientSignature,
+					hoursRaw: timeSheetTable.hoursRaw
+				}
+			})
+			.from(workdayTable)
+			.innerJoin(candidateProfileTable, eq(workdayTable.candidateId, candidateProfileTable.id))
+			.innerJoin(userTable, eq(candidateProfileTable.userId, userTable.id))
+			.innerJoin(requisitionTable, eq(workdayTable.requisitionId, requisitionTable.id))
+			.innerJoin(clientCompanyTable, eq(requisitionTable.companyId, clientCompanyTable.id))
+			.innerJoin(
+				companyOfficeLocationTable,
+				eq(requisitionTable.locationId, companyOfficeLocationTable.id)
+			)
+			.innerJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id))
+			.leftJoin(
+				experienceLevelTable,
+				eq(requisitionTable.experienceLevelId, experienceLevelTable.id)
+			)
+			.leftJoin(timeSheetTable, eq(timeSheetTable.workdayId, workdayTable.id))
+			.where(
+				and(
+					eq(workdayTable.recurrenceDayId, recurrenceDayId),
+					eq(requisitionTable.companyId, companyId)
+				)
+			);
+
+		if (!result) {
+			return null;
+		}
+
+		return result;
+	} catch (err) {
+		console.error('Error fetching workday details:', err);
+		throw error(500, `Error fetching workday details: ${err}`);
+	}
+};
+
+export const getRecurrenceDayDetails = async (
+	recurrenceDayId: string,
+	companyId: string | undefined
+) => {
+	if (!companyId) return error(400, 'Missing company id');
+
+	try {
+		const [result] = await db
+			.select({
+				recurrenceDay: { ...recurrenceDayTable },
+				requisition: {
+					id: requisitionTable.id,
+					title: requisitionTable.title,
+					companyId: requisitionTable.companyId,
+					companyName: clientCompanyTable.companyName,
+					locationId: requisitionTable.locationId,
+					locationName: companyOfficeLocationTable.name,
+					disciplineId: requisitionTable.disciplineId,
+					disciplineName: disciplineTable.name,
+					jobDescription: requisitionTable.jobDescription,
+					specialInstructions: requisitionTable.specialInstructions,
+					experienceLevelId: requisitionTable.experienceLevelId,
+					experienceLevelName: experienceLevelTable.value,
+					hourlyRate: requisitionTable.hourlyRate,
+					status: requisitionTable.status,
+					permanentPosition: requisitionTable.permanentPosition
+				}
+			})
+			.from(recurrenceDayTable)
+			.innerJoin(requisitionTable, eq(recurrenceDayTable.requisitionId, requisitionTable.id))
+			.innerJoin(clientCompanyTable, eq(requisitionTable.companyId, clientCompanyTable.id))
+			.innerJoin(
+				companyOfficeLocationTable,
+				eq(requisitionTable.locationId, companyOfficeLocationTable.id)
+			)
+			.innerJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id))
+			.leftJoin(
+				experienceLevelTable,
+				eq(requisitionTable.experienceLevelId, experienceLevelTable.id)
+			)
+			.where(eq(recurrenceDayTable.id, recurrenceDayId));
+
+		if (!result) {
+			throw error(404, 'Recurrence Day Not Found');
+		}
+		return result;
+	} catch (err) {
+		console.error('Error fetching recurrence day details:', err);
+		throw error(500, `Error fetching recurrence day details: ${err}`);
+	}
+};
+
+export function validateTimesheet(
 	timesheet: Timesheet,
 	recurrenceDays: RecurrenceDay[],
 	workdays: Workday[]
 ): TimesheetDiscrepancy[] {
 	const discrepancies: TimesheetDiscrepancy[] = [];
-	const recurrenceDayMap = new Map(recurrenceDays.map((rd) => [rd.date, rd]));
+	// Create a mapping of workdays by recurrenceDayId for lookup
 	const workdayMap = new Map(workdays.map((wd) => [wd.recurrenceDayId, wd]));
+
+	// Group recurrence days by date for better lookup, keeping all IDs for each date
+	const recurrenceDaysByDate = new Map();
+	for (const rd of recurrenceDays) {
+		const dateKey = normalizeDate(rd.date);
+		if (!recurrenceDaysByDate.has(dateKey)) {
+			recurrenceDaysByDate.set(dateKey, []);
+		}
+		recurrenceDaysByDate.get(dateKey).push(rd);
+	}
 
 	// Validate hours entries against recurrence days
 	if (timesheet.hoursRaw && Array.isArray(timesheet.hoursRaw)) {
-		const weekDates = Array.from({ length: 7 }, (_, i) => {
-			const date = new Date(timesheet.weekBeginDate);
-			date.setDate(date.getDate() + i);
-			return date.toISOString().split('T')[0];
-		});
-
 		for (const entry of timesheet.hoursRaw) {
-			// Basic validation
-			if (typeof entry.day !== 'number' || entry.day < 0 || entry.day > 6) {
-				discrepancies.push({
-					...createBaseDiscrepancy(timesheet),
-					discrepancyType: TimesheetDiscrepancyType.INVALID_HOURS,
-					details: `Invalid day number: ${entry.day}`
-				});
-				continue;
-			}
-
+			// console.log('Entry', entry);
 			if (typeof entry.hours !== 'number' || entry.hours < 0) {
 				discrepancies.push({
 					...createBaseDiscrepancy(timesheet),
 					discrepancyType: TimesheetDiscrepancyType.INVALID_HOURS,
-					details: `Invalid hours value: ${entry.hours} for day ${entry.day}`
+					details: `Invalid hours value: ${entry.hours} for day ${entry.date}`
 				});
 				continue;
 			}
 
-			const entryDate = weekDates[entry.day];
-			const recurrenceDay = recurrenceDayMap.get(entryDate);
+			const entryDate = entry.date;
+			// console.log(entryDate);
+			const recurrenceDaysForDate = recurrenceDaysByDate.get(entryDate);
 
 			// Validate against recurrence days
-			if (!recurrenceDay) {
+			if (!recurrenceDaysForDate || recurrenceDaysForDate.length === 0) {
 				discrepancies.push({
 					...createBaseDiscrepancy(timesheet),
 					discrepancyType: TimesheetDiscrepancyType.UNAUTHORIZED_WORKDAY,
@@ -897,7 +1123,18 @@ function validateTimesheet(
 			}
 
 			// Validate against workdays
-			if (!workdayMap.has(recurrenceDay.id)) {
+			let hasApprovedWorkday = false;
+			let validRecurrenceDay = null;
+
+			for (const rd of recurrenceDaysForDate) {
+				if (workdayMap.has(rd.id)) {
+					hasApprovedWorkday = true;
+					validRecurrenceDay = rd;
+					break;
+				}
+			}
+
+			if (!hasApprovedWorkday) {
 				discrepancies.push({
 					...createBaseDiscrepancy(timesheet),
 					discrepancyType: TimesheetDiscrepancyType.UNAUTHORIZED_WORKDAY,
@@ -907,7 +1144,7 @@ function validateTimesheet(
 			}
 
 			// Validate hours against schedule
-			const maxHours = calculateMaxHours(recurrenceDay);
+			const maxHours = calculateMaxHours(validRecurrenceDay);
 			if (entry.hours > maxHours) {
 				discrepancies.push({
 					...createBaseDiscrepancy(timesheet),
@@ -922,7 +1159,6 @@ function validateTimesheet(
 			(sum: number, entry: any) => sum + entry.hours,
 			0
 		);
-
 		if (Math.abs(totalSubmitted - Number(timesheet.totalHoursWorked)) > 0.01) {
 			discrepancies.push({
 				...createBaseDiscrepancy(timesheet),
@@ -944,12 +1180,12 @@ function calculateMaxHours(recurrenceDay: RecurrenceDay): number {
 	const baseDate = '2000-01-01';
 	const dayStart = parseISO(`${baseDate}T${recurrenceDay.dayStartTime}`);
 	const dayEnd = parseISO(`${baseDate}T${recurrenceDay.dayEndTime}`);
-	const lunchStart = parseISO(`${baseDate}T${recurrenceDay.lunchStartTime}`);
-	const lunchEnd = parseISO(`${baseDate}T${recurrenceDay.lunchEndTime}`);
+	// const lunchStart = parseISO(`${baseDate}T${recurrenceDay.lunchStartTime}`);
+	// const lunchEnd = parseISO(`${baseDate}T${recurrenceDay.lunchEndTime}`);
 
 	// Calculate total minutes worked
-	const totalMinutes =
-		differenceInMinutes(dayEnd, dayStart) - differenceInMinutes(lunchEnd, lunchStart);
+	const totalMinutes = differenceInMinutes(dayEnd, dayStart);
+	// - differenceInMinutes(lunchEnd, lunchStart);
 
 	// Convert to hours and round to 2 decimal places
 	return Math.round((totalMinutes / 60) * 100) / 100;
@@ -966,29 +1202,29 @@ function validateBasicTimesheet(timesheet: Timesheet, discrepancies: TimesheetDi
 	}
 
 	// Check for validation status
-	if (!timesheet.validated) {
-		discrepancies.push({
-			...createBaseDiscrepancy(timesheet),
-			discrepancyType: TimesheetDiscrepancyType.VALIDATION_MISSING,
-			details: 'Timesheet has not been validated'
-		});
-	}
+	// if (!timesheet.validated) {
+	// 	discrepancies.push({
+	// 		...createBaseDiscrepancy(timesheet),
+	// 		discrepancyType: TimesheetDiscrepancyType.VALIDATION_MISSING,
+	// 		details: 'Timesheet has not been validated'
+	// 	});
+	// }
 
 	// Check for signature status
-	if (timesheet.awaitingClientSignature) {
-		discrepancies.push({
-			...createBaseDiscrepancy(timesheet),
-			discrepancyType: TimesheetDiscrepancyType.SIGNATURE_MISSING,
-			details: 'Awaiting client signature'
-		});
-	}
+	// if (timesheet.awaitingClientSignature) {
+	// 	discrepancies.push({
+	// 		...createBaseDiscrepancy(timesheet),
+	// 		discrepancyType: TimesheetDiscrepancyType.SIGNATURE_MISSING,
+	// 		details: 'Awaiting client signature'
+	// 	});
+	// }
 }
 
 function createBaseDiscrepancy(timesheet: Timesheet): Partial<TimesheetDiscrepancy> {
 	return {
 		timeSheetId: timesheet.timeSheetId,
 		clientCompanyName: timesheet.clientCompanyName,
-		candidateId: timesheet.candidateId,
+		candidateId: timesheet.candidate?.id,
 		requisitionId: timesheet.requisitionId,
 		weekBeginDate: timesheet.weekBeginDate
 	};
@@ -1002,7 +1238,7 @@ export function formatDiscrepancyForDisplay(
 		clientCompanyName: d.clientCompanyName,
 		candidateId: d.candidateId,
 		requisitionId: d.requisitionId,
-		weekBeginning: d.weekBeginDate?.toISOString().split('T')[0],
+		weekBeginning: d.weekBeginDate,
 		discrepancyType: d.discrepancyType,
 		details: d.details,
 		hoursDiscrepancy: d.hoursDiscrepancy ? Number(d.hoursDiscrepancy).toFixed(2) : undefined
@@ -1017,7 +1253,7 @@ export async function getClientTimesheets(
 	const results = await db
 		.select({
 			timesheet: timeSheetTable,
-			candidate: candidateProfileTable,
+			candidate: { ...candidateProfileTable },
 			user: {
 				id: userTable.email,
 				firstName: userTable.firstName,
@@ -1025,8 +1261,7 @@ export async function getClientTimesheets(
 				avatarUrl: userTable.avatarUrl
 			},
 			requisition: requisitionTable,
-			workday: workdayTable,
-			recurrenceDay: recurrenceDayTable
+			workday: workdayTable
 		})
 		.from(timeSheetTable)
 		.where(eq(timeSheetTable.associatedClientId, clientId))
@@ -1037,7 +1272,6 @@ export async function getClientTimesheets(
 		.innerJoin(userTable, eq(candidateProfileTable.userId, userTable.id))
 		.leftJoin(requisitionTable, eq(timeSheetTable.requisitionId, requisitionTable.id))
 		.innerJoin(workdayTable, eq(timeSheetTable.workdayId, workdayTable.id))
-		.leftJoin(recurrenceDayTable, eq(timeSheetTable.recurrenceDayId, recurrenceDayTable.id))
 		.orderBy(desc(timeSheetTable.weekBeginDate));
 
 	if (!results.length) {
@@ -1062,9 +1296,7 @@ export async function getClientInvoices(
 				avatarUrl: userTable.avatarUrl
 			},
 			timesheet: timeSheetTable,
-			requisition: requisitionTable,
-			workday: workdayTable,
-			recurrenceDay: recurrenceDayTable
+			requisition: requisitionTable
 		})
 		.from(invoiceTable)
 		.where(eq(invoiceTable.clientId, clientId))
@@ -1072,12 +1304,138 @@ export async function getClientInvoices(
 		.innerJoin(userTable, eq(candidateProfileTable.userId, userTable.id))
 		.innerJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
 		.innerJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
-		.innerJoin(workdayTable, eq(invoiceTable.workdayId, workdayTable.id))
-		.leftJoin(recurrenceDayTable, eq(invoiceTable.recurrenceDayId, recurrenceDayTable.id))
 		.orderBy(desc(invoiceTable.createdAt));
 
 	if (!results.length) {
 		return [];
 	}
 	return results;
+}
+
+/**
+ * Get a workday by its ID
+ * @param workdayId The ID of the workday to fetch
+ * @returns The workday or null if not found
+ */
+export async function getWorkdayById(workdayId: string): Promise<WorkdaySelect | null> {
+	try {
+		const [workday] = await db.select().from(workdayTable).where(eq(workdayTable.id, workdayId));
+
+		return workday || null;
+	} catch (err) {
+		console.error('Error fetching workday:', err);
+		throw error(500, `Error fetching workday: ${err}`);
+	}
+}
+
+/**
+ * Get requisition associated with a workday
+ * @param workdayId The ID of the workday
+ * @returns The requisition details or null if not found
+ */
+export async function getRequisitionByWorkdayId(
+	workdayId: string
+): Promise<RequisitionSelect | null> {
+	try {
+		// First get the workday to access its requisitionId
+		const workday = await getWorkdayById(workdayId);
+
+		if (!workday) {
+			return null;
+		}
+
+		// Now get the requisition using the requisitionId from the workday
+		const [requisition] = await db
+			.select()
+			.from(requisitionTable)
+			.where(eq(requisitionTable.id, workday.requisitionId));
+
+		return requisition || null;
+	} catch (err) {
+		console.error('Error fetching requisition by workday ID:', err);
+		throw error(500, `Error fetching requisition: ${err}`);
+	}
+}
+
+/**
+ * Get recurrence day associated with a workday
+ * @param workdayId The ID of the workday
+ * @returns The recurrence day details or null if not found
+ */
+export async function getRecurrenceDayByWorkdayId(
+	workdayId: string
+): Promise<RecurrenceDaySelect | null> {
+	try {
+		// First get the workday to access its recurrenceDayId
+		const workday = await getWorkdayById(workdayId);
+
+		if (!workday || !workday.recurrenceDayId) {
+			return null;
+		}
+
+		// Now get the recurrence day using the recurrenceDayId from the workday
+		const [recurrenceDay] = await db
+			.select()
+			.from(recurrenceDayTable)
+			.where(eq(recurrenceDayTable.id, workday.recurrenceDayId));
+
+		return recurrenceDay || null;
+	} catch (err) {
+		console.error('Error fetching recurrence day by workday ID:', err);
+		throw error(500, `Error fetching recurrence day: ${err}`);
+	}
+}
+
+/**
+ * Get both requisition and recurrence day associated with a workday in a single function
+ * @param workdayId The ID of the workday
+ * @returns Object containing the workday, requisition, and recurrence day
+ */
+export async function getWorkdayWithRelations(workdayId: string): Promise<{
+	workday: WorkdaySelect | null;
+	requisition: RequisitionSelect | null;
+	recurrenceDay: RecurrenceDaySelect | null;
+}> {
+	try {
+		const [result] = await db
+			.select({
+				workday: workdayTable,
+				requisition: requisitionTable,
+				recurrenceDay: recurrenceDayTable
+			})
+			.from(workdayTable)
+			.where(eq(workdayTable.id, workdayId))
+			.leftJoin(requisitionTable, eq(workdayTable.requisitionId, requisitionTable.id))
+			.leftJoin(recurrenceDayTable, eq(workdayTable.recurrenceDayId, recurrenceDayTable.id));
+
+		if (!result) {
+			return { workday: null, requisition: null, recurrenceDay: null };
+		}
+
+		return result;
+	} catch (err) {
+		console.error('Error fetching workday with relations:', err);
+		throw error(500, `Error fetching workday with relations: ${err}`);
+	}
+}
+
+/**
+ * Get all workdays for a specific recurrence day
+ * @param recurrenceDayId The ID of the recurrence day
+ * @returns Array of workdays associated with the recurrence day
+ */
+export async function getWorkdaysByRecurrenceDayId(
+	recurrenceDayId: string
+): Promise<WorkdaySelect[]> {
+	try {
+		const workdays = await db
+			.select()
+			.from(workdayTable)
+			.where(eq(workdayTable.recurrenceDayId, recurrenceDayId));
+
+		return workdays;
+	} catch (err) {
+		console.error('Error fetching workdays by recurrence day ID:', err);
+		throw error(500, `Error fetching workdays: ${err}`);
+	}
 }

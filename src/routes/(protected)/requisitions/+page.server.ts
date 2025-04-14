@@ -59,8 +59,8 @@ export const load = async (event) => {
 	}
 
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
-		const client = await getClientProfileByStaffUserId(user.id)
-		const company = await getClientCompanyByClientId(client?.id)
+		const client = await getClientProfileByStaffUserId(user.id);
+		const company = await getClientCompanyByClientId(client?.id);
 
 		const form = superValidate(event, clientRequisitionSchema);
 
@@ -70,7 +70,7 @@ export const load = async (event) => {
 			orderBy
 		});
 
-		console.log({ client, company, results })
+		console.log({ client, company, results });
 		return {
 			user,
 			requisitions: results?.requisitions || [],
@@ -91,9 +91,9 @@ export const load = async (event) => {
 
 export const actions = {
 	admin: async (event: RequestEvent) => {
-		const user = event.locals.user
+		const user = event.locals.user;
 		if (!user) {
-			return fail(403)
+			return fail(403);
 		}
 		const formData = await event.request.formData();
 
@@ -118,17 +118,21 @@ export const actions = {
 			experienceLevelId
 		});
 
-		const newRequisition = await createRequisition({
-			createdAt: new Date(),
-			updatedAt: new Date(),
-			title,
-			companyId,
-			locationId,
-			disciplineId,
-			jobDescription,
-			specialInstructions,
-			experienceLevelId
-		}, user.id);
+		const newRequisition = await createRequisition(
+			{
+				createdAt: new Date(),
+				updatedAt: new Date(),
+				title,
+				companyId,
+				locationId,
+				disciplineId,
+				jobDescription,
+				specialInstructions,
+				experienceLevelId,
+				status: 'OPEN'
+			},
+			user.id
+		);
 
 		if (newRequisition) {
 			setFlash({ type: 'success', message: 'New Requisition Created.' }, event);
@@ -136,10 +140,10 @@ export const actions = {
 		}
 	},
 	client: async (event: RequestEvent) => {
-		const user = event.locals.user
+		const user = event.locals.user;
 
 		if (!user) {
-			return fail(403)
+			return fail(403);
 		}
 		const client =
 			user && user?.role === USER_ROLES.CLIENT_STAFF
@@ -166,19 +170,23 @@ export const actions = {
 		const permanentPosition = formData.get('permanentPosition');
 		const hourlyRate = Number(formData.get('hourlyRate'));
 
-		const newRequisition = await createRequisition({
-			createdAt: new Date(),
-			updatedAt: new Date(),
-			title,
-			companyId,
-			locationId,
-			hourlyRate,
-			permanentPosition: permanentPosition as unknown as boolean,
-			disciplineId,
-			jobDescription,
-			specialInstructions,
-			experienceLevelId
-		}, user.id);
+		const newRequisition = await createRequisition(
+			{
+				createdAt: new Date(),
+				updatedAt: new Date(),
+				title,
+				companyId,
+				locationId,
+				hourlyRate,
+				permanentPosition: permanentPosition as unknown as boolean,
+				disciplineId,
+				jobDescription,
+				specialInstructions,
+				experienceLevelId,
+				status: 'OPEN'
+			},
+			user.id
+		);
 
 		if (newRequisition) {
 			setFlash({ type: 'success', message: 'New Requisition Created.' }, event);

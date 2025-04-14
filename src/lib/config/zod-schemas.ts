@@ -1,5 +1,18 @@
 import { z } from 'zod';
 
+export type Primitive = string | number | boolean | null;
+
+export type JsonType = Primitive | { [key: PropertyKey]: JsonType } | JsonType[];
+
+export const zJsonString = z.string().transform((str, ctx): JsonType => {
+	try {
+		return JSON.parse(str);
+	} catch (e) {
+		ctx.addIssue({ code: 'custom', message: 'Invalid JSON' });
+		return z.NEVER;
+	}
+});
+
 export const userSchema = z.object({
 	firstName: z
 		.string({ required_error: 'First Name is required' })
@@ -211,3 +224,41 @@ export const newSupportTicketSchema = z.object({
 });
 
 export type NewSupportTicketSchema = typeof newSupportTicketSchema;
+
+export const newCandidateProfileSchema = z.object({
+	address: z.string().optional(),
+	hourlyRateMin: z.number().optional(),
+	hourlyRateMax: z.number().optional(),
+	city: z.string().optional(),
+	state: z.string().optional(),
+	zipcode: z.string().optional(),
+	cellPhone: z.string().optional(),
+	citizenship: z.string().optional(),
+	birthday: z.string().optional(),
+	regionId: z.string().optional()
+});
+export type NewCandidateProfileSchema = typeof newCandidateProfileSchema;
+
+export const fileUploadSchema = z.object({
+	file: z.instanceof(File, { message: 'Please upload a file.' })
+});
+
+export type FileUploadSchema = typeof fileUploadSchema;
+
+export const candidateDocumentUploadSchema = z.object({
+	type: z.enum(['RESUME', 'LICENSE', 'CERTIFICATE', 'OTHER']).optional(),
+	filename: z.string().optional(),
+	url: z.string().optional(),
+	urls: z.array(z.string()).optional(),
+	createdAt: z.date().optional(),
+	filesData: z
+		.array(
+			z.object({
+				filename: z.string(),
+				url: z.string()
+			})
+		)
+		.optional()
+});
+
+export type CandidateDocumentUploadSchema = typeof candidateDocumentUploadSchema;

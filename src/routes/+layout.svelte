@@ -2,7 +2,7 @@
 	import type { LayoutData } from './$types';
 	import '../app.pcss';
 	import { page } from '$app/stores';
-	// import { ModeWatcher } from 'mode-watcher';
+	import { ModeWatcher } from 'mode-watcher';
 	import { getFlash } from 'sveltekit-flash-message';
 	import { Toaster } from '$lib/components/ui/sonner';
 	import { toast } from 'svelte-sonner';
@@ -24,9 +24,11 @@
 				break;
 		}
 	}
+	import { setMode } from 'mode-watcher';
+	setMode("light");
 </script>
 
-<!-- <ModeWatcher /> -->
+<ModeWatcher />
 <Toaster richColors />
 <div class="relative flex min-h-screen flex-col overflow-hidden">
 	<slot />

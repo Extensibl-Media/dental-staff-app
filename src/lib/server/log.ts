@@ -1,6 +1,6 @@
-// import { Axiom } from '@axiomhq/js';
+import { Axiom } from '@axiomhq/js';
 //import Analytics from '@june-so/analytics-node';
-// import { AXIOM_TOKEN, AXIOM_ORG_ID, AXIOM_DATASET } from '$env/static/private';
+import { AXIOM_TOKEN, AXIOM_ORG_ID, AXIOM_DATASET } from '$env/static/private';
 import getAllUrlParams from '$lib/_helpers/getAllUrlParams';
 import parseTrack from '$lib/_helpers/parseTrack';
 import parseMessage from '$lib/_helpers/parseMessage';
@@ -57,11 +57,11 @@ export default async function log(statusCode: number, event) {
 			...trackEvents
 		};
 		console.log('log: ', JSON.stringify(logData));
-		// const client = new Axiom({
-		// 	token: AXIOM_TOKEN,
-		// 	orgId: AXIOM_ORG_ID
-		// });
-		// client.ingest(AXIOM_DATASET, [logData]);
+		const client = new Axiom({
+			token: AXIOM_TOKEN,
+			orgId: AXIOM_ORG_ID
+		});
+		client.ingest(AXIOM_DATASET, [logData]);
 		/*	const analytics = new Analytics('695GiY4XhI9EcYjP');
 		analytics.identify({
 			userId: event?.locals?.user?.userId,

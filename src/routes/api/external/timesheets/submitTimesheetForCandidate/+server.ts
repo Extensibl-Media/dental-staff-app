@@ -2,203 +2,153 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import db from '$lib/server/database/drizzle';
 import { candidateProfileTable } from '$lib/server/database/schemas/candidate';
-import { timeSheetTable } from '$lib/server/database/schemas/requisition';
+import {
+	timeSheetTable,
+	type RawTimesheetHours,
+	type TimeSheet
+} from '$lib/server/database/schemas/requisition';
 import { requisitionTable } from '$lib/server/database/schemas/requisition';
 import { workdayTable } from '$lib/server/database/schemas/requisition';
 import { authenticateUser } from '$lib/server/serverUtils';
 import { and, eq } from 'drizzle-orm';
 import { env } from '$env/dynamic/private';
 import { getClientIdByCompanyId } from '$lib/server/database/queries/clients';
+import { getCandidateProfileByUserId } from '$lib/server/database/queries/candidates';
+import { z } from 'zod';
+import {
+	getRequisitionByWorkdayId,
+	getWorkdayWithRelations
+} from '$lib/server/database/queries/requisitions';
+
+const newTimesheetSchema = z.object({
+	userId: z.string().min(1, 'User ID is required'),
+	companyId: z.string().min(1, 'Company ID is required'),
+	weekStartDate: z.string().min(1, 'Week start date is required'),
+	entries: z.array(
+		z.object({
+			workdayId: z.string().min(1, 'Workday ID is required'),
+			hours: z.number().min(1, 'Hours worked is required'),
+			startTime: z.string().min(1, 'Start time is required'),
+			endTime: z.string().min(1, 'End time is required'),
+			date: z.string().min(1, 'Date is required')
+		})
+	),
+	totalHours: z.number().min(1, 'Total hours is required')
+});
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': env.CANDIDATE_APP_DOMAIN,
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Credentials': 'true'
+	'Access-Control-Allow-Origin': env.CANDIDATE_APP_DOMAIN,
+	'Access-Control-Allow-Methods': 'POST, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+	'Access-Control-Allow-Credentials': 'true'
 };
 
 export const OPTIONS: RequestHandler = async () => {
-  return new Response(null, {
-    headers: corsHeaders
-  });
+	return new Response(null, {
+		headers: corsHeaders
+	});
 };
 
 export const POST: RequestHandler = async ({ request }) => {
-  try {
-    // Validate content type
-    const contentType = request.headers.get('content-type');
-    if (!contentType?.includes('application/json')) {
-      return json(
-        { success: false, message: 'Content-Type must be application/json' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
+	try {
+		// Validate content type
+		const contentType = request.headers.get('content-type');
+		if (!contentType?.includes('application/json')) {
+			return json(
+				{ success: false, message: 'Content-Type must be application/json' },
+				{ status: 400, headers: corsHeaders }
+			);
+		}
 
-    // Authenticate user
-    const user = await authenticateUser(request);
-    if (!user) {
-      return json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401, headers: corsHeaders }
-      );
-    }
+		// Authenticate user
+		const user = await authenticateUser(request);
+		if (!user) {
+			return json(
+				{ success: false, message: 'Unauthorized' },
+				{ status: 401, headers: corsHeaders }
+			);
+		}
 
-    // Validate request body
-    const body = await request.json().catch(() => null);
-    if (!body ||
-      typeof body.workdayId !== 'string' ||
-      typeof body.requisitionId !== 'number' ||
-      typeof body.recurrenceDayId !== 'string' ||
-      typeof body.weekBeginDate !== 'string' ||
-      !Array.isArray(body.hoursRaw) ||
-      typeof body.totalHoursWorked !== 'number' ||
-      typeof body.candidateRateBase !== 'number' ||
-      typeof body.candidateRateOT !== 'number') {
-      return json(
-        { success: false, message: 'Invalid request body' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
+		// Validate request body
+		const body = await request.json().catch((err) => console.log(err));
 
-    const {
-      workdayId,
-      requisitionId,
-      recurrenceDayId,
-      weekBeginDate,
-      hoursRaw,
-      totalHoursWorked,
-      candidateRateBase,
-      candidateRateOT
-    } = body;
+		console.log({ body });
 
-    return await db.transaction(async (tx) => {
-      // Get candidate profile
-      const candidateProfile = await tx
-        .select()
-        .from(candidateProfileTable)
-        .where(eq(candidateProfileTable.userId, user.id))
-        .limit(1)
-        .then((rows) => rows[0]);
+		if (!body) {
+			return json(
+				{ success: false, message: 'Invalid JSON body' },
+				{ status: 400, headers: corsHeaders }
+			);
+		}
 
-      if (!candidateProfile) {
-        return json(
-          { success: false, message: 'Candidate profile not found' },
-          { status: 404, headers: corsHeaders }
-        );
-      }
+		const parsedBody = newTimesheetSchema.safeParse(body);
+		if (!parsedBody.success) {
+			return json(
+				{ success: false, message: parsedBody.error.errors[0].message },
+				{ status: 400, headers: corsHeaders }
+			);
+		}
+		const { userId, companyId, weekStartDate, entries } = parsedBody.data;
 
-      // Verify requisition exists
-      const requisition = await tx
-        .select()
-        .from(requisitionTable)
-        .where(eq(requisitionTable.id, requisitionId))
-        .limit(1)
-        .then((rows) => rows[0]);
+		const candidateProfile = await getCandidateProfileByUserId(userId);
+		const clientId = await getClientIdByCompanyId(companyId);
 
-      if (!requisition) {
-        return json(
-          { success: false, message: 'Requisition not found' },
-          { status: 404, headers: corsHeaders }
-        );
-      }
+		const workdayIds = entries.map((entry) => entry.workdayId);
 
-      // Verify workday exists
-      const workday = await tx
-        .select()
-        .from(workdayTable)
-        .where(eq(workdayTable.id, workdayId))
-        .limit(1)
-        .then((rows) => rows[0]);
+		const timesheetEntries: RawTimesheetHours[] = entries.map((entry) => ({
+			hours: entry.hours,
+			startTime: entry.startTime,
+			endTime: entry.endTime,
+			date: entry.date
+		}));
 
-      if (!workday) {
-        return json(
-          { success: false, message: 'Workday not found' },
-          { status: 404, headers: corsHeaders }
-        );
-      }
+		const workdayId = workdayIds[0];
+		const requisition = await getRequisitionByWorkdayId(workdayId);
 
-      const clientId = await getClientIdByCompanyId(requisition.companyId);
+		const timesheetData: TimeSheet = {
+			id: crypto.randomUUID(),
+			createdAt: new Date(),
+			updatedAt: new Date(),
+			workdayId,
+			associatedCandidateId: candidateProfile.id,
+			associatedClientId: clientId,
+			requisitionId: requisition?.id,
+			weekBeginDate: new Date(weekStartDate),
+			totalHoursWorked: parsedBody.data.totalHours.toString(),
+			hoursRaw: timesheetEntries,
+			candidateRateBase: candidateProfile.hourlyRateMin,
+			candidateRateOT: candidateProfile.hourlyRateMin * 1.5
+		};
 
-      // Check for existing timesheet
-      const existingTimesheet = await tx
-        .select()
-        .from(timeSheetTable)
-        .where(
-          and(
-            eq(timeSheetTable.workdayId, workdayId),
-            eq(timeSheetTable.associatedCandidateId, candidateProfile.id),
-            eq(timeSheetTable.requisitionId, requisitionId)
-          )
-        )
-        .limit(1)
-        .then((rows) => rows[0]);
+		console.log('Timesheet Data submitted: ', timesheetData);
 
-      if (existingTimesheet) {
-        return json(
-          { success: false, message: 'Timesheet already exists for this workday' },
-          { status: 400, headers: corsHeaders }
-        );
-      }
+		const [result] = await db.insert(timeSheetTable).values(timesheetData).returning();
 
-      // Create timesheet with all required fields
-      const [timesheet] = await tx
-        .insert(timeSheetTable)
-        .values({
-          id: crypto.randomUUID(),
-          workdayId,
-          requisitionId,
-          recurrenceDayId,
-          associatedClientId: clientId,
-          associatedCandidateId: candidateProfile.id,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          validated: false,
-          totalHoursWorked,
-          awaitingClientSignature: true,
-          candidateRateBase,
-          candidateRateOT,
-          weekBeginDate: new Date(weekBeginDate),
-          hoursRaw
-        })
-        .returning();
+		return json(
+			{ success: true, message: 'Timesheet submitted successfully', data: result },
+			{
+				status: 200,
+				headers: corsHeaders
+			}
+		);
+	} catch (err) {
+		console.error('Error in POST /api/external/timesheets/submitTimesheetForCandidate:', err);
+		if (err instanceof Error && 'status' in err && 'body' in err) {
+			return json(
+				{ success: false, message: (err as any).body.message },
+				{
+					status: (err as any).status,
+					headers: corsHeaders
+				}
+			);
+		}
 
-      console.log(`New timesheet created: ${timesheet.id} for workday: ${workdayId}`);
-
-      return json(
-        {
-          success: true,
-          data: {
-            timesheet: {
-              id: timesheet.id,
-              totalHoursWorked: timesheet.totalHoursWorked,
-              totalHoursBilled: timesheet.totalHoursBilled,
-              validated: timesheet.validated,
-              awaitingClientSignature: timesheet.awaitingClientSignature,
-              createdAt: timesheet.createdAt
-            }
-          }
-        },
-        { headers: corsHeaders }
-      );
-    });
-  } catch (err) {
-    console.error('Error in POST /api/external/timesheets/submitTimesheetForCandidate:', err);
-    if (err instanceof Error && 'status' in err && 'body' in err) {
-      return json(
-        { success: false, message: (err as any).body.message },
-        {
-          status: (err as any).status,
-          headers: corsHeaders
-        }
-      );
-    }
-
-    return json(
-      { success: false, message: 'Internal server error' },
-      {
-        status: 500,
-        headers: corsHeaders
-      }
-    );
-  }
+		return json(
+			{ success: false, message: 'Internal server error' },
+			{
+				status: 500,
+				headers: corsHeaders
+			}
+		);
+	}
 };

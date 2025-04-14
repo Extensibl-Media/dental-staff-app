@@ -12,6 +12,9 @@ import {
 } from '$lib/server/database/queries/clients.js';
 import { Argon2id } from 'oslo/password';
 import { getClientBillingInfo } from '$lib/server/database/queries/billing.js';
+import db from '$lib/server/database/drizzle.js';
+import { eq } from 'drizzle-orm';
+import { clientCompanyTable } from '$lib/server/database/schemas/client.js';
 
 const userProfileSchema = userSchema.pick({
 	firstName: true,
@@ -29,12 +32,12 @@ export async function load(event) {
 	}
 
 	if (user.role === USER_ROLES.CLIENT || user.role === USER_ROLES.CLIENT_STAFF) {
-		let billingInfo = null
+		let billingInfo = null;
 
-
-		const clientProfile = user.role === USER_ROLES.CLIENT
-			? await getClientProfilebyUserId(user.id)
-			: await getClientProfileByStaffUserId(user.id);
+		const clientProfile =
+			user.role === USER_ROLES.CLIENT
+				? await getClientProfilebyUserId(user.id)
+				: await getClientProfileByStaffUserId(user.id);
 		const clientCompany = await getClientCompanyByClientId(clientProfile?.id);
 
 		if (user.role === USER_ROLES.CLIENT) {
@@ -59,7 +62,7 @@ export async function load(event) {
 			companyLogo: clientCompany.companyLogo as string,
 			baseLocation: clientCompany.baseLocation as string,
 			operatingHours: JSON.stringify(clientCompany.operatingHours)
-		}
+		};
 
 		return {
 			user,
@@ -160,5 +163,81 @@ export const actions = {
 		}
 		console.log('profile updated successfully');
 		return message(form, 'Profile updated successfully.');
+	},
+	updateCompany: async (event) => {
+		console.log('updating company details');
+		const user = event.locals.user;
+		const form = await superValidate(event, clientCompanySchema);
+
+		console.log({ form });
+
+		if (!form.valid || !user) {
+			return fail(400, {
+				form
+			});
+		}
+
+		try {
+			// Get the client profile
+			const clientProfile =
+				user.role === USER_ROLES.CLIENT
+					? await getClientProfilebyUserId(user.id)
+					: await getClientProfileByStaffUserId(user.id);
+			const clientCompany = await getClientCompanyByClientId(clientProfile?.id);
+
+			if (!clientProfile) {
+				return setError(form, 'Client profile not found.');
+			}
+
+			// Handle file upload if there's a new company logo
+			// let companyLogo = form.data.companyLogo;
+			// const formData = await event.request.formData();
+			// const logoFile = formData.get('companyLogo');
+
+			// Only process if it's an actual file (not string)
+			// if (logoFile && typeof logoFile !== 'string' && logoFile.size > 0) {
+			// 	// Here you would typically:
+			// 	// 1. Upload the file to your storage (S3, local filesystem, etc.)
+			// 	// 2. Get the URL or path of the uploaded file
+			// 	// 3. Set companyLogo to that URL/path
+
+			// 	// This is a placeholder - implement your file upload logic here
+			// 	// companyLogo = await uploadFile(logoFile);
+
+			// 	console.log('New logo file detected, would process upload here');
+			// }
+
+			// Parse operating hours from JSON string to object
+			let operatingHours;
+			try {
+				operatingHours = JSON.parse(form.data.operatingHours);
+			} catch (e) {
+				console.error('Error parsing operating hours:', e);
+				return setError(form, 'Invalid operating hours format.');
+			}
+
+			// Update the company details in the database
+			// This assumes you have an updateCompany function in your queries
+			// If not, you'll need to create one
+			console.log(operatingHours);
+			const [updates] = await db
+				.update(clientCompanyTable)
+				.set({
+					companyName: form.data.companyName,
+					companyDescription: form.data.companyDescription,
+					// companyLogo: companyLogo,
+					baseLocation: form.data.baseLocation,
+					operatingHours: operatingHours // Store as object, not JSON string
+				})
+				.where(eq(clientCompanyTable.id, clientCompany.id))
+				.returning();
+
+			console.log(updates);
+			setFlash({ type: 'success', message: 'Company details updated successfully.' }, event);
+			return message(form, 'Company details updated successfully.');
+		} catch (e) {
+			console.error('Error updating company details:', e);
+			return setError(form, 'There was a problem updating company details.');
+		}
 	}
 };

@@ -49,27 +49,6 @@
 				Settings
 			</DropdownMenu.Item>
 		</DropdownMenu.Group>
-
-		<!-- <DropdownMenu.Sub>
-			<DropdownMenu.SubTrigger>
-				<Sun class="mr-2 h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-				<Moon
-					class="absolute mr-2 h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100"
-				/>
-				Appearance
-			</DropdownMenu.SubTrigger>
-			<DropdownMenu.SubContent>
-				<DropdownMenu.Item on:click={() => setMode('light')}
-					><Sun class="mr-2 h-4 w-4" />Light
-				</DropdownMenu.Item>
-				<DropdownMenu.Item on:click={() => setMode('dark')}
-					><Moon class="mr-2 h-4 w-4" />Dark
-				</DropdownMenu.Item>
-				<DropdownMenu.Item on:click={() => setMode('system')}
-					><SunMoon class="mr-2 h-4 w-4" />System
-				</DropdownMenu.Item>
-			</DropdownMenu.SubContent>
-		</DropdownMenu.Sub> -->
 		<DropdownMenu.Separator />
 		<DropdownMenu.Item on:click={signOut}>
 			<LogOut class="mr-2 h-4 w-4" />

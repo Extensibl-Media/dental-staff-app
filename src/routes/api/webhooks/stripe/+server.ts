@@ -22,7 +22,7 @@ function toBuffer(ab: ArrayBuffer): Buffer {
 
 export const POST: RequestHandler = async ({ request }) => {
 	console.log('Webhook received');
-	console.log("Webhook Secret: ", STRIPE_WEBHOOK_SECRET)
+	console.log('Webhook Secret: ', STRIPE_WEBHOOK_SECRET);
 
 	// Get the raw body directly as text instead of converting to buffer
 	const payload = await request.text();
@@ -35,20 +35,16 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	try {
 		console.log('Constructing event...');
-		const event = stripe.webhooks.constructEvent(
-			payload,
-			signature,
-			STRIPE_WEBHOOK_SECRET
-		);
+		const event = stripe.webhooks.constructEvent(payload, signature, STRIPE_WEBHOOK_SECRET);
 		console.log('Event constructed successfully:', event.type);
 
 		// Add special handling for invoice.paid events
 		switch (event.type) {
-			case 'invoice.paid':
-				const invoice = event.data.object as Stripe.Invoice;
-				// You might want to handle this event to track successful payments
-				console.log('Invoice paid:', invoice.id);
-				break;
+			// case 'invoice.paid':
+			// 	const invoice = event.data.object as Stripe.Invoice;
+			// 	// You might want to handle this event to track successful payments
+			// 	console.log('Invoice paid:', invoice.id);
+			// 	break;
 
 			case 'checkout.session.completed':
 				console.log('Handling checkout session completed');
@@ -75,9 +71,8 @@ export const POST: RequestHandler = async ({ request }) => {
 	} catch (err) {
 		console.error('Full webhook error:', err);
 		console.error('Error message:', err.message);
-		return new Response(
-			`Webhook Error: ${err instanceof Error ? err.message : 'Unknown Error'}`,
-			{ status: 400 }
-		);
+		return new Response(`Webhook Error: ${err instanceof Error ? err.message : 'Unknown Error'}`, {
+			status: 400
+		});
 	}
 };

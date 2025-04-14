@@ -35,12 +35,6 @@
 		options.update((o) => ({ ...o, data: tableData }));
 	}
 
-	// $: helper = {
-	// 	start: currentPage && +currentPage > 1 ? (+currentPage - 1) * total + 1 : 1,
-	// 	end: currentPage ? Math.min(+currentPage * total, count) : total,
-	// 	total: count
-	// };
-
 	const handlePrev = () => {
 		if (currentPage < 1) {
 			return;
@@ -185,12 +179,12 @@
 		<Button disabled={currentPage === (totalPages - 1) * total} on:click={handleNext}>next</Button>
 	</div>
 	<!-- <div class="flex flex-col items-center justify-center gap-2 p-6">
-		<div class="text-sm text-gray-700 dark:text-gray-400">
-			Showing <span class="font-semibold text-gray-900 dark:text-white">{helper.start}</span>
+		<div class="text-sm text-gray-700">
+			Showing <span class="font-semibold text-gray-900 ">{helper.start}</span>
 			to
-			<span class="font-semibold text-gray-900 dark:text-white">{helper.end}</span>
+			<span class="font-semibold text-gray-900 ">{helper.end}</span>
 			of
-			<span class="font-semibold text-gray-900 dark:text-white">{helper.total}</span>
+			<span class="font-semibold text-gray-900 ">{helper.total}</span>
 			Entries
 		</div>
 	</div> -->

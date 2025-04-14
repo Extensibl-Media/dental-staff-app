@@ -4,6 +4,7 @@ import {
 	supportTicketCommentTable,
 	supportTicketTable,
 	type SupportTicket,
+	type SupportTicketComment,
 	type UpdateSuportTicket
 } from '../schemas/admin';
 import { userTable } from '../schemas/auth';
@@ -22,11 +23,15 @@ export interface SupportTicketResult {
 
 export async function createSupportTicket(data: SupportTicket) {
 	try {
-		const [result] = await db.insert(supportTicketTable).values(data).onConflictDoNothing().returning();
-		return result
+		const [result] = await db
+			.insert(supportTicketTable)
+			.values(data)
+			.onConflictDoNothing()
+			.returning();
+		return result;
 	} catch (err) {
-		console.log(err)
-		return error(500, `${err}`)
+		console.log(err);
+		return error(500, `${err}`);
 	}
 }
 
@@ -48,7 +53,7 @@ export async function getAllSupportTickets() {
 }
 
 export async function getSupportTicketsForUser(userID?: string) {
-	if (!userID) return error(400, 'User ID required')
+	if (!userID) return error(400, 'User ID required');
 	return await db
 		.select({
 			supportTicket: { ...supportTicketTable },
@@ -63,10 +68,10 @@ export async function getSupportTicketsForUser(userID?: string) {
 		.from(supportTicketTable)
 		.innerJoin(userTable, eq(supportTicketTable.reportedById, userTable.id))
 		.where(eq(supportTicketTable.reportedById, userID))
-		.orderBy(desc(supportTicketTable.createdAt));
+		.orderBy(desc(supportTicketTable.updatedAt));
 }
 export async function getSupportTicketsForUserWithLimit(userID: string, count: number) {
-	if (!userID) return error(400, 'User ID required')
+	if (!userID) return error(400, 'User ID required');
 	return await db
 		.select({
 			supportTicket: { ...supportTicketTable },
@@ -81,7 +86,7 @@ export async function getSupportTicketsForUserWithLimit(userID: string, count: n
 		.from(supportTicketTable)
 		.innerJoin(userTable, eq(supportTicketTable.reportedById, userTable.id))
 		.where(eq(supportTicketTable.reportedById, userID))
-		.orderBy(desc(supportTicketTable.createdAt))
+		.orderBy(desc(supportTicketTable.updatedAt))
 		.limit(count);
 }
 
@@ -158,3 +163,45 @@ export async function getSupportTicketDetails(ticketId: string) {
 		comments
 	};
 }
+
+export const getSupportTicketComments = async (ticketId: string) => {
+	try {
+		const result = await db
+			.select()
+			.from(supportTicketCommentTable)
+			.where(eq(supportTicketCommentTable.supportTicketId, ticketId));
+
+		return result || [];
+	} catch (err) {
+		console.log(err);
+		return error(500, `${err}`);
+	}
+};
+
+export const createSupportTicketComment = async (data: SupportTicketComment) => {
+	try {
+		const [result] = await db
+			.insert(supportTicketCommentTable)
+			.values(data)
+			.onConflictDoNothing()
+			.returning();
+		return result;
+	} catch (err) {
+		console.log(err);
+		return error(500, `${err}`);
+	}
+};
+
+export const updateSupportTicket = async (ticketId: string, data: UpdateSuportTicket) => {
+	try {
+		const [result] = await db
+			.update(supportTicketTable)
+			.set(data)
+			.where(eq(supportTicketTable.id, ticketId))
+			.returning();
+		return result;
+	} catch (err) {
+		console.log(err);
+		return error(500, `${err}`);
+	}
+};
