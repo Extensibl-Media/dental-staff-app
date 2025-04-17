@@ -9,10 +9,12 @@ import {
 	getRequisitionDetailsById,
 	getTimesheetDetails,
 	getWorkdaysForTimesheet,
+	rejectTimesheet,
 	validateTimesheet
 } from '$lib/server/database/queries/requisitions';
 import { redirect } from '@sveltejs/kit';
 import type { RequestEvent } from './$types';
+import { setFlash } from 'sveltekit-flash-message/server';
 
 export const load = async (event: RequestEvent) => {
 	const user = event.locals.user;
@@ -32,6 +34,8 @@ export const load = async (event: RequestEvent) => {
 		const workdays = await getWorkdaysForTimesheet(timesheet);
 		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
 
+		console.log({ timesheet });
+
 		return {
 			user,
 			timesheet,
@@ -50,6 +54,8 @@ export const load = async (event: RequestEvent) => {
 		const recurrenceDays = await getRecurrenceDaysForTimesheet(timesheet);
 		const workdays = await getWorkdaysForTimesheet(timesheet);
 		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
+
+		console.log({ timesheet });
 
 		return {
 			user,
@@ -71,11 +77,27 @@ export const load = async (event: RequestEvent) => {
 };
 
 export const actions = {
-	rejectTimesheet: async (event: RequestEvent) => {},
+	rejectTimesheet: async (event: RequestEvent) => {
+		try {
+			// TODO: Change Timesheet Status to DISCREPANCY
+			const { id } = event.params;
+
+			console.log('Rejecting timesheet: ', id);
+			await rejectTimesheet(id);
+			setFlash({ type: 'success', message: 'Timesheet rejected' }, event);
+			return { succes: true };
+		} catch (error) {
+			console.error('Error rejecting timesheet:', error);
+			setFlash({ type: 'error', message: 'Error rejecting timesheet' }, event);
+		}
+	},
 	approveTimesheet: async (event: RequestEvent) => {
 		// TODO: Validate Timesheet Data
 		// Change Timesheet Status to APPROVED
 		// Generate Invoice for timesheet
 	},
-	editTimesheet: async (event: RequestEvent) => {}
+	// editTimesheet: async (event: RequestEvent) => {},
+	closeTimesheet: async (event: RequestEvent) => {
+		// TODO: Change Timesheet Status to VOID
+	}
 };

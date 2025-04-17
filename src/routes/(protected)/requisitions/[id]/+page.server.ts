@@ -35,6 +35,27 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 
 	const { id } = event.params;
 	const idAsNum = Number(id);
+	const recurrenceDayForm = await superValidate(event, newRecurrenceDaySchema);
+	const changeStatusForm = await superValidate(event, changeStatusSchema);
+	const editRecurrenceDayForm = await superValidate(event, editRecurrenceDaySchema);
+	const deleteRecurrenceDayForm = await superValidate(event, deleteRecurrenceDaySchema);
+	if (user.role === USER_ROLES.SUPERADMIN) {
+		const details = getRequsitionDetailsForAdmin(idAsNum);
+
+		return {
+			user,
+			hasRequisitionRights: true,
+			changeStatusForm,
+			recurrenceDayForm,
+			editRecurrenceDayForm,
+			deleteRecurrenceDayForm,
+			company: details.company,
+			requisition: details.requisition,
+			recurrenceDays: details.recurrenceDays || [],
+			applications: details.applications || [],
+			timesheets: details.timesheets || []
+		};
+	}
 
 	if (user.role === USER_ROLES.CLIENT) {
 		const client = await getClientProfilebyUserId(user.id);
@@ -44,18 +65,13 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 		const requisitionTimesheets = await getRequisitionTimesheets(idAsNum);
 		const requisitionRecurrenceDays = await getRecurrenceDaysForRequisition(idAsNum);
 
-		const recurrenceDayForm = await superValidate(event, newRecurrenceDaySchema);
-		const changeStatusForm = await superValidate(event, changeStatusSchema);
-		const editRecurrenceDayForm = await superValidate(event, editRecurrenceDaySchema);
-		const deleteRecurrenceDayForm = await superValidate(event, deleteRecurrenceDaySchema);
-
 		const hasRequisitionRights = true;
 
 		return {
 			user,
 			company,
-			changeStatusForm,
 			hasRequisitionRights,
+			changeStatusForm,
 			recurrenceDayForm,
 			editRecurrenceDayForm,
 			deleteRecurrenceDayForm,
@@ -73,11 +89,6 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 		const requisitionApplications = await getRequisitionApplications(idAsNum);
 		const requisitionTimesheets = await getRequisitionTimesheets(idAsNum);
 		const requisitionRecurrenceDays = await getRecurrenceDaysForRequisition(idAsNum);
-
-		const recurrenceDayForm = await superValidate(event, newRecurrenceDaySchema);
-		const changeStatusForm = await superValidate(event, changeStatusSchema);
-		const editRecurrenceDayForm = await superValidate(event, editRecurrenceDaySchema);
-		const deleteRecurrenceDayForm = await superValidate(event, deleteRecurrenceDaySchema);
 
 		const hasRequisitionRights =
 			profile?.staffRole === 'CLIENT_ADMIN' || profile?.staffRole === 'CLIENT_MANAGER';

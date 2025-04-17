@@ -1439,3 +1439,17 @@ export async function getWorkdaysByRecurrenceDayId(
 		throw error(500, `Error fetching workdays: ${err}`);
 	}
 }
+
+export async function rejectTimesheet(timesheetId: string) {
+	try {
+		const [result] = await db
+			.update(timeSheetTable)
+			.set({ status: 'DISCREPANCY' })
+			.where(eq(timeSheetTable.id, timesheetId))
+			.returning();
+
+		return result;
+	} catch (err) {
+		throw error(500, `Error rejecting timesheet: ${error}`);
+	}
+}

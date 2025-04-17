@@ -15,6 +15,7 @@
   import { format, parseISO, addDays } from 'date-fns';
 	import { cn } from "$lib/utils";
 	import type { PageData } from "./$types";
+	import { enhance } from "$app/forms";
 
 	export let data: PageData
 
@@ -28,7 +29,7 @@
   // Destructure dummy data
 
   // Format dates for display
-  const weekBeginDate = parseISO(new Date(data?.timesheet?.weekBeginDate as Date).toISOString());
+  const weekBeginDate = parseISO(new Date(data?.timesheet?.weekBeginDate || new Date() as Date).toISOString());
   const weekEndDate = addDays(weekBeginDate, 6);
   const formattedWeekRange = `${format(weekBeginDate, 'MMM d')} - ${format(weekEndDate, 'MMM d, yyyy')}`;
 
@@ -201,16 +202,16 @@
               <h3 class="font-medium">Candidate Information</h3>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
                 <div>
-                  <p class="text-sm text-gray-600">Name</p>
-                  <p>{data?.timesheet?.candidate?.firstName} {data?.timesheet?.candidate?.lastName}</p>
+                  <p class="text-xs text-gray-600">Name</p>
+                  <p class="text-sm whitespace-pre-line">{data?.timesheet?.candidate?.firstName} {data?.timesheet?.candidate?.lastName || "No Name Provided"}</p>
                 </div>
                 <div>
-                  <p class="text-sm text-gray-600">Email</p>
-                  <p>{data?.timesheet?.candidate?.email}</p>
+                  <p class="text-xs text-gray-600">Email</p>
+                  <p class="text-sm whitespace-pre-line">{data?.timesheet?.candidate?.email || 'No email provided'}</p>
                 </div>
                 <div>
-                  <p class="text-sm text-gray-600">Position</p>
-                  <p>{data?.requisition.title}</p>
+                  <p class="text-xs text-gray-600">Position</p>
+                  <p class="text-sm whitespace-pre-line">{data?.requisition.title}</p>
                 </div>
               </div>
             </div>
@@ -411,12 +412,14 @@
     </div>
 
     <DialogFooter class="mt-4">
-      <Button type="button" variant="outline" on:click={() => rejectionDialogOpen = false}>
-        Cancel
-      </Button>
-      <Button type="button" variant="destructive" on:click={handleRejectTimesheet}>
-        Reject Timesheet
-      </Button>
+        <form method="POST" action="?/rejectTimesheet" use:enhance>
+            <Button type="button" variant="outline" on:click={() => rejectionDialogOpen = false}>
+                Cancel
+            </Button>
+            <Button type="submit" variant="destructive" on:click={() => rejectionDialogOpen = false}>
+                Reject Timesheet
+            </Button>
+        </form>
     </DialogFooter>
   </DialogContent>
 </Dialog>

@@ -346,7 +346,7 @@
 						</div>
 						<div class="flex items-center gap-2">
 							<CalendarClock class="shrink-0 text-gray-400" />
-							<p>{requisition.permanentPosition ? 'Permanent' : 'Temporary'} Position</p>
+							<p>{requisition?.permanentPosition ? 'Permanent' : 'Temporary'} Position</p>
 						</div>
 						<div class="flex items-center gap-2">
 							<Briefcase class="shrink-0 text-gray-400" />
@@ -373,7 +373,7 @@
 					</div>
 				</div>
 			</TabItem>
-			{#if requisition.permanentPosition}
+			{#if requisition?.permanentPosition}
 				<TabItem title="Applications">
 					<div class="column">
 						<Table.Root class="table">
@@ -417,7 +417,7 @@
 					</div>
 				</TabItem>
 			{/if}
-			{#if !requisition.permanentPosition}
+			{#if !requisition?.permanentPosition}
 			    <TabItem title="Timesheets">
                     <div class="column">
                         <Table.Root class="table">
