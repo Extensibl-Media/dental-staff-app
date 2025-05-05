@@ -8,7 +8,7 @@
 	import NewSupportTicketDialog from '$lib/components/dialogs/newSupportTicketDialog.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { cn } from '$lib/utils';
-	import { format } from 'date-fns';
+	import { format, parse } from 'date-fns';
 
 	export let user;
 	export let data;
@@ -228,7 +228,7 @@
 									</Table.Cell>
 									<Table.Cell>
 										<span class="text-gray-500">
-											{format(timesheet.timesheet.weekBeginDate, "PP")}
+											{format(parse(timesheet.timesheet.weekBeginDate, 'yyyy-MM-dd', new Date()), "PP")}
 										</span>
 									</Table.Cell>
 									<Table.Cell>

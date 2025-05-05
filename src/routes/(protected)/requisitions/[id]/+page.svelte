@@ -17,7 +17,7 @@
 		// EditRecurrenceDaySchema,
 		ChangeStatusSchema
 	} from '$lib/config/zod-schemas';
-	import { format } from 'date-fns';
+	import { format, parse } from 'date-fns';
 	import { cn } from '$lib/utils';
 	// import { USER_ROLES } from '$lib/config/constants';
 	import { Tabs, TabItem } from 'flowbite-svelte';
@@ -43,7 +43,7 @@
 
 	export let data: PageData;
 
-	// $: user = data.user;
+	$: user = data.user;
 	$: company = data.company
 	$: requisition = data.requisition;
 	$: recurrenceDays = data.recurrenceDays;
@@ -165,7 +165,7 @@
     {
         header: 'Week Beginning',
         id: 'weekBegin',
-        accessorFn: (original) => new Date(original.timeSheet.weekBeginDate).toLocaleDateString("en-US", {timeZone: "UTC"})
+        accessorFn: (original) => format(parse(original.timeSheet.weekBeginDate, 'yyyy-MM-dd', new Date()), "PP")
     },
     {
         header: 'Hours Worked',
@@ -241,7 +241,7 @@
 			<div class="flex justify-between items-center">
 				<img
 					class="h-20 w-20 rounded-md mb-2"
-					src={requisition?.company?.companyLogo}
+					src={company?.companyLogo}
 					alt="company logo"
 				/>
 				<div class="space-y-2 hidden md:block">
@@ -285,7 +285,7 @@
 			<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">
 				{requisition?.title}
 			</h1>
-			<p class="text-lg font-semibold text-gray-500">{requisition?.company.companyName}</p>
+			<p class="text-lg font-semibold text-gray-500">{company?.companyName}</p>
 		</div>
 		<div class="md:hidden space-y-2">
     		<p class="text-sm font-semibold text-gray-500">Requisition Status</p>

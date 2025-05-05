@@ -3,7 +3,10 @@ import {
 	getClientProfileByStaffUserId,
 	getClientProfilebyUserId
 } from '$lib/server/database/queries/clients';
-import { getAllTimesheetsForClient } from '$lib/server/database/queries/requisitions';
+import {
+	getAllTimesheetsForClient,
+	getAllTimesheetsAdmin
+} from '$lib/server/database/queries/requisitions';
 import { redirect } from '@sveltejs/kit';
 
 export const load = async (event) => {
@@ -12,6 +15,12 @@ export const load = async (event) => {
 	const { user } = locals;
 	if (!user) {
 		redirect(302, '/auth/sign-in');
+	}
+
+	if (user.role === USER_ROLES.SUPERADMIN) {
+		const timesheets = await getAllTimesheetsAdmin();
+
+		return { user, timesheets };
 	}
 
 	if (user.role === USER_ROLES.CLIENT) {

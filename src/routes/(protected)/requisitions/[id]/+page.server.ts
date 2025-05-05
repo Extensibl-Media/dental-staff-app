@@ -4,10 +4,13 @@ import {
 	createNewRecurrenceDay,
 	deleteRecurrenceDay,
 	editRecurrenceDay,
+	getCompanyByRequisitionIdAdmin,
 	getRecurrenceDaysForRequisition,
 	getRequisitionApplications,
 	getRequisitionDetailsById,
-	getRequisitionTimesheets
+	getRequisitionTimesheets,
+	getRequisitionDetailsForAdmin,
+	getRequisitionDetailsByIdAdmin
 } from '$lib/server/database/queries/requisitions';
 import { fail, redirect } from '@sveltejs/kit';
 import { message, setError, superValidate } from 'sveltekit-superforms/server';
@@ -39,8 +42,20 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 	const changeStatusForm = await superValidate(event, changeStatusSchema);
 	const editRecurrenceDayForm = await superValidate(event, editRecurrenceDaySchema);
 	const deleteRecurrenceDayForm = await superValidate(event, deleteRecurrenceDaySchema);
+
 	if (user.role === USER_ROLES.SUPERADMIN) {
-		const details = getRequsitionDetailsForAdmin(idAsNum);
+		const company = await getCompanyByRequisitionIdAdmin(idAsNum);
+		const requisition = await getRequisitionDetailsByIdAdmin(idAsNum);
+		const requisitionApplications = await getRequisitionApplications(idAsNum);
+		const requisitionTimesheets = await getRequisitionTimesheets(idAsNum);
+		const requisitionRecurrenceDays = await getRecurrenceDaysForRequisition(idAsNum);
+
+		console.log({
+			requisition,
+			requisitionApplications,
+			requisitionTimesheets,
+			requisitionRecurrenceDays
+		});
 
 		return {
 			user,
@@ -49,11 +64,11 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 			recurrenceDayForm,
 			editRecurrenceDayForm,
 			deleteRecurrenceDayForm,
-			company: details.company,
-			requisition: details.requisition,
-			recurrenceDays: details.recurrenceDays || [],
-			applications: details.applications || [],
-			timesheets: details.timesheets || []
+			company: company,
+			requisition: requisition.requisition || null,
+			recurrenceDays: requisitionRecurrenceDays || [],
+			applications: requisitionApplications || [],
+			timesheets: requisitionTimesheets || []
 		};
 	}
 

@@ -3,10 +3,13 @@ import type {PageData} from "./$types"
 import DataTableEmptyState from "./data-table-empty-state.svelte";
 import DataTable from "./data-table.svelte";
 import type { TimesheetWithRelations } from "$lib/server/database/schemas/requisition";
+	import { USER_ROLES } from "$lib/config/constants";
+	import AdminDataTable from "./admin-data-table.svelte";
 
 export let data: PageData
 $: console.log(data)
-$: timesheets = data.timesheets as TimesheetWithRelations[];
+$: user = data.user;
+$: timesheets = data.timesheets;
 
 
 </script>
@@ -21,10 +24,18 @@ $: timesheets = data.timesheets as TimesheetWithRelations[];
 	</div>
 
 	<div class="">
-        {#if timesheets.length === 0}
-            <DataTableEmptyState />
+        {#if user.role === USER_ROLES.SUPERADMIN}
+            {#if timesheets.length === 0}
+                <DataTableEmptyState />
+            {:else}
+                <AdminDataTable data={data.timesheets} />
+            {/if}
         {:else}
-            <DataTable data={data.timesheets} />
+            {#if timesheets.length === 0}
+                <DataTableEmptyState />
+            {:else}
+                <DataTable data={data.timesheets} />
+            {/if}
         {/if}
     </div>
 </section>

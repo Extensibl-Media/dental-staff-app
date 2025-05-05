@@ -7,7 +7,9 @@ import {
 import {
 	getRecurrenceDaysForTimesheet,
 	getRequisitionDetailsById,
+	getRequisitionDetailsByIdAdmin,
 	getTimesheetDetails,
+	getTimesheetDetailsAdmin,
 	getWorkdaysForTimesheet,
 	rejectTimesheet,
 	validateTimesheet
@@ -23,6 +25,23 @@ export const load = async (event: RequestEvent) => {
 	}
 
 	const { id } = event.params;
+
+	if (user.role === USER_ROLES.SUPERADMIN) {
+		const timesheet = await getTimesheetDetailsAdmin(id);
+		const requisition = await getRequisitionDetailsByIdAdmin(timesheet.requisitionId);
+		const recurrenceDays = await getRecurrenceDaysForTimesheet(timesheet);
+		const workdays = await getWorkdaysForTimesheet(timesheet);
+		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
+
+		return {
+			user,
+			timesheet,
+			workdays,
+			recurrenceDays,
+			requisition: requisition.requisition,
+			discrepancies
+		};
+	}
 
 	if (user.role === USER_ROLES.CLIENT) {
 		const client = await getClientProfilebyUserId(user.id);
@@ -78,12 +97,14 @@ export const load = async (event: RequestEvent) => {
 
 export const actions = {
 	rejectTimesheet: async (event: RequestEvent) => {
+		const user = event.locals.user;
+		if (!user) {
+			redirect(302, '/auth/sign-in');
+		}
+		const userId = user.id;
 		try {
-			// TODO: Change Timesheet Status to DISCREPANCY
 			const { id } = event.params;
-
-			console.log('Rejecting timesheet: ', id);
-			await rejectTimesheet(id);
+			await rejectTimesheet(id, userId);
 			setFlash({ type: 'success', message: 'Timesheet rejected' }, event);
 			return { succes: true };
 		} catch (error) {

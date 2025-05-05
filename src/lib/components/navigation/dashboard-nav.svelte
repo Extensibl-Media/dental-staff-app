@@ -83,6 +83,12 @@
 			<DashboardNavLink bind:expanded link={{ name: 'Candidates', path: '/candidates' }}>
 				<SquareUser class="shrink-0" />
 			</DashboardNavLink>
+			<DashboardNavLink bind:expanded link={{ name: 'Timesheets', path: '/timesheets ' }}>
+				<FileClock class="shrink-0" />
+			</DashboardNavLink>
+			<DashboardNavLink bind:expanded link={{ name: 'Invoices', path: '/invoices' }}>
+				<ScrollText class="shrink-0" />
+			</DashboardNavLink>
 			<DashboardNavLink
 				bind:expanded
 				link={{

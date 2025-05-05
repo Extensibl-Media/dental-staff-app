@@ -15,7 +15,12 @@ import {
 	index,
 	uuid
 } from 'drizzle-orm/pg-core';
-import { clientCompanyTable, clientProfileTable, companyOfficeLocationTable } from './client';
+import {
+	clientCompanyTable,
+	clientProfileTable,
+	companyOfficeLocationTable,
+	type ClientCompanySelect
+} from './client';
 import { candidateProfileTable, type CandidateProfileSelect } from './candidate';
 import { disciplineTable, experienceLevelTable } from './skill';
 
@@ -232,9 +237,8 @@ export const timeSheetTable = pgTable(
 		workdayId: text('workday_id')
 			.references(() => workdayTable.id)
 			.notNull(),
-		weekBeginDate: timestamp('week_begin_date', {
-			withTimezone: true,
-			mode: 'date'
+		weekBeginDate: date('week_begin_date', {
+			mode: 'string'
 		}).notNull(),
 		hoursRaw: json('hours_raw').$type<RawTimesheetHours[]>().notNull().default([]),
 		status: timesheetStatusEnum('status').default('PENDING').notNull()
@@ -348,14 +352,19 @@ type UserSelect = {
 export type TimesheetWithRelations = {
 	timesheet: TimeSheetSelect;
 	candidate: CandidateProfileSelect;
+	clientCompany?: ClientCompanySelect;
 	user: Partial<UserSelect>;
 	requisition: RequisitionSelect | null; // null because of leftJoin // null because of leftJoin
 };
 
 export type InvoiceWithRelations = {
 	invoice: InvoiceSelect;
-	candidate: CandidateProfileSelect;
-	user: UserSelect;
+	candidate: CandidateProfileSelect & {
+		avatarUrl?: string | null;
+		firstName?: string;
+		lastName?: string;
+	};
+	user?: UserSelect;
 	timesheet: TimeSheetSelect;
 	requisition: RequisitionSelect; // null because of leftJoin
 };
