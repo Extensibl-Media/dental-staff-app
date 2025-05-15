@@ -426,7 +426,7 @@
 												'Content-Type': 'application/json'
 											},
 											body: JSON.stringify({
-												priceId: 'price_1Qtd6aKSJyLDCJz65aSNbkOW' // Replace with your price ID
+												priceId: 'price_1RDtHDRdAMZLgbMga3fTw2vq' // Replace with your price ID
 											})
 										});
 

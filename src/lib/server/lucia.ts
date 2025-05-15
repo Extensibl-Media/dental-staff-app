@@ -33,7 +33,8 @@ export const lucia = new Lucia(adapter, {
 			receiveEmail: attributes.receiveEmail,
 			token: attributes.token,
 			completedOnboarding: attributes.completedOnboarding,
-			blacklisted: attributes.blacklisted
+			blacklisted: attributes.blacklisted,
+			stripeCustomerId: attributes.stripeCustomerId
 		};
 	}
 });
@@ -59,6 +60,7 @@ interface DatabaseUserAttributes {
 	token: string;
 	completedOnboarding: boolean;
 	blacklisted: boolean;
+	stripeCustomerId: string;
 }
 
 /*interface DatabaseSessionAttributes {

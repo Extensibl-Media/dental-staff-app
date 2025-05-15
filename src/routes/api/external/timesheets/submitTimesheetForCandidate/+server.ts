@@ -116,8 +116,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			weekBeginDate: new Date(weekStartDate),
 			totalHoursWorked: parsedBody.data.totalHours.toString(),
 			hoursRaw: timesheetEntries,
-			candidateRateBase: candidateProfile.hourlyRateMin,
-			candidateRateOT: candidateProfile.hourlyRateMin * 1.5
+			candidateRateBase: candidateProfile.hourlyRateMin.toString(),
+			candidateRateOT: (candidateProfile.hourlyRateMin * 1.5).toString()
 		};
 
 		console.log('Timesheet Data submitted: ', timesheetData);

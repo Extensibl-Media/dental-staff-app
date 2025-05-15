@@ -7,6 +7,7 @@ import { error } from '@sveltejs/kit';
 import type Stripe from 'stripe';
 import { getUserByEmail } from './users';
 import { getClientProfilebyUserId } from './clients';
+import { userTable } from '../schemas/auth';
 
 export async function getClientBillingInfo(clientId: string | undefined) {
 	if (!clientId) return error(500, 'Must provide client id');
@@ -139,6 +140,11 @@ export async function handleSubscriptionCreated(subscription: Stripe.Subscriptio
 					updatedAt: new Date()
 				}
 			});
+
+		await db
+			.update(userTable)
+			.set({ stripeCustomerId: customerId })
+			.where(eq(userTable.id, user.id));
 	} catch (error) {
 		console.error('Error in handleSubscriptionCreated:', error);
 		throw error;
@@ -147,6 +153,20 @@ export async function handleSubscriptionCreated(subscription: Stripe.Subscriptio
 
 export async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 	const priceId = subscription.items.data[0].price.id;
+	const customerId = subscription.customer as string;
+
+	const customerData = await stripe.customers.retrieve(customerId);
+	if (customerData.deleted === true) {
+		console.log('Customer was deleted, skipping subscription creation');
+		return;
+	}
+
+	if (!customerData.email) {
+		console.log('No customer email found, skipping subscription creation');
+		return;
+	}
+
+	const user = await getUserByEmail(customerData.email);
 
 	await db
 		.update(clientSubscriptionTable)
@@ -156,6 +176,12 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
 			updatedAt: new Date()
 		})
 		.where(eq(clientSubscriptionTable.id, subscription.id));
+	if (user) {
+		await db
+			.update(userTable)
+			.set({ stripeCustomerId: customerId })
+			.where(eq(userTable.id, user.id));
+	}
 }
 
 export async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {

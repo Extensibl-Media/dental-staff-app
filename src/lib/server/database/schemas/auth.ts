@@ -1,5 +1,4 @@
 import { pgTable, text, timestamp, boolean, pgEnum, integer } from 'drizzle-orm/pg-core';
-import { int } from 'drizzle-orm/sqlite-core';
 
 export const userRolesEnum = pgEnum('user_roles', [
 	'SUPERADMIN',
@@ -33,7 +32,7 @@ export const userTable = pgTable('users', {
 	completedOnboarding: boolean('completed_onboarding').default(false),
 	onboardingStep: integer('onboarding_step').default(1),
 	blacklisted: boolean('blacklisted').default(false),
-	stripeCustomerId: text('stripe-_customer_id').unique()
+	stripeCustomerId: text('stripe_customer_id').unique()
 });
 
 export const sessionTable = pgTable('sessions', {

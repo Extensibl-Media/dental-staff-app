@@ -264,3 +264,4 @@ export type UpdateClientCompanyStaffProfile = Partial<typeof clientStaffProfileT
 export type UpdateClientCompanyStaffLocation = Partial<
 	typeof clientStaffLocationTable.$inferInsert
 >;
+export type ClientProfileSelect = typeof clientProfileTable.$inferSelect;

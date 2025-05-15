@@ -25,6 +25,7 @@ import { error } from '@sveltejs/kit';
 import { getSupportTicketsForUser, getSupportTicketsForUserWithLimit } from './support';
 import {
 	getClientCompanyTimesheetDiscrepancies,
+	getClientInvoices,
 	getNewApplicationsCount,
 	getRecentRequisitionApplications,
 	getRecentTimesheetsDueForClient,
@@ -703,7 +704,8 @@ export async function getClientDashboardData(
 		newApplicationsCount,
 		supportTickets,
 		requisitionApplications,
-		timesheetsDue
+		timesheetsDue,
+		invoices
 	] = await Promise.all([
 		await getRequisitionsForClientWithLimit(clientId, 5),
 		await getTimesheetsDueCount(clientId),
@@ -711,7 +713,8 @@ export async function getClientDashboardData(
 		await getNewApplicationsCount(clientId),
 		await getSupportTicketsForUserWithLimit(userId, 5),
 		await getRecentRequisitionApplications(company.id),
-		await getRecentTimesheetsDueForClient(clientId)
+		await getRecentTimesheetsDueForClient(clientId),
+		await getClientInvoices(clientId, { limit: 5, offset: 0 })
 	]);
 
 	return {
@@ -721,7 +724,8 @@ export async function getClientDashboardData(
 		discrepanciesCount: discrepancies.length,
 		supportTickets,
 		newApplicationsCount,
-		positionApplications: requisitionApplications
+		positionApplications: requisitionApplications,
+		invoices
 	};
 }
 

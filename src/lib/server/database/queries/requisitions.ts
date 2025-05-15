@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { and, asc, count, eq, or, sql, desc } from 'drizzle-orm';
+import { and, asc, count, eq, or, sql, desc, isNotNull, gte, lte } from 'drizzle-orm';
 import db from '../drizzle';
 import {
 	recurrenceDayTable,
@@ -19,9 +19,14 @@ import {
 	type TimesheetWithRelations,
 	type TimeSheetSelect,
 	type WorkdaySelect,
-	type RequisitionSelect
+	type RequisitionSelect,
+	type InvoiceLineItem,
+	type InvoiceStatus,
+	type InvoiceSourceType,
+	type Invoice
 } from '../schemas/requisition';
 import { userTable, type User } from '../schemas/auth';
+import type { User as AuthUser } from 'lucia';
 import {
 	clientCompanyTable,
 	clientProfileTable,
@@ -45,6 +50,8 @@ import { writeActionHistory } from './admin';
 import { parseISO, differenceInMinutes, format, getDay } from 'date-fns';
 import type { PaginateOptions } from '$lib/types';
 import { normalizeDate } from '$lib/_helpers';
+import { createStripeInvoice } from '$lib/server/stripe';
+import type Stripe from 'stripe';
 
 // Types and Interfaces
 export interface TimesheetDiscrepancy {
@@ -86,10 +93,10 @@ export interface Timesheet {
 	status: string;
 	candidate:
 		| (CandidateProfileSelect & {
-				email: string;
-				firstName: string;
-				lastName: string;
-				avatarUrl: string | null;
+				email?: string;
+				firstName?: string;
+				lastName?: string;
+				avatarUrl?: string | null;
 		  })
 		| null;
 }
@@ -279,6 +286,47 @@ export async function getPaginatedRequisitionsforClient(
 	}
 }
 
+export async function getRequisitionDetailsByIdAdmin(requisitionId: number): Promise<any | null> {
+	const [result] = await db
+		.select({
+			requisition: {
+				...requisitionTable,
+				company: {
+					...clientCompanyTable,
+					client: {
+						...clientProfileTable,
+						user: {
+							avatarUrl: userTable.avatarUrl,
+							firstName: userTable.firstName,
+							lastName: userTable.lastName,
+							email: userTable.email,
+							id: userTable.id
+						}
+					}
+				},
+				location: { ...companyOfficeLocationTable },
+				discipline: { ...disciplineTable },
+				experienceLevel: { ...experienceLevelTable }
+			}
+		})
+		.from(requisitionTable)
+		.where(and(eq(requisitionTable.id, requisitionId), eq(requisitionTable.archived, false)))
+		.innerJoin(clientCompanyTable, eq(clientCompanyTable.id, requisitionTable.companyId))
+		.innerJoin(
+			companyOfficeLocationTable,
+			eq(companyOfficeLocationTable.id, requisitionTable.locationId)
+		)
+		.innerJoin(clientProfileTable, eq(clientProfileTable.id, clientCompanyTable.clientId))
+		.innerJoin(userTable, eq(userTable.id, clientProfileTable.userId))
+		.leftJoin(experienceLevelTable, eq(experienceLevelTable.id, requisitionTable.experienceLevelId))
+		.innerJoin(disciplineTable, eq(disciplineTable.id, requisitionTable.disciplineId));
+
+	if (!result) {
+		return error(404, 'Requisition not found');
+	} else {
+		return { requisition: result.requisition };
+	}
+}
 export async function getRequisitionDetailsById(
 	requisitionId: number,
 	companyId: string | undefined
@@ -842,6 +890,7 @@ export async function getClientCompanyTimesheetDiscrepancies(
 			candidateRateOT: timeSheetTable.candidateRateOT,
 			hoursRaw: timeSheetTable.hoursRaw,
 			workdayId: timeSheetTable.workdayId,
+			status: timeSheetTable.status,
 			candidate: {
 				...candidateProfileTable,
 				firstName: userTable.firstName,
@@ -902,6 +951,48 @@ export async function getRecurrenceDaysForTimesheet(timesheet: any): Promise<Rec
 		);
 }
 
+export async function getTimesheetDetailsAdmin(timesheetId: string) {
+	const [timesheet] = await db
+		.select({
+			timeSheetId: timeSheetTable.id,
+			createdAt: timeSheetTable.createdAt,
+			updatedAt: timeSheetTable.updatedAt,
+			totalHoursWorked: timeSheetTable.totalHoursWorked,
+			totalHoursBilled: timeSheetTable.totalHoursBilled,
+			weekBeginDate: timeSheetTable.weekBeginDate,
+			requisitionId: requisitionTable.id,
+			clientCompanyName: clientCompanyTable.companyName,
+			validated: timeSheetTable.validated,
+			awaitingClientSignature: timeSheetTable.awaitingClientSignature,
+			candidateRateBase: timeSheetTable.candidateRateBase,
+			candidateRateOT: timeSheetTable.candidateRateOT,
+			hoursRaw: timeSheetTable.hoursRaw,
+			workdayId: timeSheetTable.workdayId,
+			status: timeSheetTable.status,
+			candidate: {
+				...candidateProfileTable,
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				avatarUrl: userTable.avatarUrl,
+				email: userTable.email
+			}
+		})
+		.from(timeSheetTable)
+		.innerJoin(requisitionTable, eq(timeSheetTable.requisitionId, requisitionTable.id))
+		.innerJoin(clientProfileTable, eq(timeSheetTable.associatedClientId, clientProfileTable.id))
+		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
+		.leftJoin(workdayTable, eq(timeSheetTable.workdayId, workdayTable.id))
+		.leftJoin(
+			candidateProfileTable,
+			eq(timeSheetTable.associatedCandidateId, candidateProfileTable.id)
+		)
+		.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
+		.where(eq(timeSheetTable.id, timesheetId));
+
+	if (!timesheet) throw error(404, 'Timesheet not found');
+
+	return timesheet;
+}
 export async function getTimesheetDetails(timesheetId: string, clientId: string | undefined) {
 	if (!clientId) throw error(400, 'Client ID required');
 	const [timesheet] = await db
@@ -1282,34 +1373,314 @@ export async function getClientTimesheets(
 }
 
 export async function getClientInvoices(
-	clientId: string | undefined
+	clientId: string | undefined,
+	options?: {
+		status?: InvoiceStatus;
+		sourceType?: InvoiceSourceType;
+		includeStripeData?: boolean;
+		limit?: number;
+		offset?: number;
+	}
 ): Promise<InvoiceWithRelations[]> {
 	if (!clientId) throw error(400, 'Must provide client ID');
-	const results = await db
+
+	// Build dynamic where conditions
+	const whereConditions = [eq(invoiceTable.clientId, clientId)];
+
+	if (options?.status) {
+		whereConditions.push(eq(invoiceTable.status, options.status));
+	}
+
+	if (options?.sourceType) {
+		whereConditions.push(eq(invoiceTable.sourceType, options.sourceType));
+	}
+
+	const query = db
 		.select({
 			invoice: invoiceTable,
-			candidate: candidateProfileTable,
-			user: {
-				id: userTable.email,
-				firstName: userTable.firstName,
-				lastName: userTable.lastName,
-				avatarUrl: userTable.avatarUrl
+			candidateProfile: candidateProfileTable,
+			candidateUser: {
+				id: sql<string>`candidate_user.id`,
+				firstName: sql<string>`candidate_user.first_name`,
+				lastName: sql<string>`candidate_user.last_name`,
+				avatarUrl: sql<string>`candidate_user.avatar_url`
 			},
 			timesheet: timeSheetTable,
-			requisition: requisitionTable
+			requisition: requisitionTable,
+			client: clientProfileTable,
+			clientUser: {
+				id: sql<string>`client_user.id`,
+				firstName: sql<string>`client_user.first_name`,
+				lastName: sql<string>`client_user.last_name`,
+				avatarUrl: sql<string>`client_user.avatar_url`
+			}
 		})
 		.from(invoiceTable)
-		.where(eq(invoiceTable.clientId, clientId))
-		.innerJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
-		.innerJoin(userTable, eq(candidateProfileTable.userId, userTable.id))
-		.innerJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
-		.innerJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
+		.where(and(...whereConditions))
+		.leftJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
+		.leftJoin(
+			sql`${userTable} as candidate_user`,
+			sql`${candidateProfileTable.userId} = candidate_user.id`
+		)
+		.leftJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
+		.leftJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
+		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
+		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
 		.orderBy(desc(invoiceTable.createdAt));
+
+	// Apply pagination if specified
+	if (options?.limit) {
+		query.limit(options.limit);
+	}
+
+	if (options?.offset) {
+		query.offset(options.offset);
+	}
+
+	const results = await query;
 
 	if (!results.length) {
 		return [];
 	}
-	return results;
+
+	// Transform results to match the type structure
+	return results.map((row) => ({
+		invoice: row.invoice,
+		candidate:
+			row.candidateProfile && row.candidateUser
+				? {
+						profile: row.candidateProfile,
+						user: row.candidateUser
+					}
+				: null,
+		timesheet: row.timesheet,
+		requisition: row.requisition,
+		lineItems: (row.invoice.lineItems as InvoiceLineItem[]) || [],
+		client: row.client,
+		clientUser: row.clientUser
+	}));
+}
+
+export async function getTimesheetInvoices(
+	clientId: string,
+	options?: {
+		candidateId?: string;
+		requisitionId?: number;
+		status?: InvoiceStatus;
+	}
+): Promise<InvoiceWithRelations[]> {
+	const whereConditions = [
+		eq(invoiceTable.clientId, clientId),
+		eq(invoiceTable.sourceType, 'timesheet'),
+		isNotNull(invoiceTable.timesheetId)
+	];
+
+	if (options?.candidateId) {
+		whereConditions.push(eq(invoiceTable.candidateId, options.candidateId));
+	}
+
+	if (options?.requisitionId) {
+		whereConditions.push(eq(invoiceTable.requisitionId, options.requisitionId));
+	}
+
+	if (options?.status) {
+		whereConditions.push(eq(invoiceTable.status, options.status));
+	}
+
+	const results = await db
+		.select({
+			invoice: invoiceTable,
+			candidateProfile: candidateProfileTable,
+			candidateUser: {
+				id: sql<string>`candidate_user.id`,
+				firstName: sql<string>`candidate_user.first_name`,
+				lastName: sql<string>`candidate_user.last_name`,
+				avatarUrl: sql<string>`candidate_user.avatar_url`
+			},
+			timesheet: timeSheetTable,
+			requisition: requisitionTable,
+			client: clientProfileTable,
+			clientUser: {
+				id: sql<string>`client_user.id`,
+				firstName: sql<string>`client_user.first_name`,
+				lastName: sql<string>`client_user.last_name`,
+				avatarUrl: sql<string>`client_user.avatar_url`
+			}
+		})
+		.from(invoiceTable)
+		.where(and(...whereConditions))
+		.innerJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
+		.innerJoin(
+			sql`${userTable} as candidate_user`,
+			sql`${candidateProfileTable.userId} = candidate_user.id`
+		)
+		.innerJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
+		.innerJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
+		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
+		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
+		.orderBy(desc(invoiceTable.createdAt));
+
+	return results.map((row) => ({
+		invoice: row.invoice,
+		candidate: {
+			profile: row.candidateProfile,
+			user: row.candidateUser
+		},
+		timesheet: row.timesheet,
+		requisition: row.requisition,
+		lineItems: (row.invoice.lineItems as InvoiceLineItem[]) || [],
+		client: row.client,
+		clientUser: row.clientUser
+	}));
+}
+
+export async function getManualInvoices(
+	clientId: string,
+	options?: {
+		status?: InvoiceStatus;
+		fromDate?: Date;
+		toDate?: Date;
+	}
+): Promise<InvoiceWithRelations[]> {
+	const whereConditions = [
+		eq(invoiceTable.clientId, clientId),
+		or(eq(invoiceTable.sourceType, 'manual'), eq(invoiceTable.sourceType, 'other'))
+	];
+
+	if (options?.status) {
+		whereConditions.push(eq(invoiceTable.status, options.status));
+	}
+
+	if (options?.fromDate) {
+		whereConditions.push(gte(invoiceTable.createdAt, options.fromDate));
+	}
+
+	if (options?.toDate) {
+		whereConditions.push(lte(invoiceTable.createdAt, options.toDate));
+	}
+
+	const results = await db
+		.select({
+			invoice: invoiceTable,
+			client: clientProfileTable,
+			clientUser: {
+				id: sql<string>`client_user.id`,
+				firstName: sql<string>`client_user.first_name`,
+				lastName: sql<string>`client_user.last_name`,
+				avatarUrl: sql<string>`client_user.avatar_url`
+			}
+		})
+		.from(invoiceTable)
+		.where(and(...whereConditions))
+		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
+		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
+		.orderBy(desc(invoiceTable.createdAt));
+
+	return results.map((row) => ({
+		invoice: row.invoice,
+		client: row.client,
+		clientUser: row.clientUser,
+		lineItems: (row.invoice.lineItems as InvoiceLineItem[]) || [],
+		// These will be null for manual invoices
+		candidate: null,
+		timesheet: null,
+		requisition: null
+	}));
+}
+
+export async function getInvoiceById(invoiceId: string): Promise<InvoiceWithRelations | null> {
+	const result = await db
+		.select({
+			invoice: invoiceTable,
+			candidateProfile: candidateProfileTable,
+			candidateUser: {
+				id: sql<string>`candidate_user.id`,
+				firstName: sql<string>`candidate_user.first_name`,
+				lastName: sql<string>`candidate_user.last_name`,
+				avatarUrl: sql<string>`candidate_user.avatar_url`
+			},
+			timesheet: timeSheetTable,
+			requisition: requisitionTable,
+			client: clientProfileTable,
+			clientUser: {
+				id: sql<string>`client_user.id`,
+				firstName: sql<string>`client_user.first_name`,
+				lastName: sql<string>`client_user.last_name`,
+				avatarUrl: sql<string>`client_user.avatar_url`
+			}
+		})
+		.from(invoiceTable)
+		.where(eq(invoiceTable.id, invoiceId))
+		.leftJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
+		.leftJoin(
+			sql`${userTable} as candidate_user`,
+			sql`${candidateProfileTable.userId} = candidate_user.id`
+		)
+		.leftJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
+		.leftJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
+		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
+		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
+		.limit(1);
+
+	if (!result.length) {
+		return null;
+	}
+
+	const row = result[0];
+	return {
+		invoice: row.invoice,
+		candidate:
+			row.candidateProfile && row.candidateUser
+				? {
+						profile: row.candidateProfile,
+						user: row.candidateUser
+					}
+				: null,
+		timesheet: row.timesheet,
+		requisition: row.requisition,
+		lineItems: (row.invoice.lineItems as InvoiceLineItem[]) || [],
+		client: row.client,
+		clientUser: row.clientUser
+	};
+}
+
+export async function getInvoicesWithStripeData(
+	clientId: string,
+	options?: {
+		onlyWithStripeId?: boolean;
+		status?: InvoiceStatus;
+	}
+): Promise<(InvoiceWithRelations & { stripeData: any })[]> {
+	const whereConditions = [eq(invoiceTable.clientId, clientId)];
+
+	if (options?.onlyWithStripeId) {
+		whereConditions.push(isNotNull(invoiceTable.stripeInvoiceId));
+	}
+
+	if (options?.status) {
+		whereConditions.push(eq(invoiceTable.status, options.status));
+	}
+
+	const invoices = await getClientInvoices(clientId, {
+		status: options?.status,
+		includeStripeData: true
+	});
+
+	// Map invoices with their Stripe data
+	return invoices.map((inv) => ({
+		...inv,
+		stripeData: {
+			stripeInvoiceId: inv.invoice.stripeInvoiceId,
+			stripeCustomerId: inv.invoice.stripeCustomerId,
+			stripePdfUrl: inv.invoice.stripePdfUrl,
+			stripeHostedUrl: inv.invoice.stripeHostedUrl,
+			stripeStatus: inv.invoice.stripeStatus,
+			currency: inv.invoice.currency,
+			amountDue: inv.invoice.amountDue,
+			amountPaid: inv.invoice.amountPaid,
+			amountRemaining: inv.invoice.amountRemaining
+		}
+	}));
 }
 
 /**
@@ -1452,4 +1823,196 @@ export async function rejectTimesheet(timesheetId: string) {
 	} catch (err) {
 		throw error(500, `Error rejecting timesheet: ${error}`);
 	}
+}
+export async function revertTimesheetToPending(timesheetId: string) {
+	try {
+		const [result] = await db
+			.update(timeSheetTable)
+			.set({ status: 'PENDING' })
+			.where(eq(timeSheetTable.id, timesheetId))
+			.returning();
+
+		return result;
+	} catch (err) {
+		throw error(500, `Error rejecting timesheet: ${error}`);
+	}
+}
+
+export async function approveTimesheet(timesheetId: string) {
+	try {
+		// Update timesheet status to APPROVED
+		const [timesheet] = await db
+			.update(timeSheetTable)
+			.set({ status: 'APPROVED' })
+			.where(eq(timeSheetTable.id, timesheetId))
+			.returning();
+
+		if (!timesheet) {
+			throw error(404, 'Timesheet not found');
+		}
+
+		return timesheet;
+	} catch (err) {
+		console.error('Error in approveTimesheet:', err);
+		throw error(500, `Error approving timesheet: ${err}`);
+	}
+}
+
+export async function getInvoiceByTimesheetId(
+	timesheetId: string | undefined
+): Promise<Invoice | null> {
+	if (!timesheetId) throw error(400, 'Must provide timesheet ID');
+	try {
+		const [invoice] = await db
+			.select()
+			.from(invoiceTable)
+			.where(eq(invoiceTable.timesheetId, timesheetId));
+
+		return invoice || null;
+	} catch (err) {
+		console.error('Error fetching invoice by timesheet ID:', err);
+		throw error(500, `Error fetching invoice by timesheet ID: ${err}`);
+	}
+}
+
+export async function createInvoiceRecord({
+	clientId,
+	timesheet,
+	stripeInvoice,
+	amountInDollars
+}: {
+	clientId: string;
+	timesheet?: TimeSheetSelect;
+	stripeInvoice: Stripe.Invoice;
+	amountInDollars: string;
+}): Promise<Invoice> {
+	try {
+		if (timesheet) {
+			const [invoice] = await db
+				.insert(invoiceTable)
+				.values({
+					id: crypto.randomUUID(),
+					clientId: timesheet.associatedClientId,
+					invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
+					timesheetId: timesheet.id,
+					requisitionId: timesheet.requisitionId,
+					candidateId: timesheet.associatedCandidateId,
+					stripeInvoiceId: stripeInvoice.id,
+					stripeCustomerId: stripeInvoice.customer as string,
+					stripePdfUrl: stripeInvoice.invoice_pdf,
+					stripeHostedUrl: stripeInvoice.hosted_invoice_url,
+					status: 'open', // Maps to Stripe's 'open' status
+					sourceType: 'timesheet',
+					currency: 'usd',
+					amountDue: amountInDollars,
+					total: amountInDollars,
+					subtotal: amountInDollars,
+					amountRemaining: amountInDollars,
+					stripeStatus: stripeInvoice.status,
+					customerEmail: stripeInvoice.customer_email,
+					customerName: stripeInvoice.customer_name, // You might want to include a more friendly name if available
+					dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Due in 30 days
+					periodStart: timesheet.weekBeginDate,
+					periodEnd: new Date(
+						new Date(timesheet.weekBeginDate).setDate(
+							new Date(timesheet.weekBeginDate).getDate() + 6
+						)
+					), // End date = start date + 6 days
+					description: stripeInvoice.description,
+					lineItems: JSON.stringify(stripeInvoice.lines.data)
+				})
+				.returning();
+
+			return invoice;
+		} else {
+			const [invoice] = await db
+				.insert(invoiceTable)
+				.values({
+					id: crypto.randomUUID(),
+					clientId: clientId,
+					invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
+					stripeInvoiceId: stripeInvoice.id,
+					stripeCustomerId: stripeInvoice.customer as string,
+					stripePdfUrl: stripeInvoice.invoice_pdf,
+					stripeHostedUrl: stripeInvoice.hosted_invoice_url,
+					status: 'open', // Maps to Stripe's 'open' status
+					sourceType: 'timesheet',
+					currency: 'usd',
+					amountDue: amountInDollars,
+					total: amountInDollars,
+					subtotal: amountInDollars,
+					amountRemaining: amountInDollars,
+					stripeStatus: stripeInvoice.status,
+					customerEmail: stripeInvoice.customer_email,
+					customerName: stripeInvoice.customer_name, // You might want to include a more friendly name if available
+					dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Due in 30 days
+					description: stripeInvoice.description,
+					lineItems: JSON.stringify(stripeInvoice.lines.data)
+				})
+				.returning();
+
+			return invoice;
+		}
+	} catch (err) {
+		console.error('Error creating invoice record:', error);
+		throw error(500, `Error creating invoice record: ${error}`);
+	}
+}
+
+/**
+ * Calculates the total amount to charge based on hours billed and rates
+ * @param totalHoursBilled - Total hours billed (decimal string or number)
+ * @param candidateRateBase - Base hourly rate (decimal string or number)
+ * @param candidateRateOvertime - Optional overtime hourly rate (decimal string or number)
+ * @returns Total amount in cents for Stripe (integer)
+ */
+export function convertToStripeAmount(
+	totalHoursWorked: string | number,
+	candidateRateBase: string | number | null,
+	candidateRateOvertime?: string | number | null
+): number {
+	if (!candidateRateBase) throw new Error('Base rate is required');
+	// Convert all inputs to numbers, handling null/undefined
+	const hours = parseFloat(String(totalHoursWorked));
+	const baseRate = parseFloat(String(candidateRateBase));
+	const overtimeRate = candidateRateOvertime ? parseFloat(String(candidateRateOvertime)) : null;
+
+	// Validate inputs
+	if (isNaN(hours) || hours < 0) {
+		throw new Error('Invalid totalHoursWorked: must be a valid positive number');
+	}
+
+	if (isNaN(baseRate) || baseRate < 0) {
+		throw new Error('Invalid candidateRateBase: must be a valid positive number');
+	}
+
+	if (overtimeRate !== null && (isNaN(overtimeRate) || overtimeRate < 0)) {
+		throw new Error('Invalid candidateRateOvertime: must be a valid positive number or null');
+	}
+
+	// Define standard hours threshold (adjust as needed for your business rules)
+	const STANDARD_HOURS_THRESHOLD = 40;
+
+	let totalAmount = 0;
+
+	if (hours <= STANDARD_HOURS_THRESHOLD || !overtimeRate) {
+		// All hours are billed at base rate, or no overtime rate specified
+		totalAmount = hours * baseRate;
+	} else {
+		// Split between regular and overtime hours
+		const regularHours = STANDARD_HOURS_THRESHOLD;
+		const overtimeHours = hours - STANDARD_HOURS_THRESHOLD;
+
+		totalAmount = regularHours * baseRate + overtimeHours * overtimeRate;
+	}
+
+	// Convert to cents for Stripe (multiply by 100 and round to avoid floating point issues)
+	let amountInCents = Math.round(totalAmount * 100);
+	console.log('Amount in cents:', amountInCents);
+	// Ensure the amount is a positive integer
+	if (amountInCents < 0) {
+		throw new Error('Calculated amount is negative, which is invalid');
+	}
+
+	return amountInCents;
 }

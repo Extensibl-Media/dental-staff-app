@@ -5,16 +5,26 @@ import {
 	getClientProfilebyUserId
 } from '$lib/server/database/queries/clients';
 import {
+	approveTimesheet,
+	convertToStripeAmount,
+	createInvoiceRecord,
+	getInvoiceByTimesheetId,
 	getRecurrenceDaysForTimesheet,
 	getRequisitionDetailsById,
+	getRequisitionDetailsByIdAdmin,
 	getTimesheetDetails,
+	getTimesheetDetailsAdmin,
 	getWorkdaysForTimesheet,
 	rejectTimesheet,
+	revertTimesheetToPending,
 	validateTimesheet
 } from '$lib/server/database/queries/requisitions';
 import { redirect } from '@sveltejs/kit';
 import type { RequestEvent } from './$types';
 import { setFlash } from 'sveltekit-flash-message/server';
+import { createStripeInvoice } from '$lib/server/stripe';
+import db from '$lib/server/database/drizzle';
+import { adminConfigTable } from '$lib/server/database/schemas/config';
 
 export const load = async (event: RequestEvent) => {
 	const user = event.locals.user;
@@ -23,6 +33,25 @@ export const load = async (event: RequestEvent) => {
 	}
 
 	const { id } = event.params;
+
+	if (user.role === USER_ROLES.SUPERADMIN) {
+		const timesheet = await getTimesheetDetailsAdmin(id);
+		const requisition = await getRequisitionDetailsByIdAdmin(timesheet.requisitionId);
+		const recurrenceDays = await getRecurrenceDaysForTimesheet(timesheet);
+		const workdays = await getWorkdaysForTimesheet(timesheet);
+		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
+		const invoice = await getInvoiceByTimesheetId(id);
+
+		return {
+			user,
+			timesheet,
+			workdays,
+			recurrenceDays,
+			requisition: requisition.requisition,
+			discrepancies,
+			invoice
+		};
+	}
 
 	if (user.role === USER_ROLES.CLIENT) {
 		const client = await getClientProfilebyUserId(user.id);
@@ -33,8 +62,7 @@ export const load = async (event: RequestEvent) => {
 		const recurrenceDays = await getRecurrenceDaysForTimesheet(timesheet);
 		const workdays = await getWorkdaysForTimesheet(timesheet);
 		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
-
-		console.log({ timesheet });
+		const invoice = await getInvoiceByTimesheetId(id);
 
 		return {
 			user,
@@ -42,7 +70,8 @@ export const load = async (event: RequestEvent) => {
 			workdays,
 			recurrenceDays,
 			requisition: requisition.requisition,
-			discrepancies
+			discrepancies,
+			invoice
 		};
 	}
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
@@ -54,8 +83,7 @@ export const load = async (event: RequestEvent) => {
 		const recurrenceDays = await getRecurrenceDaysForTimesheet(timesheet);
 		const workdays = await getWorkdaysForTimesheet(timesheet);
 		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
-
-		console.log({ timesheet });
+		const invoice = await getInvoiceByTimesheetId(id);
 
 		return {
 			user,
@@ -63,7 +91,8 @@ export const load = async (event: RequestEvent) => {
 			workdays,
 			recurrenceDays,
 			requisition: requisition.requisition,
-			discrepancies
+			discrepancies,
+			invoice
 		};
 	}
 
@@ -92,11 +121,54 @@ export const actions = {
 		}
 	},
 	approveTimesheet: async (event: RequestEvent) => {
-		// TODO: Validate Timesheet Data
-		// Change Timesheet Status to APPROVED
-		// Generate Invoice for timesheet
+		const { id } = event.params;
+		try {
+			const [adminConfig] = await db.select().from(adminConfigTable).limit(1);
+			const { user } = event.locals;
+
+			if (user === null) {
+				redirect(302, '/auth/sign-in');
+			}
+			const timesheet = await approveTimesheet(id);
+			const amountInCents = convertToStripeAmount(
+				timesheet.totalHoursWorked || 0,
+				timesheet.candidateRateBase,
+				timesheet.candidateRateOT
+			);
+
+			const adminFee = adminConfig.adminPaymentFee;
+			const adminFeeType = adminConfig.adminPaymentFeeType;
+			let finalAmt = amountInCents;
+
+			if (adminFeeType === 'PERCENTAGE') {
+				finalAmt += Math.round((amountInCents * adminFee) / 100);
+			} else if (adminFeeType === 'FIXED') {
+				finalAmt += adminFee;
+			}
+
+			const stripeInvoice = await createStripeInvoice(
+				user.stripeCustomerId,
+				finalAmt,
+				`DentalStaff.US invoice: Hours worked for ${user.firstName} ${user.lastName} for timesheet ${id}`,
+				{ userId: user.id, timesheetId: timesheet.id }
+			);
+
+			setFlash({ type: 'success', message: 'Timesheet approved' }, event);
+			return {
+				success: true,
+				message: 'Timesheet approved',
+				timesheet,
+				// invoice,
+				stripeInvoice
+			};
+		} catch (err) {
+			await revertTimesheetToPending(id);
+			console.error('Error approving timesheet:', err);
+			setFlash({ type: 'error', message: 'Error approving timesheet' }, event);
+			return { success: false };
+		}
 	},
-	// editTimesheet: async (event: RequestEvent) => {},
+	editTimesheet: async (event: RequestEvent) => {},
 	closeTimesheet: async (event: RequestEvent) => {
 		// TODO: Change Timesheet Status to VOID
 	}

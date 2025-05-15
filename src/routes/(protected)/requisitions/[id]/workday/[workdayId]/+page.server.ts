@@ -28,6 +28,7 @@ export async function load({ locals, params }: RequestEvent) {
 		const company = await getClientCompanyByClientId(client.id);
 		const recurrenceDay = await getRecurrenceDayDetails(recurrenceDayId, company.id);
 		const workday = await getWorkdayDetails(recurrenceDayId, company.id);
+		console.log({ workday });
 
 		return { user, recurrenceDay, workday, client, company };
 	}

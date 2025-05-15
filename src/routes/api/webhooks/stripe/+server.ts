@@ -1,3 +1,7 @@
+import {
+	timeSheetTable,
+	type TimeSheetSelect
+} from './../../../../lib/server/database/schemas/requisition';
 import { stripe } from '$lib/server/stripe';
 import { json } from '@sveltejs/kit';
 import { STRIPE_WEBHOOK_SECRET } from '$env/static/private';
@@ -10,6 +14,13 @@ import {
 	handleSubscriptionUpdated
 } from '$lib/server/database/queries/billing';
 import type Stripe from 'stripe';
+import db from '$lib/server/database/drizzle';
+import { clientSubscriptionTable } from '$lib/server/database/schemas/client';
+import { eq } from 'drizzle-orm';
+import {
+	createInvoiceRecord,
+	getTimesheetDetails
+} from '$lib/server/database/queries/requisitions';
 
 function toBuffer(ab: ArrayBuffer): Buffer {
 	const buf = Buffer.alloc(ab.byteLength);
@@ -20,7 +31,7 @@ function toBuffer(ab: ArrayBuffer): Buffer {
 	return buf;
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
 	console.log('Webhook received');
 	console.log('Webhook Secret: ', STRIPE_WEBHOOK_SECRET);
 
@@ -40,12 +51,6 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// Add special handling for invoice.paid events
 		switch (event.type) {
-			// case 'invoice.paid':
-			// 	const invoice = event.data.object as Stripe.Invoice;
-			// 	// You might want to handle this event to track successful payments
-			// 	console.log('Invoice paid:', invoice.id);
-			// 	break;
-
 			case 'checkout.session.completed':
 				console.log('Handling checkout session completed');
 				await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
@@ -64,13 +69,69 @@ export const POST: RequestHandler = async ({ request }) => {
 			case 'customer.subscription.deleted':
 				console.log('Handling customer subscription deleted');
 				await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+				// TODO: handle subscription delete/cleanup in database
+				await db
+					.delete(clientSubscriptionTable)
+					.where(
+						eq(clientSubscriptionTable.stripeCustomerId, event.data.object.customer as string)
+					);
+				break;
+			case 'invoice.created':
+				console.log('Handling invoice created');
+				const invoiceCreated = event.data.object as Stripe.Invoice;
+				console.log(invoiceCreated);
+				break;
+			case 'invoice.finalized':
+				console.log('Handling invoice finalized');
+				const invoiceFinalized = event.data.object as Stripe.Invoice;
+
+				let timesheet;
+
+				const client = await getClientProfilebyUserId(invoiceFinalized.metadata?.userId);
+				if (!client) {
+					console.error('Client not found for userId:', invoiceFinalized.metadata?.userId);
+					return new Response('Client not found', { status: 400 });
+				}
+
+				if (invoiceFinalized.metadata?.timesheetId) {
+					const [result] = await db
+						.select()
+						.from(timeSheetTable)
+						.where(eq(timeSheetTable.id, invoiceFinalized.metadata?.timesheetId))
+						.limit(1);
+					timesheet = result as TimeSheetSelect;
+				}
+
+				await createInvoiceRecord({
+					clientId: client.id,
+					timesheet,
+					stripeInvoice: invoiceFinalized,
+					amountInDollars: (invoiceFinalized.amount_due / 100).toFixed(2)
+				});
+				const invoice = event.data.object as Stripe.Invoice;
+				console.log('Invoice paid:', invoice.id);
+				break;
+			case 'invoice.payment_failed':
+				console.log('Handling invoice payment failed');
+				const invoicePaymentFailed = event.data.object as Stripe.Invoice;
+				console.log(invoicePaymentFailed);
+				break;
+			case 'invoice.payment_succeeded':
+				console.log('Handling invoice payment succeeded');
+				const invoicePaymentSucceeded = event.data.object as Stripe.Invoice;
+				console.log(invoicePaymentSucceeded);
+				break;
+			case 'invoice.voided':
+				console.log('Handling invoice voided');
+				const invoiceVoided = event.data.object as Stripe.Invoice;
+				console.log(invoiceVoided);
 				break;
 		}
 
 		return json({ received: true });
 	} catch (err) {
 		console.error('Full webhook error:', err);
-		console.error('Error message:', err.message);
+		console.error('Error message:', (err as Error).message);
 		return new Response(`Webhook Error: ${err instanceof Error ? err.message : 'Unknown Error'}`, {
 			status: 400
 		});

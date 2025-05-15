@@ -7,8 +7,10 @@ import {
 	getClientProfilebyUserId,
 	getClientStaffProfilebyUserId
 } from '$lib/server/database/queries/clients';
-import { newSupportTicketSchema } from '$lib/config/zod-schemas';
 import { superValidate } from 'sveltekit-superforms/server';
+import db from '$lib/server/database/drizzle';
+import { invoiceTable } from '$lib/server/database/schemas/requisition';
+import { count, and, eq, lt, ne, sum } from 'drizzle-orm';
 
 export const load = async (event: RequestEvent) => {
 	//I only have this function here so it will check page again
@@ -30,8 +32,6 @@ export const load = async (event: RequestEvent) => {
 	}
 
 	if (user.role === USER_ROLES.CLIENT) {
-		const supportTicketForm = await superValidate(event, newSupportTicketSchema);
-
 		if (!user.completedOnboarding) {
 			redirect(302, '/onboarding/client/company');
 		}
@@ -44,8 +44,36 @@ export const load = async (event: RequestEvent) => {
 			timesheetsDueCount,
 			discrepanciesCount,
 			positionApplications,
-			timesheetsDue
+			timesheetsDue,
+			invoices
 		} = await getClientDashboardData(client?.id, user.id);
+
+		const overdueInvoicesCount = await db
+			.select({ count: count() })
+			.from(invoiceTable)
+			.where(
+				and(
+					eq(invoiceTable.clientId, client?.id),
+					lt(invoiceTable.dueDate, new Date()),
+					ne(invoiceTable.status, 'paid')
+				)
+			);
+
+		const pendingInvoicesCount = await db
+			.select({ count: count() })
+			.from(invoiceTable)
+			.where(and(eq(invoiceTable.clientId, client?.id), eq(invoiceTable.status, 'open')));
+
+		const totalAmountDue = await db
+			.select({ sum: sum(invoiceTable.amountDue) })
+			.from(invoiceTable)
+			.where(
+				and(
+					eq(invoiceTable.clientId, client?.id),
+					ne(invoiceTable.status, 'paid'),
+					ne(invoiceTable.status, 'void')
+				)
+			);
 
 		return {
 			user,
@@ -58,14 +86,20 @@ export const load = async (event: RequestEvent) => {
 			timesheetsDue,
 			timesheetsDueCount,
 			discrepanciesCount,
-			supportTicketForm
+			invoices,
+			totalAmountDue: totalAmountDue[0]?.sum,
+			overdueInvoicesCount: overdueInvoicesCount[0]?.count,
+			pendingInvoicesCount: pendingInvoicesCount[0]?.count
 		};
 	}
 
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
 		const client = await getClientProfileByStaffUserId(user.id);
 		const profile = await getClientStaffProfilebyUserId(user.id);
-		const supportTicketForm = await superValidate(event, newSupportTicketSchema);
+
+		if (!client) {
+			return redirect(302, '/');
+		}
 
 		const {
 			requisitions,
@@ -74,8 +108,36 @@ export const load = async (event: RequestEvent) => {
 			timesheetsDueCount,
 			discrepanciesCount,
 			positionApplications,
-			timesheetsDue
+			timesheetsDue,
+			invoices
 		} = await getClientDashboardData(client?.id, user.id);
+
+		const overdueInvoicesCount = await db
+			.select({ count: count() })
+			.from(invoiceTable)
+			.where(
+				and(
+					eq(invoiceTable.clientId, client?.id),
+					lt(invoiceTable.dueDate, new Date()),
+					ne(invoiceTable.status, 'paid')
+				)
+			);
+
+		const pendingInvoicesCount = await db
+			.select({ count: count() })
+			.from(invoiceTable)
+			.where(and(eq(invoiceTable.clientId, client.id), eq(invoiceTable.status, 'open')));
+
+		const totalAmountDue = await db
+			.select({ sum: sum(invoiceTable.amountDue) })
+			.from(invoiceTable)
+			.where(
+				and(
+					eq(invoiceTable.clientId, client?.id),
+					ne(invoiceTable.status, 'paid'),
+					ne(invoiceTable.status, 'void')
+				)
+			);
 
 		return {
 			user,
@@ -88,7 +150,10 @@ export const load = async (event: RequestEvent) => {
 			timesheetsDue,
 			timesheetsDueCount,
 			discrepanciesCount,
-			supportTicketForm
+			invoices,
+			totalAmountDue: totalAmountDue[0]?.sum,
+			overdueInvoicesCount: overdueInvoicesCount[0]?.count,
+			pendingInvoicesCount: pendingInvoicesCount[0]?.count
 		};
 	}
 

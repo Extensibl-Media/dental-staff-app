@@ -262,3 +262,17 @@ export const candidateDocumentUploadSchema = z.object({
 });
 
 export type CandidateDocumentUploadSchema = typeof candidateDocumentUploadSchema;
+
+export const ApproveTimesheetSchema = z.object({
+	id: z.string(),
+	entries: z.array(
+		z.object({
+			workdayId: z.string().min(1, 'Workday ID is required'),
+			hours: z.number().min(1, 'Hours worked is required'),
+			startTime: z.string().min(1, 'Start time is required'),
+			endTime: z.string().min(1, 'End time is required'),
+			date: z.string().min(1, 'Date is required')
+		})
+	),
+	totalHours: z.number().min(1, 'Total hours is required')
+});

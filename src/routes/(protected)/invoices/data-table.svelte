@@ -23,11 +23,11 @@
     },
     {
       header: "Requisition",
-      accessorFn: (row) => row.requisition.id
+      accessorFn: (row) => row.requisition?.id
     },
     {
       header: "Candidate",
-      accessorFn: row => `${row.user.firstName} ${row.user.lastName}`,
+      accessorFn: row => `${row.candidate?.user.firstName} ${row.candidate?.user.lastName}`,
     },
     {
       header: "Status",
@@ -36,7 +36,7 @@
     },
     {
       header: "Amount",
-      accessorFn: row => row.invoice.totalAmount,
+      accessorFn: row => row.invoice.total,
       cell: ({ getValue }) => {
         const amount = Number(getValue());
         return new Intl.NumberFormat('en-US', {

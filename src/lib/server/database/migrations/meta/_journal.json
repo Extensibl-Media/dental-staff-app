@@ -365,6 +365,34 @@
       "when": 1744141071961,
       "tag": "0051_ambiguous_silver_centurion",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "6",
+      "when": 1747083738578,
+      "tag": "0052_daffy_timeslip",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1747084632594,
+      "tag": "0053_fuzzy_peter_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1747340625684,
+      "tag": "0054_lush_johnny_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "6",
+      "when": 1747340653702,
+      "tag": "0055_minor_swordsman",
+      "breakpoints": true
     }
   ]
 }
