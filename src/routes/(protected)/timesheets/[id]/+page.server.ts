@@ -107,12 +107,14 @@ export const load = async (event: RequestEvent) => {
 
 export const actions = {
 	rejectTimesheet: async (event: RequestEvent) => {
+		const user = event.locals.user;
+		if (!user) {
+			redirect(302, '/auth/sign-in');
+		}
+		const userId = user.id;
 		try {
-			// TODO: Change Timesheet Status to DISCREPANCY
 			const { id } = event.params;
-
-			console.log('Rejecting timesheet: ', id);
-			await rejectTimesheet(id);
+			await rejectTimesheet(id, userId);
 			setFlash({ type: 'success', message: 'Timesheet rejected' }, event);
 			return { succes: true };
 		} catch (error) {

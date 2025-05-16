@@ -15,10 +15,7 @@ import { env } from '$env/dynamic/private';
 import { getClientIdByCompanyId } from '$lib/server/database/queries/clients';
 import { getCandidateProfileByUserId } from '$lib/server/database/queries/candidates';
 import { z } from 'zod';
-import {
-	getRequisitionByWorkdayId,
-	getWorkdayWithRelations
-} from '$lib/server/database/queries/requisitions';
+import { getRequisitionByWorkdayId } from '$lib/server/database/queries/requisitions';
 
 const newTimesheetSchema = z.object({
 	userId: z.string().min(1, 'User ID is required'),
@@ -113,7 +110,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			associatedCandidateId: candidateProfile.id,
 			associatedClientId: clientId,
 			requisitionId: requisition?.id,
-			weekBeginDate: new Date(weekStartDate),
+			weekBeginDate: new Date(weekStartDate).toISOString().split('T')[0],
 			totalHoursWorked: parsedBody.data.totalHours.toString(),
 			hoursRaw: timesheetEntries,
 			candidateRateBase: candidateProfile.hourlyRateMin.toString(),

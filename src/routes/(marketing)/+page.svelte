@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button';
 	import { APP_NAME } from '$lib/config/constants';
@@ -47,4 +47,4 @@
 			<Button on:click={() => goto('/auth/sign-up')} variant="outline">Sign up</Button>
 		</div>
 	</section>
-</div>
+</div> -->

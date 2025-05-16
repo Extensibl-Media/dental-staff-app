@@ -740,11 +740,19 @@
             "token"
           ]
         },
+<<<<<<< HEAD
         "users_stripe_customer_id_unique": {
           "name": "users_stripe_customer_id_unique",
           "nullsNotDistinct": false,
           "columns": [
             "stripe_customer_id"
+=======
+        "users_stripe-_customer_id_unique": {
+          "name": "users_stripe-_customer_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "stripe-_customer_id"
+>>>>>>> 3fce45fb5c7010a7c54276b527056a45a14f4f87
           ]
         }
       }

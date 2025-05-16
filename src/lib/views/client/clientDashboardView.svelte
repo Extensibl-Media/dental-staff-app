@@ -2,12 +2,20 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card';
 	import * as Table from '$lib/components/ui/table';
-	import { AlertCircle, DollarSign, FileClock, FileText, PlusIcon, ScrollText, UserPlus } from 'lucide-svelte';
+	import {
+		AlertCircle,
+		DollarSign,
+		FileClock,
+		FileText,
+		PlusIcon,
+		ScrollText,
+		UserPlus
+	} from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { formatCurrency, formatDate, formatTicketDate } from '$lib/_helpers';
 	import { Badge } from '$lib/components/ui/badge';
 	import { cn } from '$lib/utils';
-	import { format } from 'date-fns';
+	import { format, parse } from 'date-fns';
 
 	export let user;
 	export let data;
@@ -24,7 +32,7 @@
 	$: invoices = data.invoices || [];
 	$: overdueInvoicesCount = data.overdueInvoicesCount || 0;
 	$: pendingInvoicesCount = data.pendingInvoicesCount || 0;
-	$: totalAmountDue = parseInt(data.totalAmountDue || "0");
+	$: totalAmountDue = parseInt(data.totalAmountDue || '0');
 </script>
 
 <section class="grow grid grid-cols-1 lg:grid-cols-3">
@@ -152,21 +160,30 @@
 						</Table.Header>
 						<Table.Body>
 							{#each invoices as invoiceData, i (invoiceData.invoice.id)}
-								<Table.Row class="cursor-pointer" on:click={() => goto(`/invoices/${invoiceData.invoice.id}`)}>
+								<Table.Row
+									class="cursor-pointer"
+									on:click={() => goto(`/invoices/${invoiceData.invoice.id}`)}
+								>
 									<Table.Cell class="font-medium">{invoiceData.invoice.invoiceNumber}</Table.Cell>
 									<Table.Cell>
 										<div class="flex flex-col">
 											<span class="font-medium">{invoiceData.client.name}</span>
-											<span class="text-xs text-gray-500">{invoiceData.clientUser.firstName} {invoiceData.clientUser.lastName}</span>
+											<span class="text-xs text-gray-500"
+												>{invoiceData.clientUser.firstName} {invoiceData.clientUser.lastName}</span
+											>
 										</div>
 									</Table.Cell>
 									<Table.Cell>
 										{#if invoiceData.invoice.dueDate}
-											<span class={cn(
-												"text-sm",
-												new Date(invoiceData.invoice.dueDate) < new Date() && invoiceData.invoice.status !== 'paid' && "text-red-600 font-semibold"
-											)}>
-												{format(invoiceData.invoice.dueDate, "PP")}
+											<span
+												class={cn(
+													'text-sm',
+													new Date(invoiceData.invoice.dueDate) < new Date() &&
+														invoiceData.invoice.status !== 'paid' &&
+														'text-red-600 font-semibold'
+												)}
+											>
+												{format(invoiceData.invoice.dueDate, 'PP')}
 											</span>
 										{:else}
 											<span class="text-gray-400">-</span>
@@ -178,16 +195,18 @@
 												invoiceData.invoice.status === 'draft' && 'bg-gray-400 hover:bg-gray-500',
 												invoiceData.invoice.status === 'open' && 'bg-blue-500 hover:bg-blue-600',
 												invoiceData.invoice.status === 'paid' && 'bg-green-500 hover:bg-green-600',
-												invoiceData.invoice.status === 'uncollectible' && 'bg-orange-500 hover:bg-orange-600',
+												invoiceData.invoice.status === 'uncollectible' &&
+													'bg-orange-500 hover:bg-orange-600',
 												invoiceData.invoice.status === 'void' && 'bg-gray-600 hover:bg-gray-700'
 											)}
-										value={invoiceData.invoice.status.toUpperCase()} />
+											value={invoiceData.invoice.status.toUpperCase()}
+										/>
 									</Table.Cell>
 									<Table.Cell class="text-right font-semibold">
 										{formatCurrency(invoiceData.invoice.total)}
 									</Table.Cell>
 									<Table.Cell>
-										<Badge variant="outline" value={invoiceData.invoice.sourceType.toUpperCase()}/>
+										<Badge variant="outline" value={invoiceData.invoice.sourceType.toUpperCase()} />
 									</Table.Cell>
 								</Table.Row>
 							{/each}
@@ -205,7 +224,11 @@
 			<Card.Root>
 				<Card.Header class="flex flex-row justify-between items-center flex-wrap">
 					<Card.Title class="text-xl md:text-2xl">Recent Requisitions</Card.Title>
-					<Button on:click={() => goto('/requisitions')} size="sm" class="bg-blue-900 hover:bg-blue-800">
+					<Button
+						on:click={() => goto('/requisitions')}
+						size="sm"
+						class="bg-blue-900 hover:bg-blue-800"
+					>
 						<PlusIcon size={16} class="mr-1" /> New
 					</Button>
 				</Card.Header>
@@ -236,8 +259,9 @@
 												req.status === 'OPEN' && 'bg-blue-500 hover:bg-blue-600',
 												req.status === 'FILLED' && 'bg-green-400 hover:bg-bg-green-500',
 												req.status === 'UNFULFILLED' && 'bg-orange-400 hover:bg-orange-500',
-												req.status === 'CANCELED' && 'bg-red-500 hover:bg-red-600'
-												, 'text-white')}
+												req.status === 'CANCELED' && 'bg-red-500 hover:bg-red-600',
+												'text-white'
+											)}
 										/>
 									</Table.Cell>
 									<Table.Cell class="text-right">{formatCurrency(req.hourlyRate)}</Table.Cell>
@@ -247,7 +271,9 @@
 					</Table.Root>
 				</Card.Content>
 				<Card.Footer>
-					<Button size="sm" class="bg-blue-900 hover:bg-blue-800" href="/requisitions">See All</Button>
+					<Button size="sm" class="bg-blue-900 hover:bg-blue-800" href="/requisitions"
+						>See All</Button
+					>
 				</Card.Footer>
 			</Card.Root>
 		</div>
@@ -256,7 +282,9 @@
 			<Card.Root>
 				<Card.Header class="flex flex-row justify-between items-center flex-wrap">
 					<Card.Title class="text-xl md:text-2xl">Timesheets Due</Card.Title>
-					<Button size="sm" class="bg-blue-900 hover:bg-blue-800" href={'/timesheets'}>See All</Button>
+					<Button size="sm" class="bg-blue-900 hover:bg-blue-800" href={'/timesheets'}
+						>See All</Button
+					>
 				</Card.Header>
 				<Card.Content class="p-2 md:p-4">
 					<Table.Root>
@@ -275,9 +303,12 @@
 								>
 									<Table.Cell>
 										<div class="flex flex-col">
-											<span class="font-medium truncate max-w-[150px]">{timesheet.requisition.title}</span>
+											<span class="font-medium truncate max-w-[150px]"
+												>{timesheet.requisition.title}</span
+											>
 											<span class="text-xs text-gray-500">
-												{timesheet.candidate?.firstName} {timesheet.candidate?.lastName}
+												{timesheet.candidate?.firstName}
+												{timesheet.candidate?.lastName}
 											</span>
 										</div>
 									</Table.Cell>
@@ -285,16 +316,28 @@
 										<Badge
 											variant="secondary"
 											class={cn(
-												timesheet.timesheet.status === 'PENDING' && 'bg-yellow-300 hover:bg-yellow-400',
-                                                timesheet.timesheet.status === 'DISCREPANCY' && 'bg-orange-400 hover:bg-bg-orange-500',
-                                                timesheet.timesheet.status === 'APPROVED' && 'bg-green-400 hover:bg-green-600',
-                                                timesheet.timesheet.status === 'VOID' && 'bg-gray-200 hover:bg-gray-300',
-                                                timesheet.timesheet.status === 'REJECTED' && 'bg-red-500 hover:bg-red-500'
-                                            )}
-											value={timesheet.timesheet.status}/>
+												timesheet.timesheet.status === 'PENDING' &&
+													'bg-yellow-300 hover:bg-yellow-400',
+												timesheet.timesheet.status === 'DISCREPANCY' &&
+													'bg-orange-400 hover:bg-bg-orange-500',
+												timesheet.timesheet.status === 'APPROVED' &&
+													'bg-green-400 hover:bg-green-600',
+												timesheet.timesheet.status === 'VOID' && 'bg-gray-200 hover:bg-gray-300',
+												timesheet.timesheet.status === 'REJECTED' && 'bg-red-500 hover:bg-red-500'
+											)}
+											value={timesheet.timesheet.status}
+										/>
 									</Table.Cell>
 									<Table.Cell>
-										<span class="font-medium">
+										<span class="text-gray-500">
+											{format(
+												parse(timesheet.timesheet.weekBeginDate, 'yyyy-MM-dd', new Date()),
+												'PP'
+											)}
+										</span>
+									</Table.Cell>
+									<Table.Cell>
+										<span class="text-gray-500">
 											{timesheet.timesheet.totalHoursWorked}
 										</span>
 									</Table.Cell>
@@ -350,7 +393,7 @@
 									</Table.Cell>
 									<Table.Cell>
 										<span class="text-gray-500">
-											{format(application.createdAt, "PP")}
+											{format(application.createdAt, 'PP')}
 										</span>
 									</Table.Cell>
 								</Table.Row>

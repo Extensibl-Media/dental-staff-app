@@ -17,56 +17,65 @@
 	export let form: SuperValidated<SignInSchema>;
 </script>
 
-<div class="flex items-center justify-center mx-auto max-w-2xl">
-	<Form.Root let:submitting let:errors method="POST" {form} schema={signInSchema} let:config>
-		<Card.Root>
-			<Card.Header class="space-y-1">
-				<Card.Title class="text-2xl">Sign in</Card.Title>
-				<Card.Description
-					>Don't have an account yet? <a href="/auth/sign-up" class="underline">Sign up here.</a
-					></Card.Description
-				>
-			</Card.Header>
-			<Card.Content class="grid gap-4">
-				{#if errors?._errors?.length}
-					<Alert.Root variant="destructive">
-						<AlertCircle class="h-4 w-4" />
-						<Alert.Title>Error</Alert.Title>
-						<Alert.Description>
-							{#each errors._errors as error}
-								{error}
-							{/each}
-						</Alert.Description>
-					</Alert.Root>
-				{/if}
-				<Form.Field {config} name="email">
-					<Form.Item>
-						<Form.Label>Email</Form.Label>
-						<Form.Input />
-						<Form.Validation />
-					</Form.Item>
-				</Form.Field>
-				<Form.Field {config} name="password">
-					<Form.Item>
-						<Form.Label>Password</Form.Label>
-						<Form.Input type="password" />
-						<Form.Validation />
-					</Form.Item>
-				</Form.Field>
-			</Card.Content>
-			<Card.Footer>
-				<div class="block w-full">
-					<Form.Button class="w-full" disabled={submitting}
-						>{#if submitting}
-							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-							Please wait{:else}Sign In{/if}
-					</Form.Button>
+<div class="flex items-center justify-center w-full h-full min-h-screen overflow-scroll">
+	<div class="w-full md:w-1/2 flex items-center justify-center flex-col">
+	   <div>
+				<div>
+				<p class="text-3xl font-medium mb-2">DentalStaff.US</p>
 
-					<div class="mt-6 text-center text-sm">
-						<a href="/auth/password/reset" class="underline">Forgot your password?</a>
-					</div>
 				</div>
-			</Card.Footer>
-		</Card.Root>
-	</Form.Root>
+				<Form.Root let:submitting let:errors method="POST" {form} schema={signInSchema} let:config>
+					<Card.Root>
+						<Card.Header class="space-y-1">
+							<Card.Title class="text-2xl">Sign in</Card.Title>
+							<Card.Description
+								>Don't have an account yet? <a href="/auth/sign-up" class="underline">Sign up here.</a
+								></Card.Description
+							>
+						</Card.Header>
+						<Card.Content class="grid gap-4">
+							{#if errors?._errors?.length}
+								<Alert.Root variant="destructive">
+									<AlertCircle class="h-4 w-4" />
+									<Alert.Title>Error</Alert.Title>
+									<Alert.Description>
+										{#each errors._errors as error}
+											{error}
+										{/each}
+									</Alert.Description>
+								</Alert.Root>
+							{/if}
+							<Form.Field {config} name="email">
+								<Form.Item>
+									<Form.Label>Email</Form.Label>
+									<Form.Input />
+									<Form.Validation />
+								</Form.Item>
+							</Form.Field>
+							<Form.Field {config} name="password">
+								<Form.Item>
+									<Form.Label>Password</Form.Label>
+									<Form.Input type="password" />
+									<Form.Validation />
+								</Form.Item>
+							</Form.Field>
+						</Card.Content>
+						<Card.Footer>
+							<div class="block w-full">
+								<Form.Button class="w-full bg-blue-800 hover:bg-blue-900" disabled={submitting}
+									>{#if submitting}
+										<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+										Please wait{:else}Sign In{/if}
+								</Form.Button>
+
+								<div class="mt-6 text-center text-sm">
+									<a href="/auth/password/reset" class="underline">Forgot your password?</a>
+								</div>
+							</div>
+						</Card.Footer>
+					</Card.Root>
+				</Form.Root>
+				</div>
+	</div>
+	<div class="w-1/2 hidden md:block bg-blue-500 h-screen"></div>
 </div>

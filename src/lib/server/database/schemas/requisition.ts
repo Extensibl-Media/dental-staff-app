@@ -20,7 +20,13 @@ import {
 	clientCompanyTable,
 	clientProfileTable,
 	companyOfficeLocationTable,
+<<<<<<< HEAD
+	type ClientCompanySelect,
+<<<<<<< HEAD
 	type ClientProfileSelect
+=======
+	type ClientCompanySelect
+>>>>>>> 3fce45fb5c7010a7c54276b527056a45a14f4f87
 } from './client';
 import { candidateProfileTable, type CandidateProfileSelect } from './candidate';
 import { disciplineTable, experienceLevelTable } from './skill';
@@ -309,9 +315,8 @@ export const timeSheetTable = pgTable(
 		workdayId: text('workday_id')
 			.references(() => workdayTable.id)
 			.notNull(),
-		weekBeginDate: timestamp('week_begin_date', {
-			withTimezone: true,
-			mode: 'date'
+		weekBeginDate: date('week_begin_date', {
+			mode: 'string'
 		}).notNull(),
 		hoursRaw: json('hours_raw').$type<RawTimesheetHours[]>().notNull().default([]),
 		status: timesheetStatusEnum('status').default('PENDING').notNull()
@@ -425,6 +430,7 @@ type UserSelect = {
 export type TimesheetWithRelations = {
 	timesheet: TimeSheetSelect;
 	candidate: CandidateProfileSelect;
+	clientCompany?: ClientCompanySelect;
 	user: Partial<UserSelect>;
 	requisition: RequisitionSelect | null; // null because of leftJoin
 };

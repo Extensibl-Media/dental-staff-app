@@ -59,7 +59,7 @@ export interface TimesheetDiscrepancy {
 	candidateId?: string;
 	requisitionId?: number | null;
 	clientCompanyName?: string | null;
-	weekBeginDate?: Date;
+	weekBeginDate?: string;
 	discrepancyType: TimesheetDiscrepancyType;
 	details: string;
 	hoursDiscrepancy?: number;
@@ -81,7 +81,7 @@ export interface Timesheet {
 	updatedAt?: Date;
 	totalHoursWorked?: string | null;
 	totalHoursBilled?: string | null;
-	weekBeginDate: Date;
+	weekBeginDate: string;
 	requisitionId?: number | null;
 	clientCompanyName: string | null;
 	validated: boolean | null;
@@ -327,6 +327,120 @@ export async function getRequisitionDetailsByIdAdmin(requisitionId: number): Pro
 		return { requisition: result.requisition };
 	}
 }
+
+export async function getRequisitionDetailsForAdmin(id: number) {
+	try {
+		const [requisition] = await db
+			.select({
+				requisition: {
+					...requisitionTable,
+					company: {
+						...clientCompanyTable,
+						client: {
+							...clientProfileTable,
+							user: {
+								avatarUrl: userTable.avatarUrl,
+								firstName: userTable.firstName,
+								lastName: userTable.lastName,
+								email: userTable.email,
+								id: userTable.id
+							}
+						}
+					},
+					location: { ...companyOfficeLocationTable },
+					discipline: { ...disciplineTable },
+					experienceLevel: { ...experienceLevelTable }
+				}
+			})
+			.from(requisitionTable)
+			.where(and(eq(requisitionTable.id, id), eq(requisitionTable.archived, false)))
+			.innerJoin(clientCompanyTable, eq(clientCompanyTable.id, requisitionTable.companyId))
+			.innerJoin(
+				companyOfficeLocationTable,
+				eq(companyOfficeLocationTable.id, requisitionTable.locationId)
+			)
+			.innerJoin(clientProfileTable, eq(clientProfileTable.id, clientCompanyTable.clientId))
+			.innerJoin(userTable, eq(userTable.id, clientProfileTable.userId))
+			.leftJoin(
+				experienceLevelTable,
+				eq(experienceLevelTable.id, requisitionTable.experienceLevelId)
+			)
+			.innerJoin(disciplineTable, eq(disciplineTable.id, requisitionTable.disciplineId));
+		const applications = await db
+			.select({
+				application: requisitionApplicationTable,
+				candidateProfile: candidateProfileTable,
+				user: {
+					email: userTable.email,
+					firstName: userTable.firstName,
+					lastName: userTable.lastName,
+					avatarUrl: userTable.avatarUrl
+				},
+				disciplineExperience: candidateDisciplineExperienceTable,
+				discipline: disciplineTable,
+				experienceLevel: experienceLevelTable
+			})
+			.from(requisitionApplicationTable)
+			.innerJoin(
+				candidateProfileTable,
+				eq(requisitionApplicationTable.candidateId, candidateProfileTable.id)
+			)
+			.innerJoin(userTable, eq(candidateProfileTable.userId, userTable.id))
+			.leftJoin(
+				candidateDisciplineExperienceTable,
+				eq(candidateProfileTable.id, candidateDisciplineExperienceTable.candidateId)
+			)
+			.leftJoin(
+				disciplineTable,
+				eq(candidateDisciplineExperienceTable.disciplineId, disciplineTable.id)
+			)
+			.leftJoin(
+				experienceLevelTable,
+				eq(candidateDisciplineExperienceTable.experienceLevelId, experienceLevelTable.id)
+			)
+			.where(eq(requisitionApplicationTable.requisitionId, id));
+		const timesheets = await db
+			.select({
+				user: {
+					email: userTable.email,
+					firstName: userTable.firstName,
+					lastName: userTable.lastName,
+					avatarUrl: userTable.avatarUrl
+				},
+				timeSheet: { ...timeSheetTable },
+				candidateProfile: { ...candidateProfileTable }
+			})
+			.from(timeSheetTable)
+			.innerJoin(
+				candidateProfileTable,
+				eq(timeSheetTable.associatedCandidateId, candidateProfileTable.id)
+			)
+			.innerJoin(userTable, eq(candidateProfileTable.userId, userTable.id))
+			.where(eq(timeSheetTable.requisitionId, id));
+		const recurrenceDays = await db
+			.select()
+			.from(recurrenceDayTable)
+			.where(and(eq(recurrenceDayTable.requisitionId, id), eq(recurrenceDayTable.archived, false)))
+			.orderBy(asc(recurrenceDayTable.date));
+
+		console.log({
+			requisition,
+			applications,
+			timesheets,
+			recurrenceDays
+		});
+		return {
+			requisition,
+			applications,
+			timesheets,
+			recurrenceDays
+		};
+	} catch (err) {
+		console.error(err);
+		throw error(500, 'Error fetching requisition details');
+	}
+}
+
 export async function getRequisitionDetailsById(
 	requisitionId: number,
 	companyId: string | undefined
@@ -422,7 +536,7 @@ export async function createRequisition(values: Requisition, userId: string) {
 	try {
 		const [result] = await db.insert(requisitionTable).values(values).returning();
 		await writeActionHistory({
-			table: requisitionTable,
+			table: 'REQUISITIONS',
 			userId,
 			action: 'CREATE',
 			entityId: result.id.toString(),
@@ -449,17 +563,17 @@ export async function changeRequisitionStatus(
 			.where(eq(requisitionTable.id, original.id))
 			.returning();
 
-		// await writeActionHistory({
-		// 	table: requisitionTable,
-		// 	userId,
-		// 	action: 'UPDATE',
-		// 	entityId: id.toString(),
-		// 	beforeState: original,
-		// 	afterState: update,
-		// 	metadata: {
-		// 		updatedField: 'STATUS'
-		// 	}
-		// });
+		await writeActionHistory({
+			table: 'REQUISITIONS',
+			userId,
+			action: 'UPDATE',
+			entityId: id.toString(),
+			beforeState: original,
+			afterState: update,
+			metadata: {
+				updatedField: 'STATUS'
+			}
+		});
 
 		return update;
 	} else {
@@ -475,13 +589,13 @@ export async function createNewRecurrenceDay(values: RecurrenceDay, userId: stri
 			.onConflictDoNothing()
 			.returning();
 
-		// await writeActionHistory({
-		// 	table: recurrenceDayTable,
-		// 	userId,
-		// 	action: 'CREATE',
-		// 	entityId: result.id,
-		// 	afterState: result
-		// });
+		await writeActionHistory({
+			table: 'RECURRENCE_DAYS',
+			userId,
+			action: 'CREATE',
+			entityId: result.id,
+			afterState: result
+		});
 
 		return result;
 	} catch (err) {
@@ -503,7 +617,7 @@ export async function editRecurrenceDay(id: string, values: UpdateRecurrenceDay,
 
 		await writeActionHistory({
 			entityId: id,
-			table: recurrenceDayTable,
+			table: 'RECURRENCE_DAYS',
 			userId,
 			action: 'UPDATE',
 			beforeState: existing,
@@ -528,8 +642,9 @@ export async function deleteRecurrenceDay(id: string, userId: string) {
 			.set({ archived: true, archivedDate: new Date() })
 			.where(eq(recurrenceDayTable.id, id))
 			.returning();
+
 		await writeActionHistory({
-			table: recurrenceDayTable,
+			table: 'RECURRENCE_DAYS',
 			userId,
 			entityId: id,
 			beforeState: original,
@@ -772,6 +887,37 @@ export async function getRecentTimesheetsDueForClient(clientId: string) {
 		return error(500, 'Error feching timesheets due count');
 	}
 }
+
+export async function getAllTimesheetsAdmin() {
+	try {
+		const result = await db
+			.select({
+				timesheet: { ...timeSheetTable },
+				requisition: { ...requisitionTable },
+				clientCompany: { ...clientCompanyTable },
+				candidate: {
+					...candidateProfileTable,
+					firstName: userTable.firstName,
+					lastName: userTable.lastName
+				}
+			})
+			.from(timeSheetTable)
+			.leftJoin(requisitionTable, eq(requisitionTable.id, timeSheetTable.requisitionId))
+			.innerJoin(clientCompanyTable, eq(clientCompanyTable.id, requisitionTable.companyId))
+			.innerJoin(
+				candidateProfileTable,
+				eq(candidateProfileTable.id, timeSheetTable.associatedCandidateId)
+			)
+			.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
+			.orderBy(asc(timeSheetTable.createdAt));
+
+		return result || [];
+	} catch (err) {
+		console.log(err);
+		return error(500, 'Error fetching timesheets');
+	}
+}
+
 export async function getAllTimesheetsForClient(clientId: string | undefined) {
 	if (!clientId) throw new Error('Client ID required');
 	try {
@@ -924,8 +1070,6 @@ export async function getClientCompanyTimesheetDiscrepancies(
 }
 
 export async function getRecurrenceDaysForTimesheet(timesheet: any): Promise<RecurrenceDay[]> {
-	console.log(timesheet);
-	console.log(timesheet.weekBeginDate);
 	const weekStart = new Date(timesheet.weekBeginDate);
 	const weekEnd = new Date(weekStart);
 	weekEnd.setDate(weekEnd.getDate() + 6);
@@ -1811,11 +1955,41 @@ export async function getWorkdaysByRecurrenceDayId(
 	}
 }
 
-export async function rejectTimesheet(timesheetId: string) {
+// export async function approveTimesheet(timesheetId: string, userId: string) {
+// 	try {
+// 		const [original] = await db
+// 			.select()
+// 			.from(timeSheetTable)
+// 			.where(eq(timeSheetTable.id, timesheetId));
+
+// 		const [result] = await db
+// 			.update(timeSheetTable)
+// 			.set({ status: 'APPROVED' })
+// 			.where(eq(timeSheetTable.id, original.id))
+// 			.returning();
+
+// 		await writeActionHistory({
+// 			table: 'TIMESHEETS',
+// 			userId,
+// 			action: 'UPDATE',
+// 			entityId: timesheetId,
+// 			beforeState: original,
+// 			afterState: result,
+// 			metadata: {
+// 				status: 'APPROVED'
+// 			}
+// 		});
+
+// 		return result;
+// 	} catch (err) {
+// 		throw error(500, `Error rejecting timesheet: ${error}`);
+// 	}
+// }
+export async function revertTimesheetToPending(timesheetId: string) {
 	try {
 		const [result] = await db
 			.update(timeSheetTable)
-			.set({ status: 'DISCREPANCY' })
+			.set({ status: 'PENDING' })
 			.where(eq(timeSheetTable.id, timesheetId))
 			.returning();
 
@@ -1824,13 +1998,31 @@ export async function rejectTimesheet(timesheetId: string) {
 		throw error(500, `Error rejecting timesheet: ${error}`);
 	}
 }
-export async function revertTimesheetToPending(timesheetId: string) {
+
+export async function rejectTimesheet(timesheetId: string, userId: string) {
 	try {
+		const [original] = await db
+			.select()
+			.from(timeSheetTable)
+			.where(eq(timeSheetTable.id, timesheetId));
+
 		const [result] = await db
 			.update(timeSheetTable)
-			.set({ status: 'PENDING' })
-			.where(eq(timeSheetTable.id, timesheetId))
+			.set({ status: 'DISCREPANCY' })
+			.where(eq(timeSheetTable.id, original.id))
 			.returning();
+
+		await writeActionHistory({
+			table: 'TIMESHEETS',
+			userId,
+			action: 'UPDATE',
+			entityId: timesheetId,
+			beforeState: original,
+			afterState: result,
+			metadata: {
+				status: 'DISCREPANCY'
+			}
+		});
 
 		return result;
 	} catch (err) {
@@ -1912,7 +2104,7 @@ export async function createInvoiceRecord({
 					customerEmail: stripeInvoice.customer_email,
 					customerName: stripeInvoice.customer_name, // You might want to include a more friendly name if available
 					dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Due in 30 days
-					periodStart: timesheet.weekBeginDate,
+					periodStart: new Date(timesheet.weekBeginDate),
 					periodEnd: new Date(
 						new Date(timesheet.weekBeginDate).setDate(
 							new Date(timesheet.weekBeginDate).getDate() + 6
@@ -1936,7 +2128,7 @@ export async function createInvoiceRecord({
 					stripePdfUrl: stripeInvoice.invoice_pdf,
 					stripeHostedUrl: stripeInvoice.hosted_invoice_url,
 					status: 'open', // Maps to Stripe's 'open' status
-					sourceType: 'timesheet',
+					sourceType: 'manual',
 					currency: 'usd',
 					amountDue: amountInDollars,
 					total: amountInDollars,
@@ -2015,4 +2207,17 @@ export function convertToStripeAmount(
 	}
 
 	return amountInCents;
+}
+export async function getCompanyByRequisitionIdAdmin(id: number) {
+	try {
+		const [result] = await db
+			.select({ company: { ...clientCompanyTable } })
+			.from(requisitionTable)
+			.where(eq(requisitionTable.id, id))
+			.innerJoin(clientCompanyTable, eq(requisitionTable.companyId, clientCompanyTable.id));
+
+		return result?.company || null;
+	} catch (err) {
+		throw error(500, `Error fetching company: ${error}`);
+	}
 }

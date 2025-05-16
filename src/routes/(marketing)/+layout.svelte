@@ -7,7 +7,7 @@
 	$: user = data.user;
 </script>
 
-<Navigation {user} />
-<div class="mt-8 md:mt-12">
+<!-- <Navigation {user} /> -->
+<div>
 	<slot />
 </div>
