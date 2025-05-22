@@ -92,44 +92,44 @@ export const clientCompanyTable = pgTable('client_companies', {
 		.$type<OperatingHours>()
 		.default({
 			0: {
-				openTime: '00:00:00-05',
-				closeTime: '00:00:00-05',
-				isClosed: true,
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
+				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			1: {
-				openTime: '09:00:00-05',
-				closeTime: '17:00:00-05',
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			2: {
-				openTime: '09:00:00-05',
-				closeTime: '17:00:00-05',
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			3: {
-				openTime: '09:00:00-05',
-				closeTime: '17:00:00-05',
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			4: {
-				openTime: '09:00:00-05',
-				closeTime: '17:00:00-05',
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			5: {
-				openTime: '09:00:00-05',
-				closeTime: '17:00:00-05',
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			6: {
-				openTime: '09:00:00-05',
-				closeTime: '17:00:00-05',
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
 				isClosed: false,
 				timezone: 'America/New_York'
 			}
@@ -161,9 +161,55 @@ export const companyOfficeLocationTable = pgTable('company_office_locations', {
 	zipcode: text('zipcode'),
 	companyPhone: text('company_phone'),
 	cellPhone: text('cell_phone'),
-	hoursOfOperation: text('hours_of_operation'),
+	operatingHours: jsonb('operating_hours')
+		.$type<OperatingHours>()
+		.default({
+			0: {
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
+				isClosed: false,
+				timezone: 'America/New_York'
+			},
+			1: {
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
+				isClosed: false,
+				timezone: 'America/New_York'
+			},
+			2: {
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
+				isClosed: false,
+				timezone: 'America/New_York'
+			},
+			3: {
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
+				isClosed: false,
+				timezone: 'America/New_York'
+			},
+			4: {
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
+				isClosed: false,
+				timezone: 'America/New_York'
+			},
+			5: {
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
+				isClosed: false,
+				timezone: 'America/New_York'
+			},
+			6: {
+				openTime: '00:00:00Z',
+				closeTime: '00:00:00Z',
+				isClosed: false,
+				timezone: 'America/New_York'
+			}
+		}),
 	email: text('email'),
-	regionId: text('region_id').references(() => regionTable.id, { onDelete: 'set null' })
+	regionId: text('region_id').references(() => regionTable.id, { onDelete: 'set null' }),
+	timezone: text('timezone').notNull().default('America/New_York')
 });
 
 export const staffRoleEnum = pgEnum('staff_roles', [

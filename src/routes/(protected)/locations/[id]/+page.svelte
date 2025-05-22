@@ -1,13 +1,10 @@
 <script lang="ts">
 	import ViewLink from './../../../../lib/components/tables/ViewLink.svelte';
-	import { Tabs, TabItem } from 'flowbite-svelte';
+	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs/index.js';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
-	import * as Table from '$lib/components/ui/table';
 	import { writable } from 'svelte/store';
-	import AssignStaffToLocationDrawer from '$lib/components/drawers/assignStaffToLocationDrawer.svelte';
-
 	import {
 		createSvelteTable,
 		flexRender,
@@ -21,6 +18,35 @@
 	import { STAFF_ROLE_ENUM } from '$lib/config/constants';
 	import { Button } from '$lib/components/ui/button';
 	import type { PageData } from './$types';
+	import InviteStaffToLocationDialog from '$lib/components/dialogs/inviteStaffToLocationDialog.svelte';
+	import { CardHeader, CardTitle, CardContent, CardFooter } from '$lib/components/ui/card';
+	import {
+		Table,
+		TableBody,
+		TableCell,
+		TableHead,
+		TableHeader,
+		TableRow
+	} from '$lib/components/ui/table/index.js';
+	import { Card } from 'flowbite-svelte';
+	import {
+		Edit,
+		Info,
+		Users,
+		ClipboardList,
+		Building,
+		Phone,
+		Mail,
+		MapPin,
+		ExternalLink,
+		Clock,
+		UserPlus,
+		Eye,
+		UserMinus,
+		Plus,
+		AlertCircle
+	} from 'lucide-svelte';
+	import { getDayName } from '$lib/_helpers';
 
 	type StaffProfileData = {
 		profile: {
@@ -60,6 +86,7 @@
 	$: locationStaff = data.locationStaff;
 	$: allStaff = data.allStaff;
 	$: assignForm = data.assignForm;
+	$: staffDialogOpen = false;
 
 	let staffTableData: StaffProfileData[] = [];
 	let requisitionTableData: RequisitionData[] = [];
@@ -162,120 +189,311 @@
 		requisitionTableData = (requisitions as RequisitionData[]) || [];
 		requisitionOptions.update((o) => ({ ...o, data: requisitionTableData }));
 	});
-
+	const formatTime = (time: string): string => {
+		const [hours, minutes] = time.split(':');
+		const date = new Date();
+		date.setHours(parseInt(hours), parseInt(minutes));
+		return date.toLocaleTimeString('en-US', {
+			hour: 'numeric',
+			minute: '2-digit',
+			hour12: true
+		});
+	};
 	const staffTable = createSvelteTable(staffOptions);
 	const requisitionsTable = createSvelteTable(requisitionOptions);
 </script>
 
-<section class="grow h-screen overflow-y-auto p-6 flex flex-col gap-6">
-	<div class=" flex items-center justify-between flex-wrap">
-		<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">
-			Office Location Details
-		</h1>
-	</div>
-	<h2 class="text-2xl font-semibold">{location?.name}</h2>
-	<div>
-		<Tabs
-			class=""
-			tabStyle="underline"
-			contentClass="py-4"
-			inactiveClasses="p-4 text-gray-500 rounded-t-lg hover:text-gray-600 hover:bg-gray-50"
-			activeClasses="border-b-2 border-b-blue-500 p-4 text-primary-600 bg-gray-100 rounded-t-lg"
-		>
-			<TabItem open title="Details" class="">
-				<div class="space-y-4">
+{#if location}
+	<section class="container mx-auto px-4 py-6">
+		<div class="flex flex-col gap-6">
+			<!-- Header with location info -->
+			<div class="py-6">
+				<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
 					<div>
-						<p class="text-gray-500 font-semibold">Address:</p>
-						<p>{location?.streetOne} {location?.streetTwo}</p>
-						<p>{location?.city}, {location?.state}</p>
-					</div>
-					<div>
-						<p class="text-gray-500 font-semibold">Contact Info:</p>
-						<p>{location?.companyPhone}</p>
-						<p>{location?.email}</p>
+						<h1 class="text-3xl font-bold">Office Location Details</h1>
+						<h2 class="text-xl font-medium text-gray-700 mt-2">{location?.name}</h2>
 					</div>
 				</div>
-				<Button class="bg-blue-800 hover:bg-blue-900 mt-4">Edit Details</Button>
-			</TabItem>
-			<TabItem title="Staff" class="">
-				<AssignStaffToLocationDrawer {allStaff} {location} {company} {assignForm} />
-				<div class="column">
-					<Table.Root class="table">
-						<Table.TableHeader>
-							{#each $staffTable.getHeaderGroups() as headerGroup}
-								<Table.TableRow class="bg-white">
-									{#each headerGroup.headers as header}
-										<Table.TableHead colspan={header.colSpan}>
-											<svelte:component
-												this={flexRender(header.column.columnDef.header, header.getContext())}
-											/>
-											<!-- {#if sortBy && sortOn && header.getContext().header.id === sortOn}
-												{#if sortBy === 'asc'}
-													<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-												{:else}
-													<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-												{/if}
-											{/if} -->
-										</Table.TableHead>
-									{/each}
-								</Table.TableRow>
-							{/each}
-						</Table.TableHeader>
-						<Table.TableBody>
-							{#each $staffTable.getRowModel().rows as row}
-								<Table.TableRow class="bg-gray-50">
-									{#each row.getVisibleCells() as cell}
-										<Table.TableCell>
-											<svelte:component
-												this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-											/>
-										</Table.TableCell>
-									{/each}
-								</Table.TableRow>
-							{/each}
-						</Table.TableBody>
-					</Table.Root>
-				</div>
-			</TabItem>
-			<TabItem title="Requisitions" class="">
-				<div class="column">
-					<Table.Root class="table">
-						<Table.TableHeader>
-							{#each $requisitionsTable.getHeaderGroups() as headerGroup}
-								<Table.TableRow class="bg-white">
-									{#each headerGroup.headers as header}
-										<Table.TableHead colspan={header.colSpan} click={() => {}}>
-											<svelte:component
-												this={flexRender(header.column.columnDef.header, header.getContext())}
-											/>
-											<!-- {#if sortBy && sortOn && header.getContext().header.id === sortOn}
-												{#if sortBy === 'asc'}
-													<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-												{:else}
-													<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-												{/if}
-											{/if} -->
-										</Table.TableHead>
-									{/each}
-								</Table.TableRow>
-							{/each}
-						</Table.TableHeader>
-						<Table.TableBody>
-							{#each $requisitionsTable.getRowModel().rows as row}
-								<Table.TableRow class="bg-gray-50">
-									{#each row.getVisibleCells() as cell}
-										<Table.TableCell>
-											<svelte:component
-												this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-											/>
-										</Table.TableCell>
-									{/each}
-								</Table.TableRow>
-							{/each}
-						</Table.TableBody>
-					</Table.Root>
-				</div>
-			</TabItem>
-		</Tabs>
-	</div>
-</section>
+			</div>
+
+			<!-- Tabs section -->
+			<Tabs class="w-full">
+				<TabsList class="grid grid-cols-3 lg:w-fit">
+					<TabsTrigger value="details" class="gap-2">
+						<Info class="h-4 w-4" />
+						<span class="hidden md:inline">Details</span>
+					</TabsTrigger>
+					<TabsTrigger value="staff" class="gap-2">
+						<Users class="h-4 w-4" />
+						<span class="hidden md:inline">Staff</span>
+					</TabsTrigger>
+					<TabsTrigger value="requisitions" class="gap-2">
+						<ClipboardList class="h-4 w-4" />
+						<span class="hidden md:inline">Requisitions</span>
+					</TabsTrigger>
+				</TabsList>
+
+				<!-- Details Tab -->
+				<TabsContent value="details" class="mt-6">
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+						<!-- Location Information -->
+						<Card class="w-full max-w-none">
+							<CardHeader>
+								<CardTitle class="text-blue-600 flex items-center gap-2">
+									<Building class="h-5 w-5" />
+									Location Information
+								</CardTitle>
+							</CardHeader>
+							<CardContent class="space-y-4">
+								<div>
+									<h3 class="text-sm font-medium">Address:</h3>
+									<p>{location?.streetOne} {location?.streetTwo || ''}</p>
+									<p>{location?.city}, {location?.state}</p>
+								</div>
+
+								<div>
+									<h3 class="text-sm font-medium">Contact Information:</h3>
+									<div class="flex items-center gap-2 mt-1">
+										<Phone class="h-4 w-4 text-gray-500" />
+										<span>{location?.companyPhone || 'No phone number'}</span>
+									</div>
+									<div class="flex items-center gap-2 mt-1">
+										<Mail class="h-4 w-4 text-gray-500" />
+										<a href={`mailto:${location?.email}`} class="text-blue-600 hover:underline">
+											{location?.email || 'No email address'}
+										</a>
+									</div>
+								</div>
+
+								<div>
+									<h3 class="text-sm font-medium">Company:</h3>
+									<p>{company?.companyName || 'Unknown'}</p>
+								</div>
+							</CardContent>
+							<CardFooter>
+								<Button variant="default" class="gap-1">
+									<Edit class="h-4 w-4" />
+									Edit Details
+								</Button>
+							</CardFooter>
+						</Card>
+
+						<!-- Map Preview -->
+						<Card class="w-full max-w-none">
+							<CardHeader>
+								<CardTitle class="text-blue-600 flex items-center gap-2">
+									<MapPin class="h-5 w-5" />
+									Map Location
+								</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<div class="bg-gray-100 h-48 rounded-md flex items-center justify-center">
+									<div class="text-center">
+										<MapPin class="h-12 w-12 mx-auto text-gray-400 mb-2" />
+										<p class="text-sm text-gray-500">Map preview not available</p>
+									</div>
+								</div>
+							</CardContent>
+							<CardFooter>
+								<Button variant="outline" size="sm" class="gap-1">
+									<ExternalLink class="h-4 w-4" />
+									Open in Maps
+								</Button>
+							</CardFooter>
+						</Card>
+
+						<!-- Hours of Operation (if available) -->
+						{#if company?.operatingHours}
+							<Card class="w-full max-w-none">
+								<CardHeader>
+									<CardTitle class="text-blue-600 flex items-center gap-2">
+										<Clock class="h-5 w-5" />
+										Hours of Operation
+									</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<div class="space-y-1">
+										{#each Object.entries(company.operatingHours) as [day, hours]}
+											<div
+												class="flex justify-between py-1 text-sm border-b border-gray-100 last:border-0"
+											>
+												<span class="font-medium text-gray-700">
+													{getDayName(+day)}
+												</span>
+												<span class="text-gray-600">
+													{#if hours.isClosed}
+														<span class="text-gray-500">Closed</span>
+													{:else if company?.operatingHours?.[+day].isClosed}
+														<span class="text-gray-500">Closed</span>
+													{:else}
+														{formatTime(company?.operatingHours?.[+day].openTime)} - {formatTime(
+															company?.operatingHours?.[+day].closeTime
+														)}
+													{/if}
+												</span>
+											</div>
+										{/each}
+									</div>
+								</CardContent>
+							</Card>
+						{/if}
+					</div>
+				</TabsContent>
+
+				<!-- Staff Tab -->
+				<TabsContent value="staff" class="mt-6">
+					<Card class="w-full max-w-none">
+						<CardHeader class="flex flex-row items-center justify-between">
+							<CardTitle>Location Staff</CardTitle>
+							<div class="flex gap-2">
+								<InviteStaffToLocationDialog
+									bind:open={staffDialogOpen}
+									{allStaff}
+									{location}
+									{company}
+									{assignForm}
+								/>
+							</div>
+						</CardHeader>
+						<CardContent>
+							{#if staffTableData.length === 0}
+								<div class="text-center py-8">
+									<Users class="h-12 w-12 mx-auto text-gray-300" />
+									<h3 class="mt-4 text-lg font-medium">No Staff Assigned</h3>
+									<p class="mt-2 text-sm text-gray-500">
+										This location doesn't have any staff assigned yet.
+									</p>
+									<InviteStaffToLocationDialog
+										bind:open={staffDialogOpen}
+										{allStaff}
+										{location}
+										{company}
+										{assignForm}
+									/>
+								</div>
+							{:else}
+								<div class="rounded-md border">
+									<Table>
+										<TableHeader>
+											{#each $staffTable.getHeaderGroups() as headerGroup}
+												<TableRow>
+													{#each headerGroup.headers as header}
+														<TableHead>
+															<svelte:component
+																this={flexRender(
+																	header.column.columnDef.header,
+																	header.getContext()
+																)}
+															/>
+														</TableHead>
+													{/each}
+												</TableRow>
+											{/each}
+										</TableHeader>
+										<TableBody>
+											{#each $staffTable.getRowModel().rows as row}
+												<TableRow>
+													{#each row.getVisibleCells() as cell}
+														<TableCell>
+															<svelte:component
+																this={flexRender(cell.column.columnDef.cell, cell.getContext())}
+															/>
+														</TableCell>
+													{/each}
+													<!-- Add Actions column -->
+													<TableCell>
+														<div class="flex justify-end gap-2">
+															<Button variant="ghost" size="icon" class="h-8 w-8">
+																<Eye class="h-4 w-4" />
+															</Button>
+															<Button variant="ghost" size="icon" class="h-8 w-8 text-red-500">
+																<UserMinus class="h-4 w-4" />
+															</Button>
+														</div>
+													</TableCell>
+												</TableRow>
+											{/each}
+										</TableBody>
+									</Table>
+								</div>
+							{/if}
+						</CardContent>
+					</Card>
+				</TabsContent>
+
+				<!-- Requisitions Tab -->
+				<TabsContent value="requisitions" class="mt-6">
+					<Card class="w-full max-w-none">
+						<CardHeader class="flex flex-row items-center justify-between">
+							<CardTitle>Location Requisitions</CardTitle>
+							<Button size="sm" class="gap-1">
+								<Plus class="h-4 w-4" />
+								<span>New Requisition</span>
+							</Button>
+						</CardHeader>
+						<CardContent>
+							{#if requisitionTableData.length === 0}
+								<div class="text-center py-8">
+									<ClipboardList class="h-12 w-12 mx-auto text-gray-300" />
+									<h3 class="mt-4 text-lg font-medium">No Requisitions</h3>
+									<p class="mt-2 text-sm text-gray-500">
+										This location doesn't have any requisitions yet.
+									</p>
+									<Button variant="outline" class="mt-4 gap-1">
+										<Plus class="h-4 w-4" />
+										Create First Requisition
+									</Button>
+								</div>
+							{:else}
+								<div class="rounded-md border">
+									<Table>
+										<TableHeader>
+											{#each $requisitionsTable.getHeaderGroups() as headerGroup}
+												<TableRow>
+													{#each headerGroup.headers as header}
+														<TableHead>
+															<svelte:component
+																this={flexRender(
+																	header.column.columnDef.header,
+																	header.getContext()
+																)}
+															/>
+														</TableHead>
+													{/each}
+												</TableRow>
+											{/each}
+										</TableHeader>
+										<TableBody>
+											{#each $requisitionsTable.getRowModel().rows as row}
+												<TableRow>
+													{#each row.getVisibleCells() as cell}
+														<TableCell>
+															<svelte:component
+																this={flexRender(cell.column.columnDef.cell, cell.getContext())}
+															/>
+														</TableCell>
+													{/each}
+												</TableRow>
+											{/each}
+										</TableBody>
+									</Table>
+								</div>
+							{/if}
+						</CardContent>
+					</Card>
+				</TabsContent>
+			</Tabs>
+		</div>
+	</section>
+{:else}
+	<section
+		class="container mx-auto px-4 py-6 flex flex-col items-center text-center sm:justify-center gap-4 md:gap-6"
+	>
+		<div class="p-8 bg-gray-50 rounded-lg">
+			<AlertCircle class="h-12 w-12 mx-auto text-gray-400 mb-4" />
+			<h2 class="text-2xl font-bold mb-2">No Location Found</h2>
+			<p class="text-gray-500 mb-6">The requested location could not be found in our system.</p>
+			<Button type="button" on:click={() => window.history.back()}>Go Back</Button>
+		</div>
+	</section>
+{/if}

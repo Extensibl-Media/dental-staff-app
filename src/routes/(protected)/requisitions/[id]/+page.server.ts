@@ -28,6 +28,8 @@ import {
 	getClientStaffProfilebyUserId
 } from '$lib/server/database/queries/clients';
 import type { ClientCompanyStaffProfile } from '$lib/server/database/schemas/client';
+import { convertRecurrenceDayToUTC, getUserTimezone } from '$lib/_helpers/UTCTimezoneUtils';
+import { setFlash } from 'sveltekit-flash-message/server';
 
 export const load: PageServerLoad = async (event: RequestEvent) => {
 	const user = event.locals.user;
@@ -75,8 +77,11 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 	if (user.role === USER_ROLES.CLIENT) {
 		const client = await getClientProfilebyUserId(user.id);
 		const company = await getClientCompanyByClientId(client.id);
-		const result = await getRequisitionDetailsById(idAsNum, company.id);
-		const requisitionApplications = await getRequisitionApplications(idAsNum);
+		const result = await getRequisitionDetailsById(idAsNum);
+		const requisitionApplications = await getRequisitionApplications(
+			idAsNum,
+			result.requisition.disciplineId
+		);
 		const requisitionTimesheets = await getRequisitionTimesheets(idAsNum);
 		const requisitionRecurrenceDays = await getRecurrenceDaysForRequisition(idAsNum);
 
@@ -100,7 +105,7 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 		const profile: ClientCompanyStaffProfile | null = await getClientStaffProfilebyUserId(user.id);
 		const client = await getClientProfileByStaffUserId(user.id);
 		const company = await getClientCompanyByClientId(client?.id);
-		const result = await getRequisitionDetailsById(idAsNum, company.id);
+		const result = await getRequisitionDetailsById(idAsNum);
 		const requisitionApplications = await getRequisitionApplications(idAsNum);
 		const requisitionTimesheets = await getRequisitionTimesheets(idAsNum);
 		const requisitionRecurrenceDays = await getRecurrenceDaysForRequisition(idAsNum);
@@ -156,39 +161,63 @@ export const actions = {
 	},
 	addRecurrenceDays: async (event: RequestEvent) => {
 		const user = event.locals.user;
+		const { id } = event.params;
+		const idAsNum = Number(id);
 		if (!user) return fail(403);
 
 		const form = await superValidate(event, newRecurrenceDaySchema);
 		if (!form.valid) return fail(400, { form });
 
+		const requisition = await getRequisitionDetailsById(idAsNum);
+
 		try {
+			// Get the original form data
 			const daysToAdd = form.data.recurrenceDays;
-
-			console.log(daysToAdd);
-
+			console.log('Received recurrence days:', daysToAdd);
+			// Parse the recurrence days from the form data
 			await Promise.all(
-				daysToAdd.map((day) =>
-					createNewRecurrenceDay(
-						{
-							id: crypto.randomUUID(),
-							createdAt: new Date(),
-							updatedAt: new Date(),
-							requisitionId: Number(day.requisitionId),
-							date: day.date,
-							dayStartTime: `${day.dayStartTime}:00${day.timezoneOffset || ''}`,
-							dayEndTime: `${day.dayEndTime}:00${day.timezoneOffset || ''}`,
-							lunchStartTime: `${day.lunchStartTime}:00${day.timezoneOffset || ''}`,
-							lunchEndTime: `${day.lunchEndTime}:00${day.timezoneOffset || ''}`
-						},
-						user.id
-					)
-				)
+				Array.isArray(daysToAdd) ? daysToAdd.map(processDay) : [processDay(daysToAdd)]
 			);
 
-			return message(form, 'Created new Recurrence Days');
+			setFlash(
+				{
+					type: 'success',
+					message: 'Recurrence days created successfully'
+				},
+				event
+			);
+			return { form, success: true };
 		} catch (error) {
-			console.error(error);
-			return setError(form, 'Something went wrong');
+			setFlash(
+				{
+					type: 'error',
+					message: 'Failed to create recurrence days'
+				},
+				event
+			);
+			console.error('Error creating recurrence days:', error);
+			return { form, error: 'Failed to create recurrence days' };
+		}
+
+		// Helper function to process each day
+		async function processDay(day) {
+			// Convert the day to UTC format
+			const utcDay = convertRecurrenceDayToUTC(day, requisition.requisition.referenceTimezone);
+
+			const values = {
+				id: crypto.randomUUID(),
+				createdAt: new Date(),
+				updatedAt: new Date(),
+				requisitionId: Number(utcDay.requisitionId),
+				date: utcDay.date, // UTC date as string
+				dayStart: utcDay.dayStart, // JavaScript Date object for timestamp
+				dayEnd: utcDay.dayEnd,
+				lunchStart: utcDay.lunchStart,
+				lunchEnd: utcDay.lunchEnd,
+				archived: false
+			};
+
+			return createNewRecurrenceDay(values, user!.id);
 		}
 	},
 	editRecurrenceDay: async (request: RequestEvent) => {
@@ -226,10 +255,10 @@ export const actions = {
 				updatedAt: new Date(),
 				requisitionId: Number(requisitionId),
 				date: date,
-				dayStartTime: dayStartTime + ':00' + form.data.timezoneOffset,
-				dayEndTime: dayEndTime + ':00' + form.data.timezoneOffset,
-				lunchStartTime: lunchStartTime + ':00' + form.data.timezoneOffset,
-				lunchEndTime: lunchEndTime + ':00' + form.data.timezoneOffset
+				dayStart: dayStartTime,
+				dayEnd: dayEndTime,
+				lunchStart: lunchStartTime,
+				lunchEnd: lunchEndTime
 			};
 
 			await editRecurrenceDay(id, values, user.id);
@@ -244,8 +273,7 @@ export const actions = {
 						dayStartTime: '',
 						dayEndTime: '',
 						lunchStartTime: '',
-						lunchEndTime: '',
-						timezoneOffset: form.data.timezoneOffset
+						lunchEndTime: ''
 					}
 				},
 				'Edited Recurrence Day'

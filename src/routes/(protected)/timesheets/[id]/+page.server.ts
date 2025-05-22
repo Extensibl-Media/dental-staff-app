@@ -17,14 +17,17 @@ import {
 	getWorkdaysForTimesheet,
 	rejectTimesheet,
 	revertTimesheetToPending,
-	validateTimesheet
+	validateTimesheet,
+	voidTimesheet
 } from '$lib/server/database/queries/requisitions';
-import { redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import type { RequestEvent } from './$types';
 import { setFlash } from 'sveltekit-flash-message/server';
-import { createStripeInvoice } from '$lib/server/stripe';
+import { createStripeInvoice, stripe } from '$lib/server/stripe';
 import db from '$lib/server/database/drizzle';
+import { desc, eq } from 'drizzle-orm';
 import { adminConfigTable } from '$lib/server/database/schemas/config';
+import { actionHistoryTable } from '$lib/server/database/schemas/admin';
 
 export const load = async (event: RequestEvent) => {
 	const user = event.locals.user;
@@ -41,6 +44,11 @@ export const load = async (event: RequestEvent) => {
 		const workdays = await getWorkdaysForTimesheet(timesheet);
 		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
 		const invoice = await getInvoiceByTimesheetId(id);
+		const auditHistory = await db
+			.select()
+			.from(actionHistoryTable)
+			.where(eq(actionHistoryTable.entityId, id))
+			.orderBy(desc(actionHistoryTable.createdAt));
 
 		return {
 			user,
@@ -49,7 +57,8 @@ export const load = async (event: RequestEvent) => {
 			recurrenceDays,
 			requisition: requisition.requisition,
 			discrepancies,
-			invoice
+			invoice,
+			auditHistory
 		};
 	}
 
@@ -58,7 +67,7 @@ export const load = async (event: RequestEvent) => {
 		const company = await getClientCompanyByClientId(client.id);
 
 		const timesheet = await getTimesheetDetails(id, client.id);
-		const requisition = await getRequisitionDetailsById(timesheet.requisitionId, company.id);
+		const requisition = await getRequisitionDetailsById(timesheet.requisitionId);
 		const recurrenceDays = await getRecurrenceDaysForTimesheet(timesheet);
 		const workdays = await getWorkdaysForTimesheet(timesheet);
 		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
@@ -79,7 +88,7 @@ export const load = async (event: RequestEvent) => {
 		const company = await getClientCompanyByClientId(client?.id);
 
 		const timesheet = await getTimesheetDetails(id, client?.id);
-		const requisition = await getRequisitionDetailsById(timesheet.requisitionId, company.id);
+		const requisition = await getRequisitionDetailsById(timesheet.requisitionId);
 		const recurrenceDays = await getRecurrenceDaysForTimesheet(timesheet);
 		const workdays = await getWorkdaysForTimesheet(timesheet);
 		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
@@ -131,7 +140,7 @@ export const actions = {
 			if (user === null) {
 				redirect(302, '/auth/sign-in');
 			}
-			const timesheet = await approveTimesheet(id);
+			const timesheet = await approveTimesheet(id, user.id);
 			const amountInCents = convertToStripeAmount(
 				timesheet.totalHoursWorked || 0,
 				timesheet.candidateRateBase,
@@ -155,6 +164,13 @@ export const actions = {
 				{ userId: user.id, timesheetId: timesheet.id }
 			);
 
+			await createInvoiceRecord({
+				clientId: timesheet.associatedClientId,
+				timesheet,
+				stripeInvoice: stripeInvoice,
+				amountInDollars: (stripeInvoice.amount_due / 100).toFixed(2)
+			});
+
 			setFlash({ type: 'success', message: 'Timesheet approved' }, event);
 			return {
 				success: true,
@@ -170,8 +186,32 @@ export const actions = {
 			return { success: false };
 		}
 	},
-	editTimesheet: async (event: RequestEvent) => {},
-	closeTimesheet: async (event: RequestEvent) => {
-		// TODO: Change Timesheet Status to VOID
+	editTimesheet: async (event: RequestEvent) => {
+		if (event.locals.user?.role !== USER_ROLES.SUPERADMIN) {
+			throw error(403, 'Forbidden');
+		}
+
+		const { id } = event.params;
+	},
+	voidTimesheet: async (event: RequestEvent) => {
+		const user = event.locals.user;
+		if (!user) {
+			redirect(302, '/auth/sign-in');
+		}
+		const userId = user.id;
+		try {
+			const { id } = event.params;
+			await voidTimesheet(id, userId);
+			setFlash({ type: 'success', message: 'Timesheet voided' }, event);
+			return { succes: true };
+		} catch (error) {
+			console.error('Error rejecting timesheet:', error);
+			setFlash({ type: 'error', message: 'Error voiding timesheet' }, event);
+		}
+	},
+	adminOverrideTimesheet: async (event: RequestEvent) => {
+		if (event.locals.user?.role !== USER_ROLES.SUPERADMIN) {
+			throw error(403, 'Forbidden');
+		}
 	}
 };

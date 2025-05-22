@@ -26,6 +26,8 @@
 	onMount(() => {
 		mounted = true;
 	});
+
+	$: console.log(events);
 </script>
 
 <section class="grow h-screen overflow-y-auto">
@@ -69,7 +71,7 @@
 				</div>
 				<Dialog.Footer>
 					<a href={`/requisitions/${selectedEvent?.resourceIds?.[0]}`}>
-						<Button asChild type="button" class="ml-auto mt-4">View Requisition</Button>
+						<Button type="button" class="ml-auto mt-4">View Requisition</Button>
 					</a>
 				</Dialog.Footer>
 			{/if}

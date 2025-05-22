@@ -44,6 +44,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				email: z.string().email().optional(),
 				avatarUrl: z.string().optional(),
 				onboardingStep: z.number().optional(),
+				timezone: z.string().optional(),
 				completedOnboarding: z.boolean().optional()
 			})
 			.safeParse(body);

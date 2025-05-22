@@ -36,10 +36,11 @@ export async function getPaginatedRegions({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-    ORDER BY ${orderBy.direction === 'asc'
-					? sql`${sql.raw(orderSelector)} ASC`
-					: sql`${sql.raw(orderSelector)} DESC`
-				}
+    ORDER BY ${
+			orderBy.direction === 'asc'
+				? sql`${sql.raw(orderSelector)} ASC`
+				: sql`${sql.raw(orderSelector)} DESC`
+		}
   `);
 		} else {
 			query.append(sql`
@@ -69,12 +70,12 @@ export async function getAllRegions() {
 }
 
 export async function getRegionByAbbreviation(abbreviation: string) {
-	const results = await db
+	const [result] = await db
 		.select()
 		.from(regionTable)
 		.where(eq(regionTable.abbreviation, abbreviation));
 
-	return results[0];
+	return result;
 }
 
 export async function getAllSubregions() {

@@ -32,7 +32,8 @@ export const userTable = pgTable('users', {
 	completedOnboarding: boolean('completed_onboarding').default(false),
 	onboardingStep: integer('onboarding_step').default(1),
 	blacklisted: boolean('blacklisted').default(false),
-	stripeCustomerId: text('stripe_customer_id').unique()
+	stripeCustomerId: text('stripe_customer_id').unique(),
+	timezone: text('timezone').default('America/New_York')
 });
 
 export const sessionTable = pgTable('sessions', {

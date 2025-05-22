@@ -51,6 +51,10 @@
 			accessorKey: 'location_name'
 		},
 		{
+			header: 'Address',
+			accessorFn: (original) => `${original.street_one} ${original?.street_two || ''}`
+		},
+		{
 			header: 'City',
 			accessorKey: 'city'
 		},
@@ -136,7 +140,11 @@
 <section class="grow h-screen overflow-y-auto p-6 flex flex-col gap-6">
 	<div class=" flex items-center justify-between flex-wrap">
 		<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">Locations</h1>
-		<AddLocationDrawer newLocationForm={{}} />
+		<AddLocationDrawer
+			newLocationForm={data.locationForm}
+			company={data.company}
+			bind:open={drawerExpanded}
+		/>
 	</div>
 	<div class="column">
 		<Table.Root class="table">

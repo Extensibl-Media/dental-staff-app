@@ -68,10 +68,10 @@ export const GET: RequestHandler = async ({ params, request }) => {
 				recurrenceDay: {
 					id: recurrenceDayTable.id,
 					date: recurrenceDayTable.date,
-					dayStartTime: recurrenceDayTable.dayStartTime,
-					dayEndTime: recurrenceDayTable.dayEndTime,
-					lunchStartTime: recurrenceDayTable.lunchStartTime,
-					lunchEndTime: recurrenceDayTable.lunchEndTime
+					dayStartTime: recurrenceDayTable.dayStart,
+					dayEndTime: recurrenceDayTable.dayEnd,
+					lunchStartTime: recurrenceDayTable.lunchStart,
+					lunchEndTime: recurrenceDayTable.lunchEnd
 				}
 			})
 			.from(timeSheetTable)

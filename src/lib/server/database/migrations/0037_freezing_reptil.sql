@@ -1,7 +1,0 @@
-ALTER TABLE "candidate_discipline_experience" ALTER COLUMN "created_at" SET DEFAULT '2024-11-27T22:37:25.077Z';--> statement-breakpoint
-ALTER TABLE "candidate_discipline_experience" ALTER COLUMN "updated_at" SET DEFAULT '2024-11-27T22:37:25.077Z';--> statement-breakpoint
-ALTER TABLE "candidate_profiles" ALTER COLUMN "created_at" SET DEFAULT '2024-11-27T22:37:25.077Z';--> statement-breakpoint
-ALTER TABLE "candidate_profiles" ALTER COLUMN "updated_at" SET DEFAULT '2024-11-27T22:37:25.077Z';--> statement-breakpoint
-ALTER TABLE "candidate_ratings" ALTER COLUMN "created_at" SET DEFAULT '2024-11-27T22:37:25.077Z';--> statement-breakpoint
-ALTER TABLE "candidate_ratings" ALTER COLUMN "updated_at" SET DEFAULT '2024-11-27T22:37:25.077Z';--> statement-breakpoint
-ALTER TABLE "client_companies" ADD COLUMN "operating_hours" jsonb DEFAULT '{"0":{"openTime":"00:00:00-05","closeTime":"00:00:00-05","isClosed":true,"timezone":"America/New_York"},"1":{"openTime":"09:00:00-05","closeTime":"17:00:00-05","isClosed":false,"timezone":"America/New_York"},"2":{"openTime":"09:00:00-05","closeTime":"17:00:00-05","isClosed":false,"timezone":"America/New_York"},"3":{"openTime":"09:00:00-05","closeTime":"17:00:00-05","isClosed":false,"timezone":"America/New_York"},"4":{"openTime":"09:00:00-05","closeTime":"17:00:00-05","isClosed":false,"timezone":"America/New_York"},"5":{"openTime":"09:00:00-05","closeTime":"17:00:00-05","isClosed":false,"timezone":"America/New_York"},"6":{"openTime":"09:00:00-05","closeTime":"17:00:00-05","isClosed":false,"timezone":"America/New_York"}}'::jsonb;

@@ -1,37 +1,42 @@
 <script lang="ts">
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Checkbox } from '../ui/checkbox';
 	import { superForm } from 'sveltekit-superforms/client';
-	import { CLIENT_STAFF_ROLES } from '$lib/config/constants';
+	import * as Dialog from '../ui/dialog';
+	import { Loader2, PlusIcon } from 'lucide-svelte';
+	import { Textarea } from 'flowbite-svelte';
+	import { cn } from '$lib/utils';
 	export let allStaff;
 	export let location;
 	export let company;
 	export let assignForm;
+	export let open: boolean;
 
 	const form = superForm(assignForm);
-	export let selectedStaffId = '';
 
-	const { enhance, form: formData } = form;
+	const { enhance, form: formData, submitting } = form;
 
 	$: console.log(allStaff);
 </script>
 
-<Sheet.Root>
-	<Sheet.Trigger asChild let:builder>
-		<Button builders={[builder]} class="bg-blue-800 hover:bg-blue-900 mb-4">
-			Add Staff Member
-		</Button>
-	</Sheet.Trigger>
-	<Sheet.Content side="right">
-		<form method="POST" action="?/assignStaff" use:enhance>
-			<Sheet.Header>
-				<Sheet.Title>Add Staff</Sheet.Title>
-				<Sheet.Description>Add an existing staff member to this location.</Sheet.Description>
-			</Sheet.Header>
+<Dialog.Root {open}>
+	<Dialog.Trigger
+		class={cn(buttonVariants({ variant: 'default' }), 'bg-blue-900 hover:bg-blue-800 mb-4')}
+		on:click={() => {
+			// form = data.form;
+			open = true;
+		}}><PlusIcon size={20} class="mr-2" />Add Staff</Dialog.Trigger
+	>
+	<Dialog.Content class="sm:max-w-[425px]">
+		<form use:enhance method="POST" action="?/assignStaff" class="space-y-4">
+			<Dialog.Header>
+				<Dialog.Title>Add Staff to Location</Dialog.Title>
+				<Dialog.Description>Add an existing staff member to this location.</Dialog.Description>
+			</Dialog.Header>
 			<div class="grid gap-4 py-4">
 				<div class="space-y-2">
 					<Label for="name" class="text-right">Name</Label>
@@ -58,11 +63,21 @@
 					<input type="hidden" value={location.id} name="locationId" />
 				</div>
 			</div>
-			<Sheet.Footer>
-				<Sheet.Close asChild let:builder>
-					<Button class="bg-blue-800 hover:bg-blue-900 mb-4" type="submit">Add Staff Member</Button>
-				</Sheet.Close>
-			</Sheet.Footer>
+			<Dialog.Footer>
+				<Dialog.Close asChild>
+					<Button variant="outline" type="button" class="w-full">Close</Button>
+				</Dialog.Close>
+				<Dialog.Close asChild>
+					<Button
+						class="bg-green-500 hover:bg-green-600 w-full"
+						type="submit"
+						disabled={$submitting}
+						>{#if $submitting}
+							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+							Please wait...{:else}Add Staff{/if}
+					</Button>
+				</Dialog.Close>
+			</Dialog.Footer>
 		</form>
-	</Sheet.Content>
-</Sheet.Root>
+	</Dialog.Content>
+</Dialog.Root>

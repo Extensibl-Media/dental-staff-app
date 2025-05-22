@@ -10,15 +10,21 @@
 	export let form: SuperValidated<ClientRequisitionSchema>;
 	export let drawerExpanded: boolean;
 
-	const { form: formObj, enhance, submitting, reset, isTainted } = superForm(form, {
+	const {
+		form: formObj,
+		enhance,
+		submitting,
+		reset,
+		isTainted
+	} = superForm(form, {
 		clearOnSubmit: 'errors-and-message',
-		resetForm: true,
+		resetForm: true
 	});
 
 	let locations: any[] = [];
 	let disciplines: any[] = [];
 	let experienceLevels: any[] = [];
-
+	$: console.log(locations);
 	const handleGetLocations = async () => {
 		const req = await fetch(`/api/locations/getCompanyLocations`, {
 			method: 'GET'
@@ -74,9 +80,22 @@
 	$: if (!drawerExpanded) {
 		handleReset();
 	}
+	$: if ($formObj.locationId) {
+		const selectedLocation = locations.find((location) => location.id === $formObj.locationId);
+		if (selectedLocation) {
+			$formObj.timezone = selectedLocation.timezone;
+		}
+	}
+	$: console.log('form data', $formObj);
 </script>
 
-<form use:enhance method="POST" action="/requisitions?/client" class="grow flex flex-col h-full max-h-[calc(100vh_-_70px)]">
+<form
+	use:enhance
+	method="POST"
+	action="/requisitions?/client"
+	class="grow flex flex-col h-full max-h-[calc(100vh_-_70px)]"
+>
+	<input type="hidden" bind:value={$formObj.timezone} name="timezone" />
 	<div class="grow p-4 overflow-y-auto">
 		<div class="mb-4">
 			<Label for="title">Title</Label>
@@ -85,7 +104,13 @@
 
 		<div class="mb-4">
 			<Label for="locationId">Location</Label>
-			<select id="locationId" name="locationId" bind:value={$formObj.locationId} class="w-full p-2 border rounded" required>
+			<select
+				id="locationId"
+				name="locationId"
+				bind:value={$formObj.locationId}
+				class="w-full p-2 border rounded"
+				required
+			>
 				<option value="">Select Location</option>
 				{#each locations as location}
 					<option value={location.id}>{location.name}</option>
@@ -95,7 +120,13 @@
 
 		<div class="mb-4">
 			<Label for="disciplineId">Discipline</Label>
-			<select id="disciplineId" name="disciplineId" bind:value={$formObj.disciplineId} class="w-full p-2 border rounded" required>
+			<select
+				id="disciplineId"
+				name="disciplineId"
+				bind:value={$formObj.disciplineId}
+				class="w-full p-2 border rounded"
+				required
+			>
 				<option value="">Select Discipline</option>
 				{#each disciplines as discipline}
 					<option value={discipline.id}>{discipline.name}</option>
@@ -105,7 +136,13 @@
 
 		<div class="mb-4">
 			<Label for="experienceLevelId">Experience Level</Label>
-			<select id="experienceLevelId" name="experienceLevelId" bind:value={$formObj.experienceLevelId} class="w-full p-2 border rounded" required>
+			<select
+				id="experienceLevelId"
+				name="experienceLevelId"
+				bind:value={$formObj.experienceLevelId}
+				class="w-full p-2 border rounded"
+				required
+			>
 				<option value="">Select Experience</option>
 				{#each experienceLevels as level}
 					<option value={level.id}>{level.value}</option>
@@ -120,7 +157,13 @@
 
 		<div class="mb-4">
 			<Label for="permanentPosition">Requisition Type</Label>
-			<select id="permanentPosition" name="permanentPosition" bind:value={$formObj.permanentPosition} class="w-full p-2 border rounded" required>
+			<select
+				id="permanentPosition"
+				name="permanentPosition"
+				bind:value={$formObj.permanentPosition}
+				class="w-full p-2 border rounded"
+				required
+			>
 				<option value={false}>Temporary</option>
 				<option value={true}>Permanent</option>
 			</select>
@@ -128,12 +171,25 @@
 
 		<div class="mb-4">
 			<Label for="jobDescription">Job Description</Label>
-			<textarea id="jobDescription" name="jobDescription" bind:value={$formObj.jobDescription} class="w-full p-2 border rounded" rows="4" required></textarea>
+			<textarea
+				id="jobDescription"
+				name="jobDescription"
+				bind:value={$formObj.jobDescription}
+				class="w-full p-2 border rounded"
+				rows="4"
+				required
+			></textarea>
 		</div>
 
 		<div class="mb-4">
 			<Label for="specialInstructions">Special Instructions</Label>
-			<textarea id="specialInstructions" name="specialInstructions" bind:value={$formObj.specialInstructions} class="w-full p-2 border rounded" rows="4"></textarea>
+			<textarea
+				id="specialInstructions"
+				name="specialInstructions"
+				bind:value={$formObj.specialInstructions}
+				class="w-full p-2 border rounded"
+				rows="4"
+			></textarea>
 		</div>
 	</div>
 

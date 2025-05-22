@@ -44,13 +44,11 @@ export const GET: RequestHandler = async ({ request }) => {
 				id: requisitionTable.id,
 				title: requisitionTable.title,
 				status: requisitionTable.status,
-				// jobDescription: requisitionTable.jobDescription,
 				hourlyRate: requisitionTable.hourlyRate,
 				disciplineId: requisitionTable.disciplineId,
 				experienceLevelId: requisitionTable.experienceLevelId,
 				createdAt: requisitionTable.createdAt,
 				permanentPosition: requisitionTable.permanentPosition,
-				// updatedAt: requisitionTable.updatedAt,
 				company: {
 					...clientCompanyTable
 				},

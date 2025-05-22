@@ -4,11 +4,14 @@ import { USER_ROLES } from '$lib/config/constants';
 import { superValidate } from 'sveltekit-superforms/server';
 import { clientCompanyLocationSchema } from '$lib/config/zod-schemas';
 import {
+	createCompanyLocation,
 	getClientCompanyByClientId,
 	getClientProfileByStaffUserId,
 	getClientProfilebyUserId,
 	getPaginatedLocationsByCompanyId
 } from '$lib/server/database/queries/clients';
+import { getRegionByAbbreviation } from '$lib/server/database/queries/regions';
+import { setFlash } from 'sveltekit-flash-message/server';
 
 export const load: PageServerLoad = async (event) => {
 	const skip = Number(event.url.searchParams.get('skip'));
@@ -65,5 +68,68 @@ export const load: PageServerLoad = async (event) => {
 			locations: result?.locations || [],
 			count: result?.count || 0
 		};
+	}
+};
+
+export const actions = {
+	createLocation: async (event) => {
+		const form = await superValidate(event, clientCompanyLocationSchema);
+
+		if (!form.valid) {
+			return { form };
+		}
+
+		const user = event.locals.user;
+
+		if (!user) {
+			return redirect(301, '/sign-in');
+		}
+
+		if (user.role === USER_ROLES.CLIENT || user.role === USER_ROLES.CLIENT_STAFF) {
+			const client = await getClientProfilebyUserId(user.id);
+			const clientCompany = await getClientCompanyByClientId(client.id);
+
+			if (!clientCompany) {
+				return { form };
+			}
+			const regionId = (await getRegionByAbbreviation(form.data.state!)).id;
+
+			const result = await createCompanyLocation({
+				id: crypto.randomUUID(),
+				createdAt: new Date(),
+				updatedAt: new Date(),
+				name: form.data.name,
+				streetOne: form.data.streetOne,
+				streetTwo: form.data.streetTwo,
+				companyPhone: form.data.companyPhone,
+				email: form.data.email || null,
+				city: form.data.city,
+				state: form.data.state,
+				zipcode: form.data.zipcode,
+				companyId: form.data.companyId,
+				regionId,
+				timezone: form.data.timezone
+			});
+
+			if (result) {
+				setFlash(
+					{
+						type: 'success',
+						message: 'Location created successfully'
+					},
+					event
+				);
+				return { form, success: true, message: 'Location created successfully' };
+			} else {
+				setFlash(
+					{
+						type: 'error',
+						message: 'Failed to create location'
+					},
+					event
+				);
+				return { form, error: 'Failed to create location' };
+			}
+		}
 	}
 };

@@ -30,7 +30,9 @@ export const conversationTable = pgTable(
 	{
 		id: text('id').notNull().primaryKey(),
 		type: conversationTypeEnum('type').notNull(),
-		applicationId: text('application_id').references(() => requisitionApplicationTable.id),
+		applicationId: text('application_id').references(() => requisitionApplicationTable.id, {
+			onDelete: 'cascade'
+		}),
 		createdAt: timestamp('created_at', {
 			withTimezone: true,
 			mode: 'date'
@@ -98,8 +100,8 @@ export const conversationParticipantsTable = pgTable(
 			.references(() => userTable.id)
 			.notNull(),
 		participantType: participantTypeEnum('participant_type').notNull(),
-		joinedAt: timestamp('joined_at').defaultNow().notNull(),
-		leftAt: timestamp('left_at'),
+		joinedAt: timestamp('joined_at', { withTimezone: true }).defaultNow().notNull(),
+		leftAt: timestamp('left_at', { withTimezone: true }),
 		isActive: boolean('is_active').notNull().default(true),
 		latestMessageId: integer('last_read_message_id').references(() => messageTable.id)
 	},

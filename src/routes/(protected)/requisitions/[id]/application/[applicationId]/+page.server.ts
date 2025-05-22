@@ -1,6 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad, RequestEvent } from './$types';
 import {
+	approveApplication,
 	getRequisitionApplicationDetails,
 	getRequisitionDetailsById
 } from '$lib/server/database/queries/requisitions';
@@ -20,12 +21,14 @@ export const load: PageServerLoad = async (event) => {
 	try {
 		const applicationDetails = await getRequisitionApplicationDetails(+id, applicationId);
 
-		const form = await superValidate(event, z.object({ id: z.string() }));
+		const messageForm = await superValidate(event, z.object({ id: z.string() }));
+		const approvalForm = await superValidate(event, z.object({ applicationId: z.string() }));
 
 		return {
 			user,
 			application: applicationDetails || null,
-			form
+			messageForm,
+			approvalForm
 		};
 	} catch (err) {
 		console.log(err);
@@ -80,5 +83,23 @@ export const actions = {
 			setFlash({ type: 'success', message: 'Starting new conversation.' }, event);
 			return redirect(302, `/inbox/${conversationId}`);
 		}
+	},
+	approveApplication: async (event: RequestEvent) => {
+		const user = event.locals.user;
+		const { id, applicationId } = event.params;
+
+		if (!user || (user && user.role === 'CANDIDATE')) {
+			return fail(403);
+		}
+
+		try {
+			await approveApplication(applicationId, user.id);
+			setFlash({ type: 'success', message: 'Application approved successfully.' }, event);
+		} catch (error) {
+			console.error('Error approving application:', error);
+			setFlash({ type: 'error', message: 'Error approving application. Please try again.' }, event);
+			return fail(500);
+		}
+		return redirect(302, `/requisitions/${id}/application/${applicationId}`);
 	}
 };

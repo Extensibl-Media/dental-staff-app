@@ -20,13 +20,8 @@ import {
 	clientCompanyTable,
 	clientProfileTable,
 	companyOfficeLocationTable,
-<<<<<<< HEAD
-	type ClientCompanySelect,
-<<<<<<< HEAD
-	type ClientProfileSelect
-=======
+	type ClientProfileSelect,
 	type ClientCompanySelect
->>>>>>> 3fce45fb5c7010a7c54276b527056a45a14f4f87
 } from './client';
 import { candidateProfileTable, type CandidateProfileSelect } from './candidate';
 import { disciplineTable, experienceLevelTable } from './skill';
@@ -90,10 +85,12 @@ export const requisitionTable = pgTable('requisitions', {
 	experienceLevelId: text('experience_level_id').references(() => experienceLevelTable.id),
 	archived: boolean('archived').default(false),
 	archivedDate: timestamp('archived_at', {
+		withTimezone: true,
 		mode: 'date'
 	}),
 	hourlyRate: smallint('hourly_rate'),
-	permanentPosition: boolean('permanent_position').default(false)
+	permanentPosition: boolean('permanent_position').default(false),
+	referenceTimezone: text('reference_timezone').notNull().default('America/New_York')
 });
 
 export const recurrenceDayTable = pgTable('recurrence_days', {
@@ -107,11 +104,11 @@ export const recurrenceDayTable = pgTable('recurrence_days', {
 		mode: 'date'
 	}).notNull(),
 	status: recurrenceDayStatusEnum('status').default('OPEN').notNull(),
-	date: date('date', { mode: 'string' }).notNull(),
-	dayStartTime: time('day_start_time', { withTimezone: true }).notNull(),
-	dayEndTime: time('day_end_time', { withTimezone: true }).notNull(),
-	lunchStartTime: time('lunch_start_time', { withTimezone: true }).notNull(),
-	lunchEndTime: time('lunch_end_time', { withTimezone: true }).notNull(),
+	date: date('date').notNull(),
+	dayStart: timestamp('day_start_time', { withTimezone: true }).notNull(),
+	dayEnd: timestamp('day_end_time', { withTimezone: true }).notNull(),
+	lunchStart: timestamp('lunch_start_time', { withTimezone: true }).notNull(),
+	lunchEnd: timestamp('lunch_end_time', { withTimezone: true }).notNull(),
 	requisitionId: integer('requisition_id').references(() => requisitionTable.id, {
 		onDelete: 'cascade',
 		onUpdate: 'cascade'
@@ -309,15 +306,12 @@ export const timeSheetTable = pgTable(
 		candidateRateBase: decimal('candidate_rate_base'),
 		candidateRateOT: decimal('candidate_rate_overtime'),
 		requisitionId: integer('requisition_id').references(() => requisitionTable.id, {
-			onDelete: 'set null',
-			onUpdate: 'set null'
+			onDelete: 'set null'
 		}),
 		workdayId: text('workday_id')
 			.references(() => workdayTable.id)
 			.notNull(),
-		weekBeginDate: date('week_begin_date', {
-			mode: 'string'
-		}).notNull(),
+		weekBeginDate: date('week_begin_date').notNull().notNull(),
 		hoursRaw: json('hours_raw').$type<RawTimesheetHours[]>().notNull().default([]),
 		status: timesheetStatusEnum('status').default('PENDING').notNull()
 	},

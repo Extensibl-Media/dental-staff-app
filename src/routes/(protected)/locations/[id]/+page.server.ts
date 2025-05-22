@@ -15,13 +15,14 @@ import type { ClientProfile } from '$lib/server/database/schemas/client';
 import { getRequsitionsForLocation } from '$lib/server/database/queries/requisitions';
 import { message, setError, superValidate } from 'sveltekit-superforms/server';
 import { z } from 'zod';
+import { setFlash } from 'sveltekit-flash-message/server';
 
 const assignStaffToLocationSchema = z.object({
 	staffId: z.string(),
 	locationId: z.string(),
 	companyId: z.string(),
 	isPrimary: z.boolean()
-})
+});
 
 export const load: PageServerLoad = async (event) => {
 	const user = event.locals.user;
@@ -30,8 +31,7 @@ export const load: PageServerLoad = async (event) => {
 	if (!user) {
 		redirect(301, '/sign-in');
 	}
-	const form = await superValidate(event, assignStaffToLocationSchema)
-
+	const form = await superValidate(event, assignStaffToLocationSchema);
 
 	if (user.role === USER_ROLES.CLIENT || user.role === USER_ROLES.CLIENT_STAFF) {
 		const client: ClientProfile | null =
@@ -44,7 +44,7 @@ export const load: PageServerLoad = async (event) => {
 			const location = await getLocationByIdForCompany(id, company.id);
 			const requisitions = await getRequsitionsForLocation(location.id);
 			const locationStaff = await getStaffProfilesForLocation(location.id);
-			const staff = await getAllClientStaffProfiles(company.id, location.id)
+			const staff = await getAllClientStaffProfiles(company.id, location.id);
 
 			return {
 				user,
@@ -70,19 +70,18 @@ export const load: PageServerLoad = async (event) => {
 	}
 };
 
-
 export const actions = {
 	assignStaff: async (event: RequestEvent) => {
-		const currentUser = event.locals.user
+		const currentUser = event.locals.user;
 
 		if (!currentUser) {
-			fail(401)
+			fail(401);
 		}
 
-		const form = await superValidate(event, assignStaffToLocationSchema)
+		const form = await superValidate(event, assignStaffToLocationSchema);
 
 		if (!form.valid) {
-			fail(400, { form })
+			fail(400, { form });
 		}
 
 		try {
@@ -92,14 +91,27 @@ export const actions = {
 				staffId: form.data.staffId,
 				locationId: form.data.locationId,
 				isPrimary: form.data.isPrimary
-			}
+			};
 
-			const result = await addStaffToLocation(values)
-
+			await addStaffToLocation(values);
+			setFlash(
+				{
+					type: 'success',
+					message: 'Staff added to location successfully.'
+				},
+				event
+			);
+			return { form, success: true };
 		} catch (e) {
 			console.error(e);
-			return setError(form, 'There was a problem adding staff to location.');
+			setFlash(
+				{
+					type: 'error',
+					message: 'Error adding staff to location.'
+				},
+				event
+			);
+			return { form, success: false };
 		}
-		return message(form, 'Added staff to location')
 	}
-}
+};

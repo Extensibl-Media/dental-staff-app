@@ -91,6 +91,7 @@ export const clientCompanySchema = z.object({
 export type ClientCompanySchema = typeof clientCompanySchema;
 
 export const clientCompanyLocationSchema = z.object({
+	companyId: z.string(),
 	name: z.string(),
 	streetOne: z.string().optional(),
 	streetTwo: z.string().optional(),
@@ -101,7 +102,8 @@ export const clientCompanyLocationSchema = z.object({
 	hoursOfOperation: z.string().optional(),
 	email: z.string().optional(),
 	phoneNumber: z.string().optional(),
-	phoneNumberType: z.union([z.literal('cell'), z.literal('office')]).optional()
+	phoneNumberType: z.union([z.literal('cell'), z.literal('office')]).optional(),
+	timezone: z.string().optional()
 });
 
 export type CompanyLocationSchema = typeof clientCompanyLocationSchema;
@@ -153,7 +155,8 @@ export const clientRequisitionSchema = z.object({
 	experienceLevelId: z.string().optional(),
 	jobDescription: z.string(),
 	specialInstructions: z.string().optional(),
-	permanentPosition: z.boolean().default(false)
+	permanentPosition: z.boolean().default(false),
+	timezone: z.string()
 });
 
 export type ClientRequisitionSchema = typeof clientRequisitionSchema;
@@ -163,8 +166,7 @@ const singleDaySchema = z.object({
 	dayStartTime: z.string(),
 	dayEndTime: z.string(),
 	lunchStartTime: z.string(),
-	lunchEndTime: z.string(),
-	timezoneOffset: z.string()
+	lunchEndTime: z.string()
 });
 
 const recurrenceDayData = z.object({
@@ -173,8 +175,7 @@ const recurrenceDayData = z.object({
 	dayStartTime: z.string(),
 	dayEndTime: z.string(),
 	lunchStartTime: z.string(),
-	lunchEndTime: z.string(),
-	timezoneOffset: z.string().optional()
+	lunchEndTime: z.string()
 });
 
 export const newRecurrenceDaySchema = z.object({

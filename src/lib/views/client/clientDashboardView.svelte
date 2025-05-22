@@ -16,6 +16,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { cn } from '$lib/utils';
 	import { format, parse } from 'date-fns';
+	import { USER_ROLES } from '$lib/config/constants';
 
 	export let user;
 	export let data;
@@ -33,6 +34,8 @@
 	$: overdueInvoicesCount = data.overdueInvoicesCount || 0;
 	$: pendingInvoicesCount = data.pendingInvoicesCount || 0;
 	$: totalAmountDue = parseInt(data.totalAmountDue || '0');
+
+	$: console.log(invoices);
 </script>
 
 <section class="grow grid grid-cols-1 lg:grid-cols-3">
@@ -151,7 +154,13 @@
 						<Table.Header>
 							<Table.Row>
 								<Table.Head>Invoice #</Table.Head>
-								<Table.Head>Client</Table.Head>
+								<Table.Head>
+									{#if user.role === USER_ROLES.SUPERADMIN}
+										Client
+									{:else}
+										Candidate
+									{/if}
+								</Table.Head>
 								<Table.Head>Due Date</Table.Head>
 								<Table.Head>Status</Table.Head>
 								<Table.Head class="text-right">Amount</Table.Head>
@@ -165,14 +174,17 @@
 									on:click={() => goto(`/invoices/${invoiceData.invoice.id}`)}
 								>
 									<Table.Cell class="font-medium">{invoiceData.invoice.invoiceNumber}</Table.Cell>
-									<Table.Cell>
-										<div class="flex flex-col">
-											<span class="font-medium">{invoiceData.client.name}</span>
-											<span class="text-xs text-gray-500"
-												>{invoiceData.clientUser.firstName} {invoiceData.clientUser.lastName}</span
-											>
-										</div>
-									</Table.Cell>
+									{#if user.role === USER_ROLES.CLIENT || user.role === USER_ROLES.CLIENT_STAFF}
+										<Table.Cell>
+											{invoiceData.candidate?.user?.firstName || 'None'}
+											{invoiceData.candidate?.user?.lastName || 'Specified'}
+										</Table.Cell>
+									{:else}
+										<Table.Cell>
+											{invoiceData.invoice.vendor?.firstName}
+											{invoiceData.invoice.vendor?.lastName}
+										</Table.Cell>
+									{/if}
 									<Table.Cell>
 										{#if invoiceData.invoice.dueDate}
 											<span
@@ -292,6 +304,7 @@
 							<Table.Row>
 								<Table.Head class="">Requisition</Table.Head>
 								<Table.Head>Status</Table.Head>
+								<Table.Head>Week Of</Table.Head>
 								<Table.Head>Hours</Table.Head>
 							</Table.Row>
 						</Table.Header>
@@ -330,10 +343,7 @@
 									</Table.Cell>
 									<Table.Cell>
 										<span class="text-gray-500">
-											{format(
-												parse(timesheet.timesheet.weekBeginDate, 'yyyy-MM-dd', new Date()),
-												'PP'
-											)}
+											{format(timesheet.timesheet.weekBeginDate, 'PP')}
 										</span>
 									</Table.Cell>
 									<Table.Cell>

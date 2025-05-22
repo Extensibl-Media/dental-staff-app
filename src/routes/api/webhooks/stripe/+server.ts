@@ -1,4 +1,5 @@
 import {
+	invoiceTable,
 	timeSheetTable,
 	type TimeSheetSelect
 } from './../../../../lib/server/database/schemas/requisition';
@@ -102,12 +103,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					timesheet = result as TimeSheetSelect;
 				}
 
-				await createInvoiceRecord({
-					clientId: client.id,
-					timesheet,
-					stripeInvoice: invoiceFinalized,
-					amountInDollars: (invoiceFinalized.amount_due / 100).toFixed(2)
-				});
 				const invoice = event.data.object as Stripe.Invoice;
 				console.log('Invoice paid:', invoice.id);
 				break;
@@ -120,11 +115,45 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				console.log('Handling invoice payment succeeded');
 				const invoicePaymentSucceeded = event.data.object as Stripe.Invoice;
 				console.log(invoicePaymentSucceeded);
+				const [existingPaidInvoice] = await db
+					.select()
+					.from(invoiceTable)
+					.where(eq(invoiceTable.stripeInvoiceId, invoicePaymentSucceeded.id))
+					.limit(1);
+				if (existingPaidInvoice) {
+					console.log('Invoice  exists in the database:', existingPaidInvoice);
+					await db
+						.update(invoiceTable)
+						.set({
+							status: 'paid',
+							stripeStatus: invoicePaymentSucceeded.status,
+							paidAt: new Date(),
+							amountDue: (invoicePaymentSucceeded.amount_due / 100).toFixed(2),
+							amountPaid: (invoicePaymentSucceeded.amount_paid / 100).toFixed(2),
+							amountRemaining: (invoicePaymentSucceeded.amount_remaining / 100).toFixed(2)
+						})
+						.where(eq(invoiceTable.id, existingPaidInvoice.id));
+				}
 				break;
 			case 'invoice.voided':
 				console.log('Handling invoice voided');
 				const invoiceVoided = event.data.object as Stripe.Invoice;
 				console.log(invoiceVoided);
+				const [existingVoidedInvoice] = await db
+					.select()
+					.from(invoiceTable)
+					.where(eq(invoiceTable.stripeInvoiceId, invoiceVoided.id))
+					.limit(1);
+				if (existingVoidedInvoice) {
+					console.log('Invoice  exists in the database:', existingVoidedInvoice);
+					await db
+						.update(invoiceTable)
+						.set({
+							status: 'void',
+							stripeStatus: invoiceVoided.status
+						})
+						.where(eq(invoiceTable.id, existingVoidedInvoice.id));
+				}
 				break;
 		}
 

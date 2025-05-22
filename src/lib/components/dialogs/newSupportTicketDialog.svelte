@@ -33,7 +33,7 @@
 					Please describe in detail what your issue is and our team will be in touch soon to help.
 				</Dialog.Description>
 			</Dialog.Header>
-			<div class="spacey-y-2">
+			<div class="space-y-2">
 				<Label for="title">Title</Label>
 				<Input name="title" required />
 			</div>
@@ -58,6 +58,9 @@
 							<Loader2 class="mr-2 h-4 w-4 animate-spin" />
 							Please wait...{:else}Submit Ticket{/if}
 					</Button>
+				</Dialog.Close>
+				<Dialog.Close asChild>
+					<Button variant="outline" type="button" class="w-full">Close</Button>
 				</Dialog.Close>
 			</Dialog.Footer>
 		</form>

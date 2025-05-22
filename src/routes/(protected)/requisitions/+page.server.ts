@@ -108,16 +108,9 @@ export const actions = {
 		const experienceLevelId = formData.get('experienceLevelId')
 			? (formData.get('experienceLevelId') as string)
 			: null;
-		console.log({
-			title,
-			companyId,
-			locationId,
-			disciplineId,
-			jobDescription,
-			specialInstructions,
-			experienceLevelId
-		});
-
+		const timezone = formData.get('timezone') as string;
+		const permanentPosition = formData.get('permanentPosition');
+		const hourlyRate = Number(formData.get('hourlyRate'));
 		const newRequisition = await createRequisition(
 			{
 				createdAt: new Date(),
@@ -125,11 +118,14 @@ export const actions = {
 				title,
 				companyId,
 				locationId,
+				hourlyRate,
+				permanentPosition: permanentPosition as unknown as boolean,
 				disciplineId,
 				jobDescription,
 				specialInstructions,
 				experienceLevelId,
-				status: 'OPEN'
+				status: 'OPEN',
+				referenceTimezone: timezone
 			},
 			user.id
 		);
@@ -157,6 +153,8 @@ export const actions = {
 
 		const formData = await event.request.formData();
 
+		console.log({ formData });
+
 		const title = formData.get('title') as string;
 		const locationId = formData.get('locationId') as string;
 		const disciplineId = formData.get('disciplineId') as string;
@@ -169,6 +167,7 @@ export const actions = {
 			: null;
 		const permanentPosition = formData.get('permanentPosition');
 		const hourlyRate = Number(formData.get('hourlyRate'));
+		const timezone = formData.get('timezone') as string;
 
 		const newRequisition = await createRequisition(
 			{
@@ -183,7 +182,8 @@ export const actions = {
 				jobDescription,
 				specialInstructions,
 				experienceLevelId,
-				status: 'OPEN'
+				status: 'OPEN',
+				referenceTimezone: timezone
 			},
 			user.id
 		);

@@ -55,13 +55,33 @@ export const GET: RequestHandler = async ({ request }) => {
 		// Create an array of dates the candidate is already working
 		const bookedDates = acceptedWorkdays.map((day) => day.date);
 
+		// Prepare filter conditions based on whether bookedDates is empty or not
+		let dateCondition;
+		if (bookedDates.length === 0) {
+			// If no booked dates, don't use notInArray condition
+			dateCondition = or(
+				// Either all recurrence days (since none are booked)
+				isNotNull(recurrenceDayTable.id),
+				// OR it's a workday they have already claimed (redundant but matches the logic)
+				isNotNull(workdayTable.id)
+			);
+		} else {
+			// If there are booked dates, use the original condition
+			dateCondition = or(
+				// Either the recurrence day is not on a date they're already booked
+				notInArray(recurrenceDayTable.date, bookedDates),
+				// OR it's a workday they have already claimed (so we still show their bookings)
+				isNotNull(workdayTable.id)
+			);
+		}
+
 		// Fetch recurrence days with requisition and workday information
 		const recurrenceDays = await db
 			.select({
 				recurrenceDay: {
 					id: recurrenceDayTable.id,
-					startTime: recurrenceDayTable.dayStartTime,
-					endTime: recurrenceDayTable.dayEndTime,
+					startTime: recurrenceDayTable.dayStart,
+					endTime: recurrenceDayTable.dayEnd,
 					date: recurrenceDayTable.date,
 					requisitionId: recurrenceDayTable.requisitionId,
 					status: recurrenceDayTable.status
@@ -123,15 +143,8 @@ export const GET: RequestHandler = async ({ request }) => {
 						// Or check if the workday is for the current candidate
 						eq(workdayTable.candidateId, candidateProfile.id)
 					),
-					// KEY CHANGE: Filter out recurrence days that fall on dates
-					// the candidate already has a workday UNLESS it's the workday
-					// they've already accepted
-					or(
-						// Either the recurrence day is not on a date they're already booked
-						notInArray(recurrenceDayTable.date, bookedDates),
-						// OR it's a workday they have already claimed (so we still show their bookings)
-						isNotNull(workdayTable.id)
-					)
+					// KEY CHANGE: We use the prepared condition that handles empty bookedDates
+					dateCondition
 				)
 			);
 

@@ -40,7 +40,8 @@ export const GET: RequestHandler = async ({ request }) => {
 					totalHoursBilled: timeSheetTable.totalHoursBilled,
 					awaitingClientSignature: timeSheetTable.awaitingClientSignature,
 					weekBeginDate: timeSheetTable.weekBeginDate,
-					hoursRaw: timeSheetTable.hoursRaw
+					hoursRaw: timeSheetTable.hoursRaw,
+					status: timeSheetTable.status
 				},
 				requisition: {
 					id: requisitionTable.id,

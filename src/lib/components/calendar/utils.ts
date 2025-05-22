@@ -1,3 +1,4 @@
+import { formatTimestampForDisplay, getUserTimezone } from '$lib/_helpers/UTCTimezoneUtils';
 import type { RecurrenceDay, Requisition } from '$lib/server/database/schemas/requisition';
 import { format, parseISO } from 'date-fns';
 
@@ -14,19 +15,38 @@ const requisitionStatusColorEnum = {
 	CANCELED: '#f05252'
 } as const;
 
+/**
+ * Convert a RecurrenceDay to a calendar event, properly handling UTC timestamps
+ * and converting to local timezone for display
+ */
 export function convertRecurrenceDayToEvent(
 	recurrenceDay: RecurrenceDay,
 	requisition: Requisition
 ) {
-	const { date, dayStartTime, dayEndTime, status } = recurrenceDay;
-	const eventDate = new Date(date);
-	const isoDate = parseISO(date);
-	console.log({ date, eventDate });
-	const dateString = format(isoDate, 'yyyy-MM-dd');
+	const { date, dayStart, dayEnd, lunchStart, lunchEnd, status } = recurrenceDay;
 
+	// Get reference timezone from the requisition
+	const timezone = getUserTimezone() || 'America/New_York'; // Default to EST if no timezone is set
+
+	// Convert UTC timestamps to local timezone display times
+	// We need to create proper Date objects from the timestamps
+	const localDayStart = formatTimestampForDisplay(dayStart, timezone);
+	const localDayEnd = formatTimestampForDisplay(dayEnd, timezone);
+
+	console.log({
+		originalDate: date,
+		dateObj: new Date(date),
+		dayStart,
+		localDayStart,
+		dayEnd,
+		localDayEnd,
+		timezone
+	});
+
+	// Create event with local time display values
 	return {
-		start: `${dateString} ${dayStartTime}`,
-		end: `${dateString} ${dayEndTime}`,
+		start: localDayStart, // Display the local start time
+		end: localDayEnd, // Display the local end time
 		resourceIds: [requisition.id, recurrenceDay.id],
 		title: requisition.title,
 		data: requisition,

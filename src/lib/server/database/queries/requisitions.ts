@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { and, asc, count, eq, or, sql, desc, isNotNull, gte, lte } from 'drizzle-orm';
+import { and, asc, count, eq, or, sql, desc, isNotNull, gte, lte, SQL } from 'drizzle-orm';
 import db from '../drizzle';
 import {
 	recurrenceDayTable,
@@ -43,7 +43,8 @@ import {
 	candidateProfileTable,
 	candidateDisciplineExperienceTable,
 	type CandidateProfile,
-	type CandidateProfileSelect
+	type CandidateProfileSelect,
+	candidateDocumentUploadsTable
 } from '../schemas/candidate';
 import { error } from '@sveltejs/kit';
 import { writeActionHistory } from './admin';
@@ -52,6 +53,7 @@ import type { PaginateOptions } from '$lib/types';
 import { normalizeDate } from '$lib/_helpers';
 import { createStripeInvoice } from '$lib/server/stripe';
 import type Stripe from 'stripe';
+import { calculateHours, calculateMaxHours, toUTCDateString } from '$lib/_helpers/UTCTimezoneUtils';
 
 // Types and Interfaces
 export interface TimesheetDiscrepancy {
@@ -441,11 +443,7 @@ export async function getRequisitionDetailsForAdmin(id: number) {
 	}
 }
 
-export async function getRequisitionDetailsById(
-	requisitionId: number,
-	companyId: string | undefined
-): Promise<any | null> {
-	if (!companyId) throw error(400, 'Must provide company ID');
+export async function getRequisitionDetailsById(requisitionId: number): Promise<any | null> {
 	const [result] = await db
 		.select({
 			requisition: {
@@ -469,13 +467,7 @@ export async function getRequisitionDetailsById(
 			}
 		})
 		.from(requisitionTable)
-		.where(
-			and(
-				eq(requisitionTable.id, requisitionId),
-				eq(requisitionTable.archived, false),
-				eq(requisitionTable.companyId, companyId)
-			)
-		)
+		.where(and(eq(requisitionTable.id, requisitionId), eq(requisitionTable.archived, false)))
 		.innerJoin(clientCompanyTable, eq(clientCompanyTable.id, requisitionTable.companyId))
 		.innerJoin(
 			companyOfficeLocationTable,
@@ -716,10 +708,20 @@ export const getRecentRequisitionApplications = async (companyId: string | undef
 	}
 };
 
-export const getRequisitionApplications = async (requisitionId: number | undefined) => {
+export const getRequisitionApplications = async (
+	requisitionId: number | undefined,
+	disciplineId?: string
+) => {
 	if (!requisitionId) return null;
+	console.log(disciplineId);
 	try {
-		return await db
+		const filters: SQL[] = [eq(requisitionApplicationTable.requisitionId, requisitionId)];
+
+		if (disciplineId)
+			filters.push(eq(candidateDisciplineExperienceTable.disciplineId, disciplineId));
+
+		// Build the base query
+		const query = db
 			.select({
 				application: requisitionApplicationTable,
 				candidateProfile: candidateProfileTable,
@@ -751,7 +753,10 @@ export const getRequisitionApplications = async (requisitionId: number | undefin
 				experienceLevelTable,
 				eq(candidateDisciplineExperienceTable.experienceLevelId, experienceLevelTable.id)
 			)
-			.where(eq(requisitionApplicationTable.requisitionId, requisitionId));
+			.where(and(...filters));
+
+		// Execute the query
+		return await query;
 	} catch (err) {
 		console.log(err);
 		throw error(500, `${err}`);
@@ -803,12 +808,105 @@ export const getRequisitionApplicationDetails = async (
 				)
 			);
 
-		return application;
+		const [resume] = await db
+			.select()
+			.from(candidateDocumentUploadsTable)
+			.where(
+				and(
+					eq(candidateDocumentUploadsTable.candidateId, application.candidateProfile.id),
+					eq(candidateDocumentUploadsTable.type, 'RESUME')
+				)
+			)
+			.orderBy(desc(candidateDocumentUploadsTable.createdAt))
+			.limit(1);
+
+		return { ...application, resume: resume || null };
 	} catch (err) {
 		console.log(err);
 		throw error(500, `${err}`);
 	}
 };
+
+export async function approveApplication(applicationId: string, userId: string) {
+	try {
+		const [application] = await db
+			.select()
+			.from(requisitionApplicationTable)
+			.where(eq(requisitionApplicationTable.id, applicationId));
+
+		if (!application) throw error(404, 'Application not found');
+
+		const [result] = await db
+			.update(requisitionApplicationTable)
+			.set({ status: 'APPROVED', updatedAt: new Date() })
+			.where(eq(requisitionApplicationTable.id, applicationId))
+			.returning();
+
+		const [requisition] = await db
+			.select()
+			.from(requisitionTable)
+			.where(eq(requisitionTable.id, application.requisitionId));
+
+		const [reqResult] = await db
+			.update(requisitionTable)
+			.set({ status: 'FILLED' })
+			.where(eq(requisitionTable.id, requisition.id))
+			.returning();
+
+		await writeActionHistory({
+			table: 'REQUISITION_APPLICATIONS',
+			userId,
+			action: 'UPDATE',
+			entityId: applicationId,
+			beforeState: application,
+			afterState: result
+		});
+
+		await writeActionHistory({
+			table: 'REQUISITIONS',
+			userId,
+			action: 'UPDATE',
+			entityId: requisition.id.toString(),
+			beforeState: requisition,
+			afterState: reqResult
+		});
+
+		return result;
+	} catch (err) {
+		console.log(err);
+		throw error(500, `${err}`);
+	}
+}
+export async function denyApplication(applicationId: string, userId: string) {
+	try {
+		const [application] = await db
+			.select()
+			.from(requisitionApplicationTable)
+			.where(eq(requisitionApplicationTable.id, applicationId));
+
+		if (!application) throw error(404, 'Application not found');
+
+		const [result] = await db
+			.update(requisitionApplicationTable)
+			.set({ status: 'DENIED', updatedAt: new Date() })
+			.where(eq(requisitionApplicationTable.id, applicationId))
+			.returning();
+
+		await writeActionHistory({
+			table: 'REQUISITION_APPLICATIONS',
+			userId,
+			action: 'UPDATE',
+			entityId: applicationId,
+			beforeState: application,
+			afterState: result
+		});
+
+		return result;
+	} catch (err) {
+		console.log(err);
+		throw error(500, `${err}`);
+	}
+}
 
 export async function getRequisitionTimesheets(requisitionId: number | undefined) {
 	if (!requisitionId) return null;
@@ -1074,14 +1172,18 @@ export async function getRecurrenceDaysForTimesheet(timesheet: any): Promise<Rec
 	const weekEnd = new Date(weekStart);
 	weekEnd.setDate(weekEnd.getDate() + 6);
 
+	// Format both dates as YYYY-MM-DD strings in UTC
+	const startDateString = toUTCDateString(weekStart);
+	const endDateString = toUTCDateString(weekEnd);
+
 	return await db
 		.select({
 			id: recurrenceDayTable.id,
 			date: recurrenceDayTable.date,
-			dayStartTime: recurrenceDayTable.dayStartTime,
-			dayEndTime: recurrenceDayTable.dayEndTime,
-			lunchStartTime: recurrenceDayTable.lunchStartTime,
-			lunchEndTime: recurrenceDayTable.lunchEndTime,
+			dayStart: recurrenceDayTable.dayStart,
+			dayEnd: recurrenceDayTable.dayEnd,
+			lunchStart: recurrenceDayTable.lunchStart,
+			lunchEnd: recurrenceDayTable.lunchEnd,
 			createdAt: recurrenceDayTable.createdAt, // Add createdAt
 			updatedAt: recurrenceDayTable.updatedAt
 		})
@@ -1089,8 +1191,8 @@ export async function getRecurrenceDaysForTimesheet(timesheet: any): Promise<Rec
 		.where(
 			and(
 				eq(recurrenceDayTable.requisitionId, timesheet.requisitionId),
-				sql`${recurrenceDayTable.date} >= ${weekStart.toISOString().split('T')[0]}`,
-				sql`${recurrenceDayTable.date} <= ${weekEnd.toISOString().split('T')[0]}`
+				sql`${recurrenceDayTable.date} >= ${startDateString}`,
+				sql`${recurrenceDayTable.date} <= ${endDateString}`
 			)
 		);
 }
@@ -1182,7 +1284,6 @@ export async function getTimesheetDetails(timesheetId: string, clientId: string 
 }
 
 export async function getWorkdaysForTimesheet(timesheet: any) {
-	console.log({ timesheet });
 	return await db
 		.select()
 		.from(workdayTable)
@@ -1380,6 +1481,7 @@ export function validateTimesheet(
 
 			// Validate hours against schedule
 			const maxHours = calculateMaxHours(validRecurrenceDay);
+			console.log({ maxHours, validRecurrenceDay });
 			if (entry.hours > maxHours) {
 				discrepancies.push({
 					...createBaseDiscrepancy(timesheet),
@@ -1410,21 +1512,20 @@ export function validateTimesheet(
 	return discrepancies;
 }
 
-function calculateMaxHours(recurrenceDay: RecurrenceDay): number {
-	// Parse times into Date objects using a reference date
-	const baseDate = '2000-01-01';
-	const dayStart = parseISO(`${baseDate}T${recurrenceDay.dayStartTime}`);
-	const dayEnd = parseISO(`${baseDate}T${recurrenceDay.dayEndTime}`);
-	// const lunchStart = parseISO(`${baseDate}T${recurrenceDay.lunchStartTime}`);
-	// const lunchEnd = parseISO(`${baseDate}T${recurrenceDay.lunchEndTime}`);
+// export function calculateMaxHours(recurrenceDay: any): number {
+// 	if (!recurrenceDay) return 0;
 
-	// Calculate total minutes worked
-	const totalMinutes = differenceInMinutes(dayEnd, dayStart);
-	// - differenceInMinutes(lunchEnd, lunchStart);
+// 	// Check which format we're dealing with
+// 	if (recurrenceDay.dayStart) {
+// 		// New format with dayStart property
+// 		return calculateHours(recurrenceDay.dayStart, recurrenceDay.dayEnd);
+// 	} else if (recurrenceDay.dayStartTime) {
+// 		// Legacy format with dayStartTime property
+// 		return calculateHours(recurrenceDay.dayStartTime, recurrenceDay.dayEndTime);
+// 	}
 
-	// Convert to hours and round to 2 decimal places
-	return Math.round((totalMinutes / 60) * 100) / 100;
-}
+// 	return 0;
+// }
 
 function validateBasicTimesheet(timesheet: Timesheet, discrepancies: TimesheetDiscrepancy[]): void {
 	// Check for missing rates
@@ -1999,6 +2100,36 @@ export async function revertTimesheetToPending(timesheetId: string) {
 	}
 }
 
+export async function voidTimesheet(timesheetId: string, userId: string) {
+	try {
+		const [original] = await db
+			.select()
+			.from(timeSheetTable)
+			.where(eq(timeSheetTable.id, timesheetId));
+
+		const [result] = await db
+			.update(timeSheetTable)
+			.set({ status: 'VOID' })
+			.where(eq(timeSheetTable.id, original.id))
+			.returning();
+
+		await writeActionHistory({
+			table: 'TIMESHEETS',
+			userId,
+			action: 'UPDATE',
+			entityId: timesheetId,
+			beforeState: original,
+			afterState: result,
+			metadata: {
+				status: 'VOID'
+			}
+		});
+
+		return result;
+	} catch (err) {
+		throw error(500, `Error rejecting timesheet: ${error}`);
+	}
+}
 export async function rejectTimesheet(timesheetId: string, userId: string) {
 	try {
 		const [original] = await db
@@ -2030,20 +2161,37 @@ export async function rejectTimesheet(timesheetId: string, userId: string) {
 	}
 }
 
-export async function approveTimesheet(timesheetId: string) {
+export async function approveTimesheet(timesheetId: string, userId: string) {
 	try {
+		const [original] = await db
+			.select()
+			.from(timeSheetTable)
+			.where(eq(timeSheetTable.id, timesheetId));
+
+		if (!original) {
+			throw error(404, 'Timesheet not found');
+		}
+
 		// Update timesheet status to APPROVED
-		const [timesheet] = await db
+		const [result] = await db
 			.update(timeSheetTable)
 			.set({ status: 'APPROVED' })
 			.where(eq(timeSheetTable.id, timesheetId))
 			.returning();
 
-		if (!timesheet) {
-			throw error(404, 'Timesheet not found');
-		}
+		await writeActionHistory({
+			table: 'TIMESHEETS',
+			userId,
+			action: 'UPDATE',
+			entityId: timesheetId,
+			beforeState: original,
+			afterState: result,
+			metadata: {
+				status: 'APPROVED'
+			}
+		});
 
-		return timesheet;
+		return result;
 	} catch (err) {
 		console.error('Error in approveTimesheet:', err);
 		throw error(500, `Error approving timesheet: ${err}`);
@@ -2080,6 +2228,11 @@ export async function createInvoiceRecord({
 }): Promise<Invoice> {
 	try {
 		if (timesheet) {
+			// Create dates with consistent timezone handling
+			const startDate = new Date(timesheet.weekBeginDate + 'T00:00:00Z');
+			const endDate = new Date(startDate);
+			endDate.setUTCDate(startDate.getUTCDate() + 6);
+
 			const [invoice] = await db
 				.insert(invoiceTable)
 				.values({
@@ -2104,12 +2257,8 @@ export async function createInvoiceRecord({
 					customerEmail: stripeInvoice.customer_email,
 					customerName: stripeInvoice.customer_name, // You might want to include a more friendly name if available
 					dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Due in 30 days
-					periodStart: new Date(timesheet.weekBeginDate),
-					periodEnd: new Date(
-						new Date(timesheet.weekBeginDate).setDate(
-							new Date(timesheet.weekBeginDate).getDate() + 6
-						)
-					), // End date = start date + 6 days
+					periodStart: startDate,
+					periodEnd: endDate,
 					description: stripeInvoice.description,
 					lineItems: JSON.stringify(stripeInvoice.lines.data)
 				})

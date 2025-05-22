@@ -33,14 +33,14 @@
 		Download,
 		User,
 		AlertTriangle,
-		Bookmark,
 		Info,
 		HelpCircle,
-		ScrollText,
 		Edit,
 		RefreshCw,
 		Save,
-		Shield
+		Shield,
+		History,
+		Clipboard
 	} from 'lucide-svelte';
 	import { format, parseISO, addDays } from 'date-fns';
 	import { cn } from '$lib/utils';
@@ -52,6 +52,8 @@
 
 	export let data: PageData;
 	$: user = data.user;
+
+	$: console.log({ data });
 
 	// State variables
 	let approvalDialogOpen = false;
@@ -86,20 +88,6 @@
 		} else {
 			return { variant: 'secondary', text: 'Draft', icon: FileText };
 		}
-	}
-
-	function formatTimeRange(startTime: string, endTime: string) {
-		if (!startTime || !endTime) return 'N/A';
-
-		const formatTime = (time: string) => {
-			const [hours, minutes] = time.split(':');
-			const hour = parseInt(hours);
-			const ampm = hour >= 12 ? 'PM' : 'AM';
-			const hour12 = hour % 12 || 12;
-			return `${hour12}:${minutes || '00'} ${ampm}`;
-		};
-
-		return `${formatTime(startTime)} - ${formatTime(endTime)}`;
 	}
 
 	function getCostEstimate() {
@@ -328,12 +316,13 @@
 											</div>
 											<div class="col-span-3">
 												<p class="text-sm text-gray-600">
-													{formatTimeRange(hour.startTime, hour.endTime)}
+													{format(hour.startTime, 'hh:mm a')} - {format(hour.endTime, 'hh:mm a')}
 												</p>
 											</div>
 											<div class="col-span-3">
 												<p class="text-sm text-gray-600">
-													{formatTimeRange(recurrenceDay?.dayStartTime, recurrenceDay?.dayEndTime)}
+													{format(recurrenceDay?.dayStart, 'hh:mm a')} -{' '}
+													{format(recurrenceDay?.dayEnd, 'hh:mm a')}
 												</p>
 											</div>
 											<div class="col-span-2 text-right">
@@ -479,18 +468,6 @@
 														</Button>
 													</div>
 													<p class="mt-2">{discrepancy.details}</p>
-													{#if discrepancy.discrepancyType === 'INVALID_HOURS'}
-														<div class="mt-2 grid grid-cols-2 gap-2 text-sm">
-															<div class="p-2 bg-red-50 rounded">
-																<span class="block text-xs text-red-600">Current Hours</span>
-																<span class="font-medium">12</span>
-															</div>
-															<div class="p-2 bg-green-50 rounded">
-																<span class="block text-xs text-green-600">Suggested Hours</span>
-																<span class="font-medium">8</span>
-															</div>
-														</div>
-													{/if}
 												</div>
 											</div>
 										{/each}
@@ -593,14 +570,16 @@
 								<span>Approve Timesheet</span>
 							</Button>
 
-							<Button
-								variant="outline"
-								class="w-full border-amber-200 text-amber-700 hover:bg-amber-50 gap-2"
-								disabled={!hasDiscrepancies()}
-							>
-								<Shield class="h-4 w-4" />
-								<span>Override Discrepancies</span>
-							</Button>
+							{#if hasDiscrepancies()}
+								<Button
+									variant="outline"
+									class="w-full border-amber-200 text-amber-700 hover:bg-amber-50 gap-2"
+									on:click={() => (overrideDialogOpen = true)}
+								>
+									<Shield class="h-4 w-4" />
+									<span>Override Discrepancies</span>
+								</Button>
+							{/if}
 
 							<Button
 								variant="outline"
@@ -659,56 +638,11 @@
 						provide a reason for this override.
 					</DialogDescription>
 				</DialogHeader>
-
-				<div class="space-y-4">
-					<Alert variant="destructive">
-						<AlertTriangle class="h-4 w-4" />
-						<AlertTitle>Administrative Override</AlertTitle>
-						<AlertDescription>
-							This action will be logged in the audit history and will approve the timesheet as is.
-						</AlertDescription>
-					</Alert>
-
-					<Textarea
-						bind:value={overrideReason}
-						placeholder="Please explain why you're overriding these discrepancies..."
-						rows={4}
-						required
-					/>
-				</div>
-
 				<DialogFooter class="mt-4">
 					<Button variant="outline">Cancel</Button>
 					<Button variant="default" class="bg-amber-600 hover:bg-amber-700">
 						Override & Approve
 					</Button>
-				</DialogFooter>
-			</DialogContent>
-		</Dialog>
-
-		<!-- Rejection Dialog -->
-		<Dialog bind:open={rejectionDialogOpen}>
-			<DialogContent>
-				<DialogHeader>
-					<DialogTitle>Reject Timesheet</DialogTitle>
-					<DialogDescription>
-						Please provide a reason for rejecting this timesheet. This will be sent to the
-						candidate.
-					</DialogDescription>
-				</DialogHeader>
-
-				<div class="space-y-4">
-					<Textarea
-						bind:value={rejectionReason}
-						placeholder="Please explain why this timesheet is being rejected..."
-						rows={4}
-						required
-					/>
-				</div>
-
-				<DialogFooter class="mt-4">
-					<Button variant="outline">Cancel</Button>
-					<Button variant="destructive">Reject Timesheet</Button>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>
@@ -727,16 +661,17 @@
 						data?.timesheet?.status === 'REJECTED' && 'bg-red-500 hover:bg-red-500'
 					)}
 					value={data?.timesheet?.status}
-				>
-					<svelte:component this={statusBadge.icon} class="h-3 w-3" />
-				</Badge>
+				></Badge>
 
-				<!-- {#if hasDiscrepancies()}
-            <Badge variant="outline" class="bg-amber-50 text-amber-800 border-amber-200 gap-1">
-              <AlertTriangle class="h-3 w-3" />
-              {discrepancies.length} Issue{discrepancies.length > 1 ? 's' : ''}
-            </Badge>
-          {/if} -->
+				{#if hasDiscrepancies()}
+					<Badge
+						variant="outline"
+						class="bg-amber-50 text-amber-800 border-amber-200 gap-1"
+						value={`${data.discrepancies?.length} Issue${data.discrepancies?.length > 1 ? 's' : ''}`}
+					>
+						<AlertTriangle class="h-3 w-3" />
+					</Badge>
+				{/if}
 			</div>
 			<p class="text-gray-600 flex items-center mt-1">
 				<Calendar class="h-4 w-4 mr-1" />
@@ -810,7 +745,7 @@
 									</div>
 									<div>
 										<p class="text-xs text-gray-600">Email</p>
-										<p class="text-sm whitespace-pre-line">
+										<p class="text-sm whitespace-pre-line truncate">
 											{data?.timesheet?.candidate?.email || 'No email provided'}
 										</p>
 									</div>
@@ -862,17 +797,21 @@
 										<div class="py-3 grid grid-cols-12 items-center">
 											<div class="col-span-4">
 												<p class="font-medium">
-													{format(parseISO(entry.date), 'EEEE, MMM d, yyyy')}
+													{entry.date}
 												</p>
 											</div>
 											<div class="col-span-3">
 												<p class="text-sm text-gray-600">
-													{formatTimeRange(entry.startTime, entry.endTime)}
+													{format(entry.startTime, 'hh:mm a')} -{' '}
+													{format(entry.endTime, 'hh:mm a')}
 												</p>
 											</div>
 											<div class="col-span-3">
 												<p class="text-sm text-gray-600">
-													{formatTimeRange(recurrenceDay?.dayStartTime, recurrenceDay?.dayEndTime)}
+													{format(recurrenceDay?.dayStart, 'hh:mm a')} - {format(
+														recurrenceDay.dayEnd,
+														'hh:mm a'
+													)}
 												</p>
 											</div>
 											<div class="col-span-2 text-right">
@@ -943,7 +882,7 @@
 			<!-- Sidebar -->
 			<div class="space-y-6">
 				<!-- Approval Actions -->
-				{#if data?.timesheet?.awaitingClientSignature}
+				{#if data?.timesheet?.status !== 'APPROVED'}
 					<Card>
 						<CardHeader>
 							<CardTitle>Timesheet Approval</CardTitle>
@@ -958,7 +897,7 @@
 							<div class="space-y-2">
 								<Button
 									class="w-full bg-green-700 hover:bg-green-800 gap-2"
-									on:click={handleApproveTimesheet}
+									on:click={() => (approvalDialogOpen = true)}
 									disabled={hasDiscrepancies()}
 								>
 									<CheckCircle2 class="h-4 w-4" />
@@ -969,7 +908,7 @@
 									variant="outline"
 									class="w-full border-red-200 text-red-700 hover:bg-red-50 gap-2"
 									on:click={() => (rejectionDialogOpen = true)}
-									disabled={data.timesheet?.status !== 'PENDING'}
+									disabled={data.timesheet?.status === 'APPROVED'}
 								>
 									<X class="h-4 w-4" />
 									<span>Reject Timesheet</span>
@@ -980,11 +919,14 @@
 								<Alert variant="default" class="mt-3">
 									<AlertCircle class="h-4 w-4" />
 									<AlertDescription>
-										{#if data.timesheet?.status === 'PENDING'}
-											This timesheet has unresolved discrepancies. Correct them or use the override
-											function.
+										{#if data.timesheet?.status !== 'APPROVED'}
+											{#if hasDiscrepancies()}
+												This timesheet has unresolved discrepancies.
+											{:else}
+												This timesheet is currently under review
+											{/if}
 										{:else}
-											This timesheet is currently under review
+											This timesheet has been approved.
 										{/if}
 									</AlertDescription>
 								</Alert>
@@ -1003,7 +945,7 @@
 									<p class="font-medium text-green-800">Timesheet Approved</p>
 									<p class="text-sm text-green-700">
 										This timesheet was approved on {format(
-											parseISO(new Date(data?.timesheet?.updatedAt).toISOString()),
+											parseISO(data?.timesheet?.updatedAt.toISOString()),
 											'MMM d, yyyy'
 										)}
 									</p>
