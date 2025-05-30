@@ -1,19 +1,15 @@
 <script lang="ts">
-	import AdminRequisitionForm from '$lib/views/admin/requisitions/newRequisitionFormAdmin.svelte';
-	import CompanyRequisitionForm from '$lib/views/client/companyRequisitionForm.svelte';
 	import { Tabs, TabItem } from 'flowbite-svelte';
 	import type { PageData } from './$types';
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import { cn } from '$lib/utils';
+
 	import { USER_ROLES } from '$lib/config/constants';
 	import {
-		adminRequisitionSchema,
-		// clientRequisitionSchema,
 		type AdminRequisitionSchema,
 		type ClientRequisitionSchema
 	} from '$lib/config/zod-schemas';
-	import { ArrowUpNarrowWide, ArrowDownWideNarrow } from 'lucide-svelte';
+	import { ArrowUpNarrowWide, ArrowDownWideNarrow, Plus } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import {
@@ -32,10 +28,11 @@
 		RequisitionDetailsRaw,
 		RequisitionResults
 	} from '$lib/server/database/queries/requisitions';
+	import AddRequisitionDrawer from '$lib/components/drawers/addRequisitionDrawer.svelte';
 
 	export let data: PageData;
-	export let adminForm: SuperValidated<AdminRequisitionSchema>;
-	export let clientForm: SuperValidated<ClientRequisitionSchema>;
+	export let adminForm: SuperValidated<AdminRequisitionSchema> | null = null;
+
 	const total = 10;
 
 	let drawerExpanded: boolean = false;
@@ -43,6 +40,7 @@
 
 	$: user = data.user;
 	$: requisitions = data.requisitions;
+	$: clientForm = data.clientForm as SuperValidated<ClientRequisitionSchema>;
 
 	$: count = data.count;
 	$: sortOn = $page.url.searchParams.get('sortOn');
@@ -237,9 +235,17 @@
 <section class="grow h-screen overflow-y-auto p-6 flex flex-col gap-6">
 	<div class=" flex items-center justify-between flex-wrap">
 		<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">Requisitions</h1>
-		<Button class="bg-blue-900 hover:bg-blue-800" on:click={() => (drawerExpanded = true)}
-			>New Requisition</Button
-		>
+		{#if user?.role !== USER_ROLES.SUPERADMIN}
+			<Button
+				on:click={() => {
+					drawerExpanded = true;
+				}}
+				class="bg-blue-800 hover:bg-blue-900 text-white"
+			>
+				<Plus class="inline mr-2" size={18} />
+				New Requisition
+			</Button>
+		{/if}
 	</div>
 	<div class="">
 		<Tabs
@@ -722,24 +728,4 @@
 	</div>
 </section>
 
-<!-- TODO: Need to ensure that if drawer is not open, then anything in the drawer is not able to have positive tabIndex -->
-<div
-	class={cn(
-		'transition-all duration-300 absolute w-full max-w-[500px] top-0 bottom-0 z-30 bg-white shadow-lg h-screen overflow-hidden flex flex-col',
-		drawerExpanded ? 'right-0' : '-right-[500px]'
-	)}
->
-	<div class="p-4 border-b border-b-gray-200">
-		<p class="text-xl font-bold">Create New Requisition</p>
-	</div>
-	{#if drawerExpanded}
-		{#if user?.role === USER_ROLES.SUPERADMIN}
-			<AdminRequisitionForm form={adminForm} schema={adminRequisitionSchema} bind:drawerExpanded />
-		{/if}
-		{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
-			<CompanyRequisitionForm form={clientForm} bind:drawerExpanded />
-		{/if}
-	{:else}
-		<div></div>
-	{/if}
-</div>
+<AddRequisitionDrawer {user} bind:drawerExpanded {clientForm} adminForm={adminForm ?? null} />

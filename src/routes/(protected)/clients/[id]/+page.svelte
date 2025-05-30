@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ClientCompanyLocation } from '$lib/server/database/schemas/client';
-	import { CANDIDATE_STATUS, USER_ROLES } from '$lib/config/constants';
+	import { CANDIDATE_STATUS, STAFF_ROLE_ENUM, USER_ROLES } from '$lib/config/constants';
 	import type { PageData } from './$types';
 	import convertNameToInitials from '$lib/_helpers/convertNameToInitials';
 	import { getDayName } from '$lib/_helpers';
@@ -11,6 +11,7 @@
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs';
 	import {
 		Dialog,
+		DialogClose,
 		DialogContent,
 		DialogDescription,
 		DialogFooter,
@@ -58,7 +59,9 @@
 		Plus,
 		Receipt,
 		User,
-		Users
+		Users,
+		CalendarDays,
+		UserMinus
 	} from 'lucide-svelte';
 
 	// Table library
@@ -76,11 +79,43 @@
 	import { onMount } from 'svelte';
 	import Calendar from '$lib/components/calendar/calendar.svelte';
 	import { cn } from '$lib/utils';
+	import type { CalendarEvent } from '$lib/types';
+	import { goto } from '$app/navigation';
 
 	export let data: PageData;
 	let initials: string = '';
 	let locationTableData: ClientCompanyLocation[] = [];
 	let showInvoiceDialog = false;
+	let selectedEvent: CalendarEvent | null = null;
+	let dialogOpen: boolean = false;
+	let detailsDialogOpen: boolean = false;
+	let selectedProfile: StaffProfileData | null = null;
+	let tableData: StaffProfileData[] = [];
+
+	type StaffProfileData = {
+		profile: {
+			id: string;
+			userId: string;
+			createdAt: Date;
+			updatedAt: Date;
+			birthday: string | null;
+			clientId: string;
+			companyId: string;
+			staffRole: 'CLIENT_ADMIN' | 'CLIENT_MANAGER' | 'CLIENT_EMPLOYEE' | null;
+		};
+		user: {
+			id: string;
+			firstName: string;
+			lastName: string;
+			email: string;
+			avatarUrl: string;
+		};
+	};
+
+	const selectEvent = (event: CalendarEvent) => {
+		selectedEvent = event;
+		dialogOpen = true;
+	};
 
 	// Invoice form state
 	let invoiceForm = {
@@ -97,6 +132,10 @@
 	$: isAdmin = user?.role === USER_ROLES.SUPERADMIN;
 	$: client = data.client;
 	$: locations = data.client?.locations || [];
+	$: requisitions = data.requisitions || [];
+	$: supportTickets = data.supportTickets || [];
+	$: staff = data.staff || [];
+
 	$: {
 		locationTableData = locations;
 	}
@@ -151,26 +190,23 @@
 		getCoreRowModel: getCoreRowModel(),
 		getSortedRowModel: getSortedRowModel()
 	});
+	$: {
+		locationTableData = (locations as ClientCompanyLocation[]) ?? [];
+		locationOptions.update((o) => ({ ...o, data: locationTableData }));
+
+		tableData = (staff as StaffProfileData[]) || [];
+		options.update((o) => ({ ...o, data: tableData }));
+	}
 
 	onMount(() => {
 		locationTableData = (locations as ClientCompanyLocation[]) ?? [];
 		locationOptions.update((o) => ({ ...o, data: locationTableData }));
+
+		tableData = (staff as StaffProfileData[]) || [];
+		options.update((o) => ({ ...o, data: tableData }));
 	});
 
 	const locationTable = createSvelteTable(locationOptions);
-
-	// Helper functions
-	const formatTime = (time: string): string => {
-		if (!time) return '';
-		const [hours, minutes] = time.split(':');
-		const date = new Date();
-		date.setHours(parseInt(hours), parseInt(minutes));
-		return date.toLocaleTimeString('en-US', {
-			hour: 'numeric',
-			minute: '2-digit',
-			hour12: true
-		});
-	};
 
 	function handleCreateInvoice() {
 		// Handle invoice creation logic here
@@ -200,6 +236,46 @@
 		invoiceForm.items = [...invoiceForm.items];
 		invoiceForm.amount = invoiceForm.items.reduce((total, item) => total + item.amount, 0);
 	}
+
+	const staffColumns: ColumnDef<StaffProfileData>[] = [
+		{
+			header: 'Name',
+			id: 'last_name',
+			accessorFn: (original) => `${original.user.lastName}, ${original.user.firstName}`
+		},
+		{
+			header: 'Email',
+			id: 'email',
+			accessorFn: (original) => original.user.email
+		},
+		{
+			header: 'Role',
+			id: 'role',
+			accessorFn: (original) => {
+				const role = original.profile.staffRole as keyof typeof STAFF_ROLE_ENUM;
+				return STAFF_ROLE_ENUM[role];
+			}
+		}
+	];
+
+	const options = writable<TableOptions<StaffProfileData>>({
+		data: tableData,
+		columns: staffColumns,
+		getCoreRowModel: getCoreRowModel(),
+		getSortedRowModel: getSortedRowModel()
+	});
+
+	const handleViewStaff = (profile: StaffProfileData) => {
+		selectedProfile = profile;
+		detailsDialogOpen = true;
+	};
+
+	const handleCloseDetailsDialog = () => {
+		detailsDialogOpen = false;
+		selectedProfile = null;
+	};
+
+	const table = createSvelteTable(options);
 </script>
 
 {#if client}
@@ -266,22 +342,6 @@
 									>{client.user.email}</a
 								>
 							</div>
-
-							{#if client.profile?.cellPhone}
-								<div class="flex items-center gap-2">
-									<Phone class="h-4 w-4 text-gray-500" />
-									<span>{client.profile.cellPhone}</span>
-								</div>
-							{/if}
-
-							{#if client.profile?.address && client.profile?.city && client.profile?.state}
-								<div class="flex items-center gap-2">
-									<MapPin class="h-4 w-4 text-gray-500" />
-									<span
-										>{client.profile.address}, {client.profile.city}, {client.profile.state}</span
-									>
-								</div>
-							{/if}
 						</div>
 					</div>
 				</div>
@@ -402,7 +462,7 @@
 
 			<!-- Tabs section -->
 			<Tabs class="w-full">
-				<TabsList class="w-full md:w-auto grid grid-cols-2 md:grid-cols-5 gap-2">
+				<TabsList class="w-full md:w-auto grid grid-cols-2 md:grid-cols-4 gap-2 h-fit">
 					<TabsTrigger value="profile" class="flex items-center gap-2">
 						<Users class="h-4 w-4" />
 						<span class="hidden md:inline">Profile</span>
@@ -414,10 +474,6 @@
 					<TabsTrigger value="requisitions" class="flex items-center gap-2">
 						<ClipboardList class="h-4 w-4" />
 						<span class="hidden md:inline">Requisitions</span>
-					</TabsTrigger>
-					<TabsTrigger value="documents" class="flex items-center gap-2">
-						<FileText class="h-4 w-4" />
-						<span class="hidden md:inline">Documents</span>
 					</TabsTrigger>
 					<TabsTrigger value="support" class="flex items-center gap-2">
 						<MessageSquare class="h-4 w-4" />
@@ -451,48 +507,6 @@
 							</CardContent>
 						</Card>
 
-						<!-- Hours of Operation -->
-						{#if client.company?.operatingHours}
-							<Card class="w-full max-w-none col-span-4 md:col-span-2">
-								<CardHeader>
-									<CardTitle class="flex items-center gap-2">
-										<Clock class="h-5 w-5 text-blue-600" />
-										<span>Hours of Operation</span>
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									<div class="space-y-1">
-										{#each Array.from({ length: 7 }, (_, i) => i) as dayIndex}
-											<div
-												class="flex justify-between py-1 text-sm border-b border-gray-100 last:border-0"
-											>
-												<span class="font-medium text-gray-700">
-													{getDayName(dayIndex)}
-												</span>
-												<span class="text-gray-600">
-													{#if client?.company?.operatingHours?.[dayIndex]?.isClosed}
-														<span class="text-gray-500">Closed</span>
-													{:else}
-														{formatTime(client?.company?.operatingHours?.[dayIndex]?.openTime)} - {formatTime(
-															client?.company?.operatingHours?.[dayIndex]?.closeTime
-														)}
-													{/if}
-												</span>
-											</div>
-										{/each}
-										{#if client?.company?.operatingHours?.[1]?.timezone}
-											<div class="mt-1 text-xs text-gray-500">
-												All times shown in {client?.company?.operatingHours?.[1].timezone.replace(
-													'_',
-													' '
-												)}
-											</div>
-										{/if}
-									</div>
-								</CardContent>
-							</Card>
-						{/if}
-
 						<!-- Billing Information -->
 						<Card class="w-full max-w-none col-span-4 md:col-span-2">
 							<CardHeader>
@@ -518,7 +532,7 @@
 						</Card>
 
 						<!-- Recent Invoices -->
-						<Card class="w-full max-w-none col-span-4 md:col-span-2">
+						<Card class="w-full max-w-none col-span-4">
 							<CardHeader class="flex flex-row items-center justify-between">
 								<CardTitle class="flex items-center gap-2">
 									<Receipt class="h-5 w-5 text-blue-600" />
@@ -593,6 +607,59 @@
 								</CardFooter>
 							{/if}
 						</Card>
+
+						<!-- Staff -->
+						<Card class="w-full max-w-none col-span-4">
+							<CardHeader class="flex flex-row items-center justify-between">
+								<CardTitle class="flex items-center gap-2">
+									<Receipt class="h-5 w-5 text-blue-600" />
+									<span>Client Staff</span>
+								</CardTitle>
+							</CardHeader>
+							<CardContent>
+								<Table class="bg-white">
+									<TableHeader>
+										{#each $table.getHeaderGroups() as headerGroup}
+											<TableRow>
+												{#each headerGroup.headers as header}
+													<TableHead>
+														<svelte:component
+															this={flexRender(header.column.columnDef.header, header.getContext())}
+														/>
+													</TableHead>
+												{/each}
+											</TableRow>
+										{/each}
+									</TableHeader>
+									<TableBody>
+										{#each $table.getRowModel().rows as row}
+											<TableRow>
+												{#each row.getVisibleCells() as cell}
+													<TableCell>
+														<svelte:component
+															this={flexRender(cell.column.columnDef.cell, cell.getContext())}
+														/>
+													</TableCell>
+												{/each}
+												<!-- Add Actions column -->
+												<TableCell>
+													<div class="flex justify-end gap-2">
+														<Button
+															on:click={() => handleViewStaff(row.getAllCells()[0].row.original)}
+															variant="ghost"
+															size="icon"
+															class="h-8 w-8"
+														>
+															<Eye class="h-4 w-4" />
+														</Button>
+													</div>
+												</TableCell>
+											</TableRow>
+										{/each}
+									</TableBody>
+								</Table>
+							</CardContent>
+						</Card>
 					</div>
 				</TabsContent>
 
@@ -655,11 +722,13 @@
 													{/each}
 													<TableCell class="text-right">
 														<div class="flex justify-end gap-2">
-															<Button variant="ghost" size="icon" class="h-8 w-8">
+															<Button
+																href={`/clients/${client.profile.id}/locations/${row.getAllCells()[0].row.original.id}`}
+																variant="ghost"
+																size="icon"
+																class="h-8 w-8"
+															>
 																<Eye class="h-4 w-4" />
-															</Button>
-															<Button variant="ghost" size="icon" class="h-8 w-8">
-																<Edit class="h-4 w-4" />
 															</Button>
 														</div>
 													</TableCell>
@@ -686,37 +755,7 @@
 							{/if}
 						</CardHeader>
 						<CardContent>
-							<Calendar events={[]} selectEvent={() => {}} />
-						</CardContent>
-					</Card>
-				</TabsContent>
-
-				<!-- Documents Tab -->
-				<TabsContent value="documents" class="mt-6">
-					<Card class="w-full max-w-none">
-						<CardHeader class="flex flex-row items-center justify-between">
-							<CardTitle>Client Documents</CardTitle>
-							{#if isAdmin}
-								<Button size="sm" class="gap-1">
-									<FilePlus class="h-4 w-4" />
-									<span>Upload Document</span>
-								</Button>
-							{/if}
-						</CardHeader>
-						<CardContent>
-							<div class="flex flex-col items-center justify-center py-8 text-center">
-								<FileText class="h-12 w-12 text-gray-300 mb-2" />
-								<h3 class="text-lg font-medium">No Documents</h3>
-								<p class="text-sm text-gray-500 mb-4">
-									This client doesn't have any documents yet.
-								</p>
-								{#if isAdmin}
-									<Button variant="outline" size="sm" class="gap-1">
-										<FilePlus class="h-4 w-4" />
-										<span>Upload First Document</span>
-									</Button>
-								{/if}
-							</div>
+							<Calendar events={requisitions} {selectEvent} />
 						</CardContent>
 					</Card>
 				</TabsContent>
@@ -726,29 +765,134 @@
 					<Card class="w-full max-w-none">
 						<CardHeader class="flex flex-row items-center justify-between">
 							<CardTitle>Support Tickets</CardTitle>
-							<Button size="sm" class="gap-1">
-								<Plus class="h-4 w-4" />
-								<span>New Ticket</span>
-							</Button>
 						</CardHeader>
 						<CardContent>
-							<div class="flex flex-col items-center justify-center py-8 text-center">
-								<MessageSquare class="h-12 w-12 text-gray-300 mb-2" />
-								<h3 class="text-lg font-medium">No Support Tickets</h3>
-								<p class="text-sm text-gray-500 mb-4">
-									This client doesn't have any support tickets.
-								</p>
-								<Button variant="outline" size="sm" class="gap-1">
-									<Plus class="h-4 w-4" />
-									<span>Create First Ticket</span>
-								</Button>
-							</div>
+							{#if supportTickets.length > 0}
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>Title</TableHead>
+											<TableHead>Status</TableHead>
+											<TableHead>Created At</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{#each supportTickets as ticket}
+											<TableRow
+												class="cursor-pointer"
+												on:click={() => goto(`/support/ticket/${ticket.id}`)}
+											>
+												<TableCell>{ticket.title}</TableCell>
+												<TableCell>
+													<Badge
+														variant="default"
+														value={ticket.status}
+														class={cn(
+															ticket.status === 'NEW' && 'bg-yellow-300',
+															ticket.status === 'PENDING' && 'bg-green-500',
+															ticket.status === 'CLOSED' && 'bg-gray-400',
+															'text-white'
+														)}
+													/>
+												</TableCell>
+												<TableCell>{new Date(ticket.createdAt).toLocaleDateString()}</TableCell>
+											</TableRow>
+										{/each}
+									</TableBody>
+								</Table>
+							{:else}
+								<div class="flex flex-col items-center justify-center py-8 text-center">
+									<AlertCircle class="h-12 w-12 text-gray-300 mb-2" />
+									<h3 class="text-lg font-medium">No Support Tickets</h3>
+									<p class="text-sm text-gray-500 mb-4">
+										This client doesn't have any support tickets yet.
+									</p>
+								</div>
+							{/if}
 						</CardContent>
 					</Card>
 				</TabsContent>
 			</Tabs>
 		</div>
 	</section>
+	<Dialog open={dialogOpen} onOpenChange={() => (dialogOpen = !dialogOpen)}>
+		<DialogContent>
+			<DialogHeader>
+				<DialogTitle class="text-xl text-left">{selectedEvent?.title}</DialogTitle>
+				<DialogDescription>
+					<div class="flex items-center gap-2">
+						<img
+							src={selectedEvent?.extendedProps.requisition.client.companyLogo}
+							class="w-10 h-10 rounded-full shadow-lg"
+							alt="company logo"
+						/>
+						<span>{selectedEvent?.extendedProps.requisition.client.companyName}</span>
+					</div>
+				</DialogDescription>
+			</DialogHeader>
+
+			{#if selectedEvent?.extendedProps.type === 'RECURRENCE_DAY'}
+				<p class="font-semibold">Date & Time</p>
+				<div class="flex items-center gap-2 text-gray-500">
+					<CalendarDays size={18} />
+					{new Date(selectedEvent.start).toLocaleDateString()}
+				</div>
+				<div class="flex items-center gap-2 text-gray-500">
+					<Clock size={18} />
+					<span
+						>{new Date(selectedEvent.start).toLocaleTimeString()} - {new Date(
+							selectedEvent.end
+						).toLocaleTimeString()}</span
+					>
+				</div>
+				<DialogFooter>
+					<a href={`/requisitions/${selectedEvent?.resourceIds?.[0]}`}>
+						<Button type="button" class="ml-auto mt-4">View Requisition</Button>
+					</a>
+				</DialogFooter>
+			{/if}
+		</DialogContent>
+	</Dialog>
+
+	<Dialog bind:open={detailsDialogOpen}>
+		<DialogContent>
+			<DialogHeader>
+				<DialogTitle>Staff Details</DialogTitle>
+			</DialogHeader>
+			<div>
+				{#if selectedProfile}
+					<div class="space-y-4">
+						<p>
+							<strong>Name:</strong>
+							{selectedProfile.user.firstName}
+							{selectedProfile.user.lastName}
+						</p>
+						<p><strong>Email:</strong> {selectedProfile.user.email}</p>
+						{#if selectedProfile.profile.staffRole}
+							<p>
+								<strong>Role:</strong>
+								{STAFF_ROLE_ENUM[selectedProfile.profile.staffRole]}
+							</p>
+						{/if}
+						<p><strong>Birthday:</strong> {selectedProfile.profile.birthday || 'N/A'}</p>
+						<p>
+							<strong>Created At:</strong>
+							{new Date(selectedProfile.profile.createdAt).toLocaleDateString()}
+						</p>
+					</div>
+				{:else}
+					<p>No staff profile selected.</p>
+				{/if}
+			</div>
+			<DialogFooter>
+				<DialogClose asChild>
+					<Button on:click={handleCloseDetailsDialog} variant="outline" type="button" class="w-full"
+						>Close</Button
+					>
+				</DialogClose>
+			</DialogFooter>
+		</DialogContent>
+	</Dialog>
 {:else}
 	<section
 		class="container mx-auto px-4 py-6 flex flex-col items-center text-center sm:justify-center gap-4 md:gap-6"

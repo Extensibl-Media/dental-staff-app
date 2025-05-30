@@ -10,6 +10,7 @@ import {
 	type UpdateSubregion
 } from '../schemas/region';
 import type { PaginateOptions } from '$lib/types';
+import { error } from '@sveltejs/kit';
 
 export type RegionRaw = {
 	id: string;
@@ -67,6 +68,13 @@ export async function getPaginatedRegions({
 
 export async function getAllRegions() {
 	return await db.select().from(regionTable);
+}
+
+export async function getRegionById(regionId: string | null | undefined) {
+	if (!regionId) throw error(400, 'Region ID is required');
+	const [result] = await db.select().from(regionTable).where(eq(regionTable.id, regionId));
+
+	return result;
 }
 
 export async function getRegionByAbbreviation(abbreviation: string) {

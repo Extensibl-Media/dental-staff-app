@@ -9,6 +9,8 @@ import {
 } from '../schemas/admin';
 import { userTable } from '../schemas/auth';
 import { error } from '@sveltejs/kit';
+import { getClientProfileById } from './clients';
+import { getUserById } from './users';
 
 export interface SupportTicketResult {
 	supportTicket: SupportTicket;
@@ -50,6 +52,28 @@ export async function getAllSupportTickets() {
 		.from(supportTicketTable)
 		.innerJoin(userTable, eq(supportTicketTable.reportedById, userTable.id))
 		.orderBy(desc(supportTicketTable.createdAt));
+}
+
+export async function getSupportTicketsForClient(clientId: string | undefined) {
+	if (!clientId) return error(400, 'Client ID required');
+
+	const client = await getClientProfileById(clientId);
+	if (!client) return error(404, 'Client not found');
+
+	const clientUser = await getUserById(client.user.id);
+	if (!clientUser) return error(404, 'Client not found');
+
+	try {
+		const tickets = await db
+			.select()
+			.from(supportTicketTable)
+			.where(eq(supportTicketTable.reportedById, clientUser.user.id));
+
+		return tickets;
+	} catch (err) {
+		console.log(err);
+		return error(500, `${err}`);
+	}
 }
 
 export async function getSupportTicketsForUser(userID?: string) {

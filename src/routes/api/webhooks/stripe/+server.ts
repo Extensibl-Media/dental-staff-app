@@ -23,16 +23,7 @@ import {
 	getTimesheetDetails
 } from '$lib/server/database/queries/requisitions';
 
-function toBuffer(ab: ArrayBuffer): Buffer {
-	const buf = Buffer.alloc(ab.byteLength);
-	const view = new Uint8Array(ab);
-	for (let i = 0; i < buf.length; i++) {
-		buf[i] = view[i];
-	}
-	return buf;
-}
-
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request }) => {
 	console.log('Webhook received');
 	console.log('Webhook Secret: ', STRIPE_WEBHOOK_SECRET);
 

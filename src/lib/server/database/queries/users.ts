@@ -34,15 +34,12 @@ export const createUser = async (values: User, tx?: any) => {
 	try {
 		const query = tx || db; // Use transaction if provided, otherwise use db
 
-		const [user] = await query
-			.insert(userTable)
-			.values(values)
-			.returning();
+		const [user] = await query.insert(userTable).values(values).returning();
 
 		return user;
 	} catch (err) {
-		console.log(err)
-		throw new Error(`Error creating new user: ${err}`)
+		console.log(err);
+		throw new Error(`Error creating new user: ${err}`);
 	}
 };
 

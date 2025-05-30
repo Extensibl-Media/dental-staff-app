@@ -7,6 +7,7 @@ import { candidateProfileTable } from '$lib/server/database/schemas/candidate';
 import {
 	recurrenceDayTable,
 	requisitionTable,
+	timeSheetTable,
 	workdayTable
 } from '$lib/server/database/schemas/requisition';
 import {
@@ -62,7 +63,8 @@ export const GET: RequestHandler = async ({ request }) => {
 				city: companyOfficeLocationTable.city,
 				state: companyOfficeLocationTable.state,
 				zip: companyOfficeLocationTable.zipcode
-			}
+			},
+			timesheet: { ...timeSheetTable }
 		})
 		.from(workdayTable)
 		.innerJoin(recurrenceDayTable, eq(recurrenceDayTable.id, workdayTable.recurrenceDayId))
@@ -72,6 +74,7 @@ export const GET: RequestHandler = async ({ request }) => {
 			eq(requisitionTable.locationId, companyOfficeLocationTable.id)
 		)
 		.innerJoin(clientCompanyTable, eq(requisitionTable.companyId, clientCompanyTable.id))
+		.leftJoin(timeSheetTable, eq(timeSheetTable.workdayId, workdayTable.id))
 		.where(eq(workdayTable.candidateId, candidateProfile.id));
 
 	return json({ success: true, data: workdays }, { headers: corsHeaders });

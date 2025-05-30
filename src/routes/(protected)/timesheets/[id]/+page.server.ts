@@ -28,6 +28,7 @@ import db from '$lib/server/database/drizzle';
 import { desc, eq } from 'drizzle-orm';
 import { adminConfigTable } from '$lib/server/database/schemas/config';
 import { actionHistoryTable } from '$lib/server/database/schemas/admin';
+import { redirectIfNotValidCustomer } from '$lib/server/database/queries/billing';
 
 export const load = async (event: RequestEvent) => {
 	const user = event.locals.user;
@@ -64,7 +65,7 @@ export const load = async (event: RequestEvent) => {
 
 	if (user.role === USER_ROLES.CLIENT) {
 		const client = await getClientProfilebyUserId(user.id);
-		const company = await getClientCompanyByClientId(client.id);
+		await redirectIfNotValidCustomer(client.id, user.role);
 
 		const timesheet = await getTimesheetDetails(id, client.id);
 		const requisition = await getRequisitionDetailsById(timesheet.requisitionId);
@@ -85,7 +86,7 @@ export const load = async (event: RequestEvent) => {
 	}
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
 		const client = await getClientProfileByStaffUserId(user.id);
-		const company = await getClientCompanyByClientId(client?.id);
+		await redirectIfNotValidCustomer(client?.id, user.role);
 
 		const timesheet = await getTimesheetDetails(id, client?.id);
 		const requisition = await getRequisitionDetailsById(timesheet.requisitionId);

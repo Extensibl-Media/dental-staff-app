@@ -3,11 +3,22 @@ import { eq } from 'drizzle-orm';
 import db from '../drizzle';
 import { clientSubscriptionTable } from '../schemas/client';
 import { stripe } from '$lib/server/stripe';
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import type Stripe from 'stripe';
 import { getUserByEmail } from './users';
 import { getClientProfilebyUserId } from './clients';
 import { userTable } from '../schemas/auth';
+import { USER_ROLES } from '$lib/config/constants';
+
+export type SubscriptionStatus =
+	| 'incomplete'
+	| 'incomplete_expired'
+	| 'trialing'
+	| 'active'
+	| 'past_due'
+	| 'canceled'
+	| 'unpaid'
+	| 'paused';
 
 export async function getClientBillingInfo(clientId: string | undefined) {
 	if (!clientId) return error(500, 'Must provide client id');
@@ -248,5 +259,43 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
 	} catch (error) {
 		console.error('Error in handleCheckoutCompleted:', error);
 		throw error;
+	}
+}
+
+export async function checkCustomerSubscriptionStatus(
+	clientId: string
+): Promise<SubscriptionStatus | null> {
+	if (!clientId) {
+		throw error(400, 'Client ID is required');
+	}
+	const [clientSubscription] = await db
+		.select({ status: clientSubscriptionTable.status })
+		.from(clientSubscriptionTable)
+		.where(eq(clientSubscriptionTable.clientId, clientId))
+		.limit(1);
+
+	if (!clientSubscription) {
+		return null;
+	}
+
+	return clientSubscription.status as SubscriptionStatus;
+}
+
+export async function redirectIfNotValidCustomer(clientId: string | undefined, role: string) {
+	if (!clientId) {
+		throw error(400, 'Client ID is required');
+	}
+	const status = await checkCustomerSubscriptionStatus(clientId);
+	switch (role) {
+		case USER_ROLES.CLIENT:
+			if (status !== 'active') {
+				redirect(302, '/settings?tab=BILLING&role=CLIENT');
+			}
+			break;
+		case USER_ROLES.CLIENT_STAFF:
+			if (status !== 'active') {
+				redirect(302, '/dashboard');
+			}
+			break;
 	}
 }

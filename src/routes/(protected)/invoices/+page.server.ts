@@ -6,6 +6,7 @@ import {
 	getClientProfileByStaffUserId
 } from '$lib/server/database/queries/clients';
 import { getClientInvoices } from '$lib/server/database/queries/requisitions';
+import { redirectIfNotValidCustomer } from '$lib/server/database/queries/billing';
 
 export const load: PageServerLoad = async (event) => {
 	const user = event.locals.user;
@@ -16,6 +17,7 @@ export const load: PageServerLoad = async (event) => {
 
 	if (user.role === USER_ROLES.CLIENT) {
 		const client = await getClientProfilebyUserId(user.id);
+		await redirectIfNotValidCustomer(client.id, user.role);
 
 		const invoices = await getClientInvoices(client?.id);
 
@@ -27,6 +29,7 @@ export const load: PageServerLoad = async (event) => {
 	}
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
 		const client = await getClientProfileByStaffUserId(user.id);
+		await redirectIfNotValidCustomer(client?.id, user.role);
 
 		const invoices = await getClientInvoices(client?.id);
 

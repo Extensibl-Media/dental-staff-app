@@ -1,8 +1,12 @@
 <script lang="ts">
 	import ViewLink from './../../../../lib/components/tables/ViewLink.svelte';
 	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/ui/tabs/index.js';
-	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
+	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
+	import * as Select from '$lib/components/ui/select';
+	import { STATES } from '$lib/config/constants';
+	import { Save, X } from 'lucide-svelte';
+	import { superForm } from 'sveltekit-superforms/client';
 	import { onMount } from 'svelte';
 	import { writable } from 'svelte/store';
 	import {
@@ -15,7 +19,7 @@
 	} from '@tanstack/svelte-table';
 	import Badge from '$lib/components/ui/badge/badge.svelte';
 	import { cn } from '$lib/utils';
-	import { STAFF_ROLE_ENUM } from '$lib/config/constants';
+	import { STAFF_ROLE_ENUM, USER_ROLES } from '$lib/config/constants';
 	import { Button } from '$lib/components/ui/button';
 	import type { PageData } from './$types';
 	import InviteStaffToLocationDialog from '$lib/components/dialogs/inviteStaffToLocationDialog.svelte';
@@ -47,6 +51,10 @@
 		AlertCircle
 	} from 'lucide-svelte';
 	import { getDayName } from '$lib/_helpers';
+	import AddRequisitionDrawer from '$lib/components/drawers/addRequisitionDrawer.svelte';
+	import { clientRequisitionSchema, type ClientRequisitionSchema } from '$lib/config/zod-schemas';
+	import { formatTimeForDisplay, formatTimeString } from '$lib/_helpers/UTCTimezoneUtils';
+	import type { SuperValidated } from 'sveltekit-superforms';
 
 	type StaffProfileData = {
 		profile: {
@@ -87,9 +95,14 @@
 	$: allStaff = data.allStaff;
 	$: assignForm = data.assignForm;
 	$: staffDialogOpen = false;
+	$: user = data.user;
+	$: clientForm = data.clientForm;
 
 	let staffTableData: StaffProfileData[] = [];
 	let requisitionTableData: RequisitionData[] = [];
+	let drawerExpanded = false;
+	let selectedState = location?.state || '';
+	let selectedTimezone = location?.timezone || '';
 
 	const staffColumns: ColumnDef<StaffProfileData>[] = [
 		// {
@@ -201,6 +214,50 @@
 	};
 	const staffTable = createSvelteTable(staffOptions);
 	const requisitionsTable = createSvelteTable(requisitionOptions);
+
+	const {
+		form: locationForm,
+		enhance: addressEnhance,
+		submitting: isAddressSubmitting,
+		errors: addressErrors
+	} = superForm(data.locationForm, {
+		onResult: ({ result }) => {
+			if (result.type === 'success') {
+				editingLocation = false;
+			}
+		}
+	});
+
+	const {
+		form: hoursForm,
+		enhance: hoursEnhance,
+		submitting: isHoursSubmitting,
+		errors: hoursErrors
+	} = superForm(data.operatingHoursForm, {
+		onResult: ({ result }) => {
+			if (result.type === 'success') {
+				editingHours = false;
+			}
+		}
+	});
+
+	// Edit state tracking
+	let editingLocation = false;
+	let editingHours = false;
+
+	function cancelEdit(section) {
+		switch (section) {
+			case 'location':
+				editingLocation = false;
+				break;
+			case 'hours':
+				editingHours = false;
+				break;
+		}
+	}
+
+	$: JSONHours = JSON.parse($hoursForm.operatingHours) || {};
+	$: stringifiedHours = JSON.stringify($hoursForm.operatingHours) || {};
 </script>
 
 {#if location}
@@ -235,108 +292,374 @@
 
 				<!-- Details Tab -->
 				<TabsContent value="details" class="mt-6">
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-						<!-- Location Information -->
-						<Card class="w-full max-w-none">
+					<div class="grid grid-cols-4 gap-6">
+						<Card class="w-full max-w-none col-span-4 md:col-span-2">
 							<CardHeader>
-								<CardTitle class="text-blue-600 flex items-center gap-2">
-									<Building class="h-5 w-5" />
-									Location Information
-								</CardTitle>
-							</CardHeader>
-							<CardContent class="space-y-4">
-								<div>
-									<h3 class="text-sm font-medium">Address:</h3>
-									<p>{location?.streetOne} {location?.streetTwo || ''}</p>
-									<p>{location?.city}, {location?.state}</p>
+								<div class="flex items-center justify-between">
+									<CardTitle class="text-blue-600 flex items-center gap-2">
+										<Building class="h-5 w-5" />
+										Location Information
+									</CardTitle>
+									{#if !editingLocation}
+										<Button variant="ghost" size="sm" on:click={() => (editingLocation = true)}>
+											<Edit class="h-4 w-4" />
+										</Button>
+									{/if}
 								</div>
-
-								<div>
-									<h3 class="text-sm font-medium">Contact Information:</h3>
-									<div class="flex items-center gap-2 mt-1">
-										<Phone class="h-4 w-4 text-gray-500" />
-										<span>{location?.companyPhone || 'No phone number'}</span>
-									</div>
-									<div class="flex items-center gap-2 mt-1">
-										<Mail class="h-4 w-4 text-gray-500" />
-										<a href={`mailto:${location?.email}`} class="text-blue-600 hover:underline">
-											{location?.email || 'No email address'}
-										</a>
-									</div>
-								</div>
-
-								<div>
-									<h3 class="text-sm font-medium">Company:</h3>
-									<p>{company?.companyName || 'Unknown'}</p>
-								</div>
-							</CardContent>
-							<CardFooter>
-								<Button variant="default" class="gap-1">
-									<Edit class="h-4 w-4" />
-									Edit Details
-								</Button>
-							</CardFooter>
-						</Card>
-
-						<!-- Map Preview -->
-						<Card class="w-full max-w-none">
-							<CardHeader>
-								<CardTitle class="text-blue-600 flex items-center gap-2">
-									<MapPin class="h-5 w-5" />
-									Map Location
-								</CardTitle>
 							</CardHeader>
 							<CardContent>
-								<div class="bg-gray-100 h-48 rounded-md flex items-center justify-center">
-									<div class="text-center">
-										<MapPin class="h-12 w-12 mx-auto text-gray-400 mb-2" />
-										<p class="text-sm text-gray-500">Map preview not available</p>
+								{#if editingLocation}
+									<form
+										method="POST"
+										use:addressEnhance
+										action="?/updateLocationDetails"
+										class="space-y-4"
+									>
+										{#if $addressErrors}
+											<div class="text-red-500 text-sm">
+												{#each Object.values($addressErrors) as error}
+													<p>{error}</p>
+												{/each}
+											</div>
+										{/if}
+
+										<div class="space-y-2">
+											<Label for="name">Location Name</Label>
+											<Input
+												id="name"
+												name="name"
+												bind:value={$locationForm.name}
+												placeholder="Enter location name"
+											/>
+										</div>
+
+										<div class="space-y-2">
+											<Label for="streetOne">Street Address</Label>
+											<Input
+												id="streetOne"
+												name="streetOne"
+												bind:value={$locationForm.streetOne}
+												placeholder="Enter street address"
+											/>
+										</div>
+
+										<div class="space-y-2">
+											<Label for="streetTwo">Street Address Line 2</Label>
+											<Input
+												id="streetTwo"
+												name="streetTwo"
+												bind:value={$locationForm.streetTwo}
+												placeholder="Apartment, suite, etc. (optional)"
+											/>
+										</div>
+
+										<div class="grid grid-cols-2 gap-4">
+											<div class="space-y-2">
+												<Label for="city">City</Label>
+												<Input
+													id="city"
+													name="city"
+													bind:value={$locationForm.city}
+													placeholder="Enter city"
+												/>
+											</div>
+											<div class="space-y-2">
+												<Label for="state">State</Label>
+												<Select.Root
+													preventScroll={false}
+													selected={selectedState}
+													onSelectedChange={(v) => {
+														v && ($locationForm.state = String(v.value));
+													}}
+												>
+													<Select.Trigger>
+														<Select.Value />
+													</Select.Trigger>
+													<Select.Content class="max-h-[150px] overflow-y-scroll">
+														{#each STATES as state}
+															<Select.Item value={state.abbreviation}>
+																<span>{state.abbreviation}</span>
+															</Select.Item>
+														{/each}
+													</Select.Content>
+													<Input type="hidden" value={$locationForm.state} name="state" />
+												</Select.Root>
+											</div>
+											<div class="space-y-2">
+												<Label for="timezone">Timezone</Label>
+												<Select.Root
+													preventScroll={false}
+													selected={selectedTimezone}
+													onSelectedChange={(v) => {
+														v && ($locationForm.timezone = String(v.value));
+													}}
+												>
+													<Select.Trigger>
+														<Select.Value />
+													</Select.Trigger>
+													<Select.Content class="max-h-[150px] overflow-y-scroll">
+														{#each Intl.supportedValuesOf('timeZone') as timezone}
+															<Select.Item value={timezone}>
+																<span>{timezone}</span>
+															</Select.Item>
+														{/each}
+													</Select.Content>
+													<Input name="timezone" type="hidden" value={$locationForm.timezone} />
+												</Select.Root>
+											</div>
+										</div>
+
+										<div class="space-y-2">
+											<Label for="zipcode">ZIP Code</Label>
+											<Input
+												id="zipcode"
+												name="zipcode"
+												bind:value={$locationForm.zipcode}
+												placeholder="Enter ZIP code"
+											/>
+										</div>
+
+										<div class="space-y-2">
+											<Label for="companyPhone">Office Phone</Label>
+											<Input
+												id="companyPhone"
+												name="companyPhone"
+												bind:value={$locationForm.companyPhone}
+												placeholder="Enter office phone number"
+											/>
+										</div>
+
+										<div class="space-y-2">
+											<Label for="email">Email Address</Label>
+											<Input
+												id="email"
+												name="email"
+												type="email"
+												bind:value={$locationForm.email}
+												placeholder="Enter email address"
+											/>
+										</div>
+
+										<div class="flex gap-2 pt-4">
+											<Button
+												type="submit"
+												size="sm"
+												class="gap-2 bg-green-500 hover:bg-green-600 text-white"
+												disabled={$isAddressSubmitting}
+											>
+												<Save class="h-4 w-4" />
+												{$isAddressSubmitting ? 'Saving...' : 'Save Changes'}
+											</Button>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												on:click={() => cancelEdit('location')}
+												class="gap-2 border-red-500 text-red-500 hover:bg-red-50 hover:text-red-500"
+											>
+												<X class="h-4 w-4" />
+												Cancel
+											</Button>
+										</div>
+									</form>
+								{:else}
+									<div class="space-y-4">
+										<div>
+											<h3 class="text-sm font-medium text-muted-foreground">Address</h3>
+											<address class="mt-1 not-italic">
+												{#if location?.streetOne}
+													{location.streetOne}<br />
+												{/if}
+												{#if location?.streetTwo}
+													{location.streetTwo}<br />
+												{/if}
+												{#if location?.city && location?.state}
+													{location.city}, {location.state}
+												{/if}
+												{#if location?.zipcode}
+													{location.zipcode}
+												{/if}
+											</address>
+										</div>
+
+										<div>
+											<h3 class="text-sm font-medium text-muted-foreground">Contact Information</h3>
+											<div class="mt-2 space-y-2">
+												{#if location?.companyPhone}
+													<div class="flex items-center gap-2">
+														<Phone class="h-4 w-4 text-gray-500" />
+														<a
+															href={`tel:${location.companyPhone}`}
+															class="text-blue-600 hover:underline"
+														>
+															{location.companyPhone}
+														</a>
+													</div>
+												{/if}
+
+												{#if location?.email}
+													<div class="flex items-center gap-2">
+														<Mail class="h-4 w-4 text-gray-500" />
+														<a
+															href={`mailto:${location.email}`}
+															class="text-blue-600 hover:underline"
+														>
+															{location.email}
+														</a>
+													</div>
+												{/if}
+
+												{#if !location?.companyPhone && !location?.email}
+													<p class="text-sm text-muted-foreground">
+														No contact information available
+													</p>
+												{/if}
+											</div>
+										</div>
+
+										<div>
+											<h3 class="text-sm font-medium text-muted-foreground">Company</h3>
+											<p class="mt-1">{company?.companyName || 'Unknown'}</p>
+										</div>
 									</div>
-								</div>
+								{/if}
 							</CardContent>
-							<CardFooter>
-								<Button variant="outline" size="sm" class="gap-1">
-									<ExternalLink class="h-4 w-4" />
-									Open in Maps
-								</Button>
-							</CardFooter>
 						</Card>
 
-						<!-- Hours of Operation (if available) -->
-						{#if company?.operatingHours}
-							<Card class="w-full max-w-none">
-								<CardHeader>
+						<Card class="w-full max-w-none col-span-4 md:col-span-2">
+							<CardHeader>
+								<div class="flex items-center justify-between">
 									<CardTitle class="text-blue-600 flex items-center gap-2">
 										<Clock class="h-5 w-5" />
 										Hours of Operation
 									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									<div class="space-y-1">
-										{#each Object.entries(company.operatingHours) as [day, hours]}
-											<div
-												class="flex justify-between py-1 text-sm border-b border-gray-100 last:border-0"
+									{#if !editingHours}
+										<Button variant="ghost" size="sm" on:click={() => (editingHours = true)}>
+											<Edit class="h-4 w-4" />
+										</Button>
+									{/if}
+								</div>
+							</CardHeader>
+							<CardContent>
+								{#if editingHours}
+									<form
+										use:hoursEnhance
+										method="POST"
+										action="?/updateOperatingHours"
+										class="space-y-4"
+									>
+										{#each Array.from({ length: 7 }, (_, i) => i) as dayIndex}
+											<div class="space-y-2">
+												<Label>{getDayName(dayIndex)}</Label>
+												<div class="grid grid-cols-3 gap-2 items-center">
+													<div class="space-y-1">
+														<Label for={`open-${dayIndex}`} class="text-xs">Open Time</Label>
+														<Input
+															id={`open-${dayIndex}`}
+															type="time"
+															value={formatTimeString(JSONHours[dayIndex]?.openTime) || ''}
+															disabled={JSONHours[dayIndex]?.isClosed}
+															on:change={(e) => {
+																let hours = JSONHours;
+																hours[dayIndex].openTime = formatTimeString(e.target.value);
+																$hoursForm.operatingHours = JSON.stringify(hours);
+															}}
+														/>
+													</div>
+													<div class="space-y-1">
+														<Label for={`close-${dayIndex}`} class="text-xs">Close Time</Label>
+														<Input
+															id={`close-${dayIndex}`}
+															type="time"
+															value={formatTimeString(JSONHours[dayIndex]?.closeTime) || ''}
+															disabled={JSONHours[dayIndex]?.isClosed}
+															on:change={(e) => {
+																let hours = JSONHours;
+																hours[dayIndex].closeTime = formatTimeString(e.target.value);
+																$hoursForm.operatingHours = JSON.stringify(hours);
+															}}
+														/>
+													</div>
+													<div class="space-y-1">
+														<Label class="text-xs">Closed</Label>
+														<input
+															type="checkbox"
+															checked={JSONHours[dayIndex].isClosed}
+															class="h-4 w-4"
+															on:change={(e) => {
+																let hours = JSONHours;
+																hours[dayIndex].isClosed = e.target?.checked;
+
+																$hoursForm.operatingHours = JSON.stringify(hours);
+															}}
+														/>
+													</div>
+												</div>
+											</div>
+										{/each}
+										<input type="hidden" name="operatingHours" bind:value={stringifiedHours} />
+										{#if $hoursErrors}
+											<div class="text-red-500 text-sm">
+												{#each Object.values($hoursErrors) as error}
+													<p>{error}</p>
+												{/each}
+											</div>
+										{/if}
+										<div class="flex gap-2 pt-4">
+											<Button type="submit" size="sm" class="gap-2 bg-green-500 hover:bg-green-600">
+												<Save class="h-4 w-4" />
+												{#if $isHoursSubmitting}
+													Saving...
+												{:else}
+													Save Changes
+												{/if}
+											</Button>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												on:click={() => cancelEdit('hours')}
+												class="gap-2 text-red-500 border-red-500 hover:bg-red-50 hover:text-red-500"
 											>
-												<span class="font-medium text-gray-700">
-													{getDayName(+day)}
+												<X class="h-4 w-4" />
+												Cancel
+											</Button>
+										</div>
+									</form>
+								{:else}
+									<div class="space-y-3">
+										{#each Array.from({ length: 7 }, (_, i) => i) as dayIndex}
+											<div
+												class="flex justify-between items-center py-2 border-b border-gray-100 last:border-0"
+											>
+												<span class="font-medium text-gray-700 w-24">
+													{getDayName(dayIndex)}
 												</span>
 												<span class="text-gray-600">
-													{#if hours.isClosed}
-														<span class="text-gray-500">Closed</span>
-													{:else if company?.operatingHours?.[+day].isClosed}
-														<span class="text-gray-500">Closed</span>
+													{#if location?.operatingHours?.[dayIndex]?.isClosed}
+														<span class="text-red-500 font-medium">Closed</span>
+													{:else if location?.operatingHours?.[dayIndex]?.openTime && location.operatingHours[dayIndex]?.closeTime}
+														<span class="font-medium">
+															{formatTimeForDisplay(location.operatingHours[dayIndex].openTime)} - {formatTimeForDisplay(
+																location.operatingHours[dayIndex].closeTime
+															)}
+														</span>
 													{:else}
-														{formatTime(company?.operatingHours?.[+day].openTime)} - {formatTime(
-															company?.operatingHours?.[+day].closeTime
-														)}
+														<span class="text-muted-foreground">Hours not set</span>
 													{/if}
 												</span>
 											</div>
 										{/each}
+
+										{#if location?.timezone}
+											<div class="pt-2 text-xs text-muted-foreground border-t">
+												All times shown in {location.timezone.replace('_', ' ')}
+											</div>
+										{/if}
 									</div>
-								</CardContent>
-							</Card>
-						{/if}
+								{/if}
+							</CardContent>
+						</Card>
 					</div>
 				</TabsContent>
 
@@ -426,10 +749,17 @@
 					<Card class="w-full max-w-none">
 						<CardHeader class="flex flex-row items-center justify-between">
 							<CardTitle>Location Requisitions</CardTitle>
-							<Button size="sm" class="gap-1">
-								<Plus class="h-4 w-4" />
-								<span>New Requisition</span>
-							</Button>
+							{#if user?.role !== USER_ROLES.SUPERADMIN}
+								<Button
+									on:click={() => {
+										drawerExpanded = true;
+									}}
+									class="bg-blue-800 hover:bg-blue-900 text-white"
+								>
+									<Plus class="inline mr-2" size={18} />
+									New Requisition
+								</Button>
+							{/if}
 						</CardHeader>
 						<CardContent>
 							{#if requisitionTableData.length === 0}
@@ -485,6 +815,7 @@
 			</Tabs>
 		</div>
 	</section>
+	<AddRequisitionDrawer {user} bind:drawerExpanded {clientForm} {location} />
 {:else}
 	<section
 		class="container mx-auto px-4 py-6 flex flex-col items-center text-center sm:justify-center gap-4 md:gap-6"

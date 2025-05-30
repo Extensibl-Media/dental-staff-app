@@ -1239,6 +1239,33 @@ export async function getTimesheetDetailsAdmin(timesheetId: string) {
 
 	return timesheet;
 }
+
+export async function closeAllRecurrenceDays(requisitionId: number | undefined, userId: string) {
+	if (!requisitionId) throw error(400, 'Requisition ID is required');
+	try {
+		const result = await db
+			.update(recurrenceDayTable)
+			.set({ status: 'CANCELED', updatedAt: new Date() })
+			.where(eq(recurrenceDayTable.requisitionId, requisitionId))
+			.returning();
+
+		for (const day of result) {
+			await writeActionHistory({
+				table: 'RECURRENCE_DAYS',
+				userId,
+				action: 'UPDATE',
+				entityId: day.id,
+				beforeState: day,
+				afterState: { ...day, status: 'CANCELED', updatedAt: new Date() }
+			});
+		}
+
+		return result;
+	} catch (err) {
+		console.error('Error closing recurrence days:', err);
+		throw error(500, `Error closing recurrence days: ${err}`);
+	}
+}
 export async function getTimesheetDetails(timesheetId: string, clientId: string | undefined) {
 	if (!clientId) throw error(400, 'Client ID required');
 	const [timesheet] = await db

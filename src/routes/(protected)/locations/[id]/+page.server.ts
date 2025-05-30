@@ -3,19 +3,29 @@ import type { PageServerLoad } from './$types';
 import { USER_ROLES } from '$lib/config/constants';
 import {
 	addStaffToLocation,
-	getAllClientStaffProfiles,
+	getAllClientStaffProfilesForLocation,
 	getClientCompanyByClientId,
 	getClientProfileByStaffUserId,
 	getClientProfilebyUserId,
 	getClientStaffProfilebyClientId,
 	getLocationByIdForCompany,
-	getStaffProfilesForLocation
+	getStaffProfilesForLocation,
+	updateCompanyLocation
 } from '$lib/server/database/queries/clients';
 import type { ClientProfile } from '$lib/server/database/schemas/client';
 import { getRequsitionsForLocation } from '$lib/server/database/queries/requisitions';
 import { message, setError, superValidate } from 'sveltekit-superforms/server';
 import { z } from 'zod';
 import { setFlash } from 'sveltekit-flash-message/server';
+import {
+	NewAddressSchema,
+	ContactSchema,
+	OperatingHoursSchema,
+	LocationSchema,
+	ClientLocationDetailsSchema,
+	clientRequisitionSchema
+} from '$lib/config/zod-schemas';
+import { redirectIfNotValidCustomer } from '$lib/server/database/queries/billing';
 
 const assignStaffToLocationSchema = z.object({
 	staffId: z.string(),
@@ -29,44 +39,92 @@ export const load: PageServerLoad = async (event) => {
 	const { id } = event.params;
 
 	if (!user) {
-		redirect(301, '/sign-in');
+		redirect(301, '/auth/sign-in');
 	}
+
+	if (user.role === USER_ROLES.SUPERADMIN) {
+		redirect(301, '/dashboard');
+	}
+
 	const form = await superValidate(event, assignStaffToLocationSchema);
+	const locationForm = await superValidate(event, ClientLocationDetailsSchema);
+	const operatingHoursForm = await superValidate(event, OperatingHoursSchema);
+	const clientForm = await superValidate(event, clientRequisitionSchema);
 
-	if (user.role === USER_ROLES.CLIENT || user.role === USER_ROLES.CLIENT_STAFF) {
-		const client: ClientProfile | null =
-			user.role === USER_ROLES.CLIENT
-				? await getClientProfilebyUserId(user.id)
-				: await getClientProfileByStaffUserId(user.id);
+	if (user.role === USER_ROLES.CLIENT) {
+		const client = await getClientProfilebyUserId(user.id);
+		await redirectIfNotValidCustomer(client.id, user.role);
 
-		if (client) {
-			const company = await getClientCompanyByClientId(client.id);
-			const location = await getLocationByIdForCompany(id, company.id);
-			const requisitions = await getRequsitionsForLocation(location.id);
-			const locationStaff = await getStaffProfilesForLocation(location.id);
-			const staff = await getAllClientStaffProfiles(company.id, location.id);
+		const company = await getClientCompanyByClientId(client?.id);
+		const location = await getLocationByIdForCompany(id, company.id);
+		const requisitions = await getRequsitionsForLocation(location.id);
+		const locationStaff = await getStaffProfilesForLocation(location.id);
+		const staff = await getAllClientStaffProfilesForLocation(company.id, location.id);
 
-			return {
-				user,
-				client,
-				company,
-				location,
-				requisitions,
-				locationStaff,
-				allStaff: staff,
-				assignForm: form
-			};
-		} else
-			return {
-				user,
-				client: null,
-				company: null,
-				location: null,
-				requisitions: null,
-				locationStaff: null,
-				allStaff: null,
-				assignForm: null
-			};
+		locationForm.data = {
+			name: location.name || '',
+			timezone: location.timezone || 'America/New_York',
+			streetOne: location.streetOne || '',
+			streetTwo: location.streetTwo || '',
+			city: location.city || '',
+			state: location.state || '',
+			zipcode: location.zipcode || '',
+			companyPhone: location.companyPhone || '',
+			email: location.email || ''
+		};
+		operatingHoursForm.data = {
+			operatingHours: JSON.stringify(location.operatingHours || {})
+		};
+
+		return {
+			user: user,
+			client: client || null,
+			company: company || null,
+			location: location || null,
+			requisitions: requisitions || [],
+			locationStaff: locationStaff || [],
+			allStaff: staff || [],
+			assignForm: form,
+			locationForm,
+			operatingHoursForm,
+			clientForm
+		};
+	}
+	if (user.role === USER_ROLES.CLIENT_STAFF) {
+		const client = await getClientProfileByStaffUserId(user.id);
+		await redirectIfNotValidCustomer(client?.id, user.role);
+		const company = await getClientCompanyByClientId(client?.id);
+		const location = await getLocationByIdForCompany(id, company.id);
+		const requisitions = await getRequsitionsForLocation(location.id);
+		const locationStaff = await getClientStaffProfilebyClientId(client?.id);
+		const staff = await getAllClientStaffProfilesForLocation(company.id, location.id);
+		locationForm.data = {
+			name: location.name || '',
+			timezone: location.timezone || 'America/New_York',
+			streetOne: location.streetOne || '',
+			streetTwo: location.streetTwo || '',
+			city: location.city || '',
+			state: location.state || '',
+			zipcode: location.zipcode || '',
+			companyPhone: location.companyPhone || '',
+			email: location.email || ''
+		};
+		operatingHoursForm.data = {
+			operatingHours: JSON.stringify(location.operatingHours || {})
+		};
+		return {
+			user: user,
+			client: client || null,
+			company: company || null,
+			location: location || null,
+			requisitions: requisitions || [],
+			locationStaff: locationStaff || [],
+			allStaff: staff || [],
+			assignForm: form,
+			locationForm,
+			operatingHoursForm,
+			clientForm
+		};
 	}
 };
 
@@ -112,6 +170,111 @@ export const actions = {
 				event
 			);
 			return { form, success: false };
+		}
+	},
+	updateLocationDetails: async (event) => {
+		const user = event.locals.user;
+		if (!user) {
+			redirect(302, '/auth/sign-in');
+		}
+		const form = await superValidate(event, ClientLocationDetailsSchema);
+
+		if (!form.valid) {
+			return fail(400, { form });
+		}
+		const { id } = event.params;
+
+		const { streetOne, streetTwo, city, state, zipcode, name, email, companyPhone, timezone } =
+			form.data;
+
+		const details = {
+			streetOne,
+			streetTwo: streetTwo || '',
+			city,
+			state,
+			zipcode,
+			timezone,
+			companyPhone,
+			email,
+			name
+		};
+
+		try {
+			await updateCompanyLocation(id, details);
+			setFlash(
+				{
+					type: 'success',
+					message: 'Location details updated successfully'
+				},
+				event
+			);
+			return { form };
+		} catch (error) {
+			console.error('Error updating location details:', error);
+			setFlash(
+				{
+					type: 'error',
+					message: 'Failed to update location details. Please try again.'
+				},
+				event
+			);
+			return { form };
+		}
+	},
+	updateOperatingHours: async (event) => {
+		const user = event.locals.user;
+		if (!user) {
+			redirect(302, '/auth/sign-in');
+		}
+		const form = await superValidate(event, OperatingHoursSchema);
+		console.log('Operating hours form data:', form, form.data);
+
+		if (!form.valid) {
+			return fail(400, { form });
+		}
+
+		let jsonHours: Record<
+			string,
+			{ openTime: string; closeTime: string; isClosed: boolean; timezone: string }
+		>;
+
+		try {
+			jsonHours = JSON.parse(form.data.operatingHours);
+		} catch (error) {
+			console.error('Invalid JSON format for operating hours:', error);
+			setError(form, 'operatingHours', 'Invalid JSON format for operating hours');
+			setFlash(
+				{
+					type: 'error',
+					message: 'Invalid JSON format for operating hours'
+				},
+				event
+			);
+			return { form };
+		}
+		const { id } = event.params;
+
+		try {
+			console.log('Updating operating hours:', jsonHours);
+			await updateCompanyLocation(id, { operatingHours: jsonHours });
+			setFlash(
+				{
+					type: 'success',
+					message: 'Operating hours updated successfully'
+				},
+				event
+			);
+			return { form };
+		} catch (err) {
+			console.error('Error updating operating hours:', err);
+			setFlash(
+				{
+					type: 'error',
+					message: 'Failed to update operating hours. Please try again.'
+				},
+				event
+			);
+			return { form };
 		}
 	}
 };

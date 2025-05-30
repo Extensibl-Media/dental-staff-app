@@ -8,9 +8,11 @@ import {
 	companyOfficeLocationTable,
 	type ClientCompany,
 	type ClientCompanyLocation,
+	type ClientCompanyLocationSelect,
 	type ClientCompanyStaffProfile,
 	type ClientProfile,
 	type NewClientCompanyStaffLocation,
+	type OperatingHours,
 	type UpdateClientProfile
 } from '../schemas/client';
 import {
@@ -97,7 +99,7 @@ export type StaffLocation = {
 	zipcode: string | null;
 	companyPhone: string | null;
 	cellPhone: string | null;
-	hoursOfOperation: string | null;
+	operatingHours: OperatingHours | null;
 	email: string | null;
 	regionId: string | null;
 	isPrimary: boolean | null;
@@ -221,6 +223,7 @@ export async function getClientProfileById(clientId: string) {
 		.select({
 			profile: { ...clientProfileTable },
 			user: {
+				id: userTable.id,
 				firstName: userTable.firstName,
 				lastName: userTable.lastName,
 				email: userTable.email,
@@ -316,13 +319,14 @@ export async function getClientStaffProfilebyUserId(userId: string) {
 	}
 }
 
-export async function getClientStaffProfilebyClientId(clientId: string) {
-	const result = await db
+export async function getClientStaffProfilebyClientId(clientId: string | undefined) {
+	if (!clientId) throw error(400, 'Missing client id');
+	const [result] = await db
 		.select()
 		.from(clientStaffProfileTable)
 		.where(eq(clientStaffProfileTable.clientId, clientId));
 
-	return result[0];
+	return result;
 }
 
 export async function getClientStaffProfilesCount(companyId: string) {
@@ -333,7 +337,11 @@ export async function getClientStaffProfilesCount(companyId: string) {
 
 	return countResult[0].value;
 }
-export async function getAllClientStaffProfiles(companyId: string, currentLocationId: string) {
+
+export async function getAllClientStaffProfilesForLocation(
+	companyId: string,
+	currentLocationId: string
+) {
 	const results = await db
 		.select({
 			profile: { ...clientStaffProfileTable },
@@ -363,6 +371,24 @@ export async function getAllClientStaffProfiles(companyId: string, currentLocati
 				)
 			)
 		);
+
+	return results;
+}
+export async function getAllClientStaffProfiles(companyId: string) {
+	const results = await db
+		.select({
+			profile: { ...clientStaffProfileTable },
+			user: {
+				id: userTable.id,
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				email: userTable.email,
+				avatarUrl: userTable.avatarUrl
+			}
+		})
+		.from(clientStaffProfileTable)
+		.innerJoin(userTable, eq(clientStaffProfileTable.userId, userTable.id))
+		.where(eq(clientStaffProfileTable.companyId, companyId));
 
 	return results;
 }
@@ -484,7 +510,9 @@ export async function getLocationByIdForCompany(locationId: string, companyId: s
 	return result[0] || null;
 }
 
-export async function getAllClientLocationsByCompanyId(companyId: string) {
+export async function getAllClientLocationsByCompanyId(
+	companyId: string
+): Promise<ClientCompanyLocationSelect[]> {
 	const results = await db
 		.select()
 		.from(companyOfficeLocationTable)
@@ -558,6 +586,28 @@ export async function createCompanyLocation(values: ClientCompanyLocation) {
 	}
 }
 
+export async function updateCompanyLocation(
+	locationId: string | undefined,
+	values: Partial<ClientCompanyLocation>
+) {
+	if (!locationId) throw error(400, 'Location ID is required for update');
+	try {
+		const [result] = await db
+			.update(companyOfficeLocationTable)
+			.set({ ...values, updatedAt: new Date() })
+			.where(eq(companyOfficeLocationTable.id, locationId))
+			.returning();
+		if (!result) {
+			return null;
+		} else {
+			return result;
+		}
+	} catch (err) {
+		console.error('Error updating company location:', err);
+		throw error(500, 'Error updating company location');
+	}
+}
+
 // export async function createCompanyStaffProfile(values: ClientCompanyStaffProfile) { }
 
 export async function getStaffProfilesForLocation(locationId: string) {
@@ -597,7 +647,7 @@ export async function getLocationsForStaffUser(staffId: string): Promise<StaffLo
 				zipcode: companyOfficeLocationTable.zipcode,
 				companyPhone: companyOfficeLocationTable.companyPhone,
 				cellPhone: companyOfficeLocationTable.cellPhone,
-				hoursOfOperation: companyOfficeLocationTable.hoursOfOperation,
+				operatingHours: companyOfficeLocationTable.operatingHours,
 				email: companyOfficeLocationTable.email,
 				regionId: companyOfficeLocationTable.regionId,
 				isPrimary: clientStaffLocationTable.isPrimary

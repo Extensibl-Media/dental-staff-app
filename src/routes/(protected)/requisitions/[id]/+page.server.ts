@@ -10,7 +10,8 @@ import {
 	getRequisitionDetailsById,
 	getRequisitionTimesheets,
 	getRequisitionDetailsForAdmin,
-	getRequisitionDetailsByIdAdmin
+	getRequisitionDetailsByIdAdmin,
+	closeAllRecurrenceDays
 } from '$lib/server/database/queries/requisitions';
 import { fail, redirect } from '@sveltejs/kit';
 import { message, setError, superValidate } from 'sveltekit-superforms/server';
@@ -30,6 +31,7 @@ import {
 import type { ClientCompanyStaffProfile } from '$lib/server/database/schemas/client';
 import { convertRecurrenceDayToUTC, getUserTimezone } from '$lib/_helpers/UTCTimezoneUtils';
 import { setFlash } from 'sveltekit-flash-message/server';
+import { redirectIfNotValidCustomer } from '$lib/server/database/queries/billing';
 
 export const load: PageServerLoad = async (event: RequestEvent) => {
 	const user = event.locals.user;
@@ -76,6 +78,9 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 
 	if (user.role === USER_ROLES.CLIENT) {
 		const client = await getClientProfilebyUserId(user.id);
+
+		await redirectIfNotValidCustomer(client.id, user.role);
+
 		const company = await getClientCompanyByClientId(client.id);
 		const result = await getRequisitionDetailsById(idAsNum);
 		const requisitionApplications = await getRequisitionApplications(
@@ -102,8 +107,11 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 		};
 	}
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
-		const profile: ClientCompanyStaffProfile | null = await getClientStaffProfilebyUserId(user.id);
 		const client = await getClientProfileByStaffUserId(user.id);
+
+		await redirectIfNotValidCustomer(client?.id, user.role);
+
+		const profile: ClientCompanyStaffProfile | null = await getClientStaffProfilebyUserId(user.id);
 		const company = await getClientCompanyByClientId(client?.id);
 		const result = await getRequisitionDetailsById(idAsNum);
 		const requisitionApplications = await getRequisitionApplications(idAsNum);
@@ -152,10 +160,26 @@ export const actions = {
 			};
 
 			await changeRequisitionStatus(values, Number(requisitionId), user.id);
-
+			if (status === 'CANCELED') {
+				await closeAllRecurrenceDays(Number(requisitionId), user.id);
+			}
+			setFlash(
+				{
+					type: 'success',
+					message: 'Requisition status updated successfully'
+				},
+				request
+			);
 			return message(form, 'Status Updated');
 		} catch (error) {
 			console.log(error);
+			setFlash(
+				{
+					type: 'error',
+					message: 'Failed to update requisition status'
+				},
+				request
+			);
 			return setError(form, 'Something went wrong');
 		}
 	},

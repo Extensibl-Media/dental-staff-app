@@ -63,7 +63,7 @@
 			time: '8:15 AM',
 			date: 'Today',
 			title: 'Support ticket resolved',
-			description: 'Amanda Taylor\'s login issue was resolved',
+			description: "Amanda Taylor's login issue was resolved",
 			icon: CheckCircle2,
 			color: 'bg-green-500'
 		},
@@ -79,7 +79,7 @@
 			time: '2:30 PM',
 			date: 'Yesterday',
 			title: 'Timesheet discrepancy flagged',
-			description: 'Discrepancy in Emily Davis\'s timesheet',
+			description: "Discrepancy in Emily Davis's timesheet",
 			icon: AlertCircle,
 			color: 'bg-orange-500'
 		},
@@ -158,7 +158,7 @@
 
 <section class="min-h-screen bg-gray-50">
 	<!-- Header area -->
-	<div class="px-6 py-4 bg-white shadow-sm border-b border-gray-200">
+	<!-- <div class="px-6 py-4 bg-white shadow-sm border-b border-gray-200">
 		<div class="flex justify-between items-center max-w-7xl mx-auto">
 			<h1 class="text-2xl font-bold text-gray-900">
 				<span class="text-blue-600">Admin</span> Dashboard
@@ -175,7 +175,7 @@
 				</div>
 			</div>
 		</div>
-	</div>
+	</div> -->
 
 	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 		<!-- Welcome and date -->
@@ -198,13 +198,15 @@
 							<p class="text-gray-500 text-sm font-medium">Timesheets Due</p>
 							<div class="flex items-baseline mt-1">
 								<p class="text-4xl font-bold text-gray-900">{timesheetsDueCount}</p>
-								<span class={`ml-2 ${getTrendColorClass(timesheetsTrendPercent)} text-sm font-medium flex items-center`}>
+								<span
+									class={`ml-2 ${getTrendColorClass(timesheetsTrendPercent)} text-sm font-medium flex items-center`}
+								>
 									{formatTrendValue(timesheetsTrendPercent)}
-									{#if timesheetsTrendPercent > 0 }
+									{#if timesheetsTrendPercent > 0}
 										<TrendingUp size={16} class="ml-1" />
-										{:else}
+									{:else}
 										<TrendingUp size={16} class="ml-1 transform rotate-180" />
-										{/if}
+									{/if}
 								</span>
 							</div>
 							<p class="text-gray-400 text-xs mt-1">vs. previous period</p>
@@ -230,13 +232,15 @@
 							<p class="text-gray-500 text-sm font-medium">Discrepancies</p>
 							<div class="flex items-baseline mt-1">
 								<p class="text-4xl font-bold text-gray-900">{timesheetDiscrepancies}</p>
-								<span class={`ml-2 ${getTrendColorClass(discrepanciesTrendPercent)} text-sm font-medium flex items-center`}>
+								<span
+									class={`ml-2 ${getTrendColorClass(discrepanciesTrendPercent)} text-sm font-medium flex items-center`}
+								>
 									{formatTrendValue(discrepanciesTrendPercent)}
-									{#if discrepanciesTrendPercent > 0 }
+									{#if discrepanciesTrendPercent > 0}
 										<TrendingUp size={16} class="ml-1" />
-										{:else}
+									{:else}
 										<TrendingUp size={16} class="ml-1 transform rotate-180" />
-										{/if}
+									{/if}
 								</span>
 							</div>
 							<p class="text-gray-400 text-xs mt-1">vs. previous period</p>
@@ -246,7 +250,11 @@
 						</div>
 					</div>
 					<div class="mt-4">
-						<Button variant="link" class="text-orange-600 p-0 h-auto" href="/timesheets/discrepancies">
+						<Button
+							variant="link"
+							class="text-orange-600 p-0 h-auto"
+							href="/timesheets/discrepancies"
+						>
 							Review discrepancies
 							<ArrowRight size={16} class="ml-1" />
 						</Button>
@@ -262,13 +270,15 @@
 							<p class="text-gray-500 text-sm font-medium">Support Tickets</p>
 							<div class="flex items-baseline mt-1">
 								<p class="text-4xl font-bold text-gray-900">{supportTicketsCount}</p>
-								<span class={`ml-2 ${getTrendColorClass(supportTicketsTrendPercent)} text-sm font-medium flex items-center`}>
+								<span
+									class={`ml-2 ${getTrendColorClass(supportTicketsTrendPercent)} text-sm font-medium flex items-center`}
+								>
 									{formatTrendValue(supportTicketsTrendPercent)}
-									{#if supportTicketsTrendPercent > 0 }
+									{#if supportTicketsTrendPercent > 0}
 										<TrendingUp size={16} class="ml-1" />
-										{:else}
+									{:else}
 										<TrendingUp size={16} class="ml-1 transform rotate-180" />
-										{/if}
+									{/if}
 								</span>
 							</div>
 							<p class="text-gray-400 text-xs mt-1">vs. previous period</p>
@@ -296,19 +306,19 @@
 					<div class="flex border-b border-gray-200">
 						<button
 							class={`flex-1 py-4 px-4 text-center font-medium ${activeTab === 'timesheets' ? 'text-blue-600 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700'}`}
-							on:click={() => activeTab = 'timesheets'}
+							on:click={() => (activeTab = 'timesheets')}
 						>
 							Timesheets with Issues
 						</button>
 						<button
 							class={`flex-1 py-4 px-4 text-center font-medium ${activeTab === 'tickets' ? 'text-blue-600 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700'}`}
-							on:click={() => activeTab = 'tickets'}
+							on:click={() => (activeTab = 'tickets')}
 						>
 							Support Tickets
 						</button>
 						<button
 							class={`flex-1 py-4 px-4 text-center font-medium ${activeTab === 'messages' ? 'text-blue-600 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700'}`}
-							on:click={() => activeTab = 'messages'}
+							on:click={() => (activeTab = 'messages')}
 						>
 							Recent Messages
 						</button>
@@ -327,17 +337,24 @@
 								</Table.Header>
 								<Table.Body>
 									{#each timesheetsWithDiscrepancies.slice(0, 5) as timesheet, i (timesheet.id)}
-										<Table.Row class="cursor-pointer hover:bg-gray-50" on:click={() => goto(`/timesheets/${timesheet.id}`)}>
+										<Table.Row
+											class="cursor-pointer hover:bg-gray-50"
+											on:click={() => goto(`/timesheets/${timesheet.id}`)}
+										>
 											<Table.Cell>
 												<span class="font-medium text-gray-900">{timesheet.requisition.title}</span>
 											</Table.Cell>
 											<Table.Cell>
-												{timesheet.candidate?.firstName} {timesheet.candidate?.lastName}
+												{timesheet.candidate?.firstName}
+												{timesheet.candidate?.lastName}
 											</Table.Cell>
 											<Table.Cell>
 												<div class="flex items-center text-gray-500">
 													<Clock size={14} class="mr-1" />
-													{format(parse(timesheet.weekBeginDate, 'yyyy-MM-dd', new Date()), "MMM d")}
+													{format(
+														parse(timesheet.weekBeginDate, 'yyyy-MM-dd', new Date()),
+														'MMM d'
+													)}
 												</div>
 											</Table.Cell>
 											<Table.Cell class="text-right">
@@ -368,12 +385,16 @@
 								</Table.Header>
 								<Table.Body>
 									{#each supportTickets.slice(0, 5) as ticket, i (ticket.id)}
-										<Table.Row class="cursor-pointer hover:bg-gray-50" on:click={() => goto(`/support/ticket/${ticket.id}`)}>
+										<Table.Row
+											class="cursor-pointer hover:bg-gray-50"
+											on:click={() => goto(`/support/ticket/${ticket.id}`)}
+										>
 											<Table.Cell>
 												<span class="font-medium text-gray-900">{ticket.title}</span>
 											</Table.Cell>
 											<Table.Cell>
-												{ticket.user.firstName} {ticket.user.lastName}
+												{ticket.user.firstName}
+												{ticket.user.lastName}
 											</Table.Cell>
 											<Table.Cell>
 												<div class="flex items-center text-gray-500">
@@ -382,10 +403,7 @@
 												</div>
 											</Table.Cell>
 											<Table.Cell class="text-right">
-												<Badge
-													value={ticket.status}
-													class={getStatusColorClass(ticket.status)}
-												/>
+												<Badge value={ticket.status} class={getStatusColorClass(ticket.status)} />
 											</Table.Cell>
 										</Table.Row>
 									{/each}
@@ -409,9 +427,14 @@
 								</Table.Header>
 								<Table.Body>
 									{#each recentMessages.slice(0, 5) as message, i (message.id)}
-										<Table.Row class="cursor-pointer hover:bg-gray-50" on:click={() => goto(`/messages/${message.id}`)}>
+										<Table.Row
+											class="cursor-pointer hover:bg-gray-50"
+											on:click={() => goto(`/messages/${message.id}`)}
+										>
 											<Table.Cell>
-												<span class="font-medium text-gray-900">{message.sender.firstName} {message.sender.lastName}</span>
+												<span class="font-medium text-gray-900"
+													>{message.sender.firstName} {message.sender.lastName}</span
+												>
 											</Table.Cell>
 											<Table.Cell>
 												{message.subject}
@@ -424,8 +447,10 @@
 											</Table.Cell>
 											<Table.Cell class="text-right">
 												<Badge
-													class={message.read ? "bg-gray-100 text-gray-800" : "bg-blue-100 text-blue-800"}
-													value={message.read ? "Read" : "Unread"}
+													class={message.read
+														? 'bg-gray-100 text-gray-800'
+														: 'bg-blue-100 text-blue-800'}
+													value={message.read ? 'Read' : 'Unread'}
 												/>
 											</Table.Cell>
 										</Table.Row>
@@ -457,13 +482,19 @@
 						<Card.Content class="pt-4">
 							<ul class="space-y-3">
 								{#each newCandidateProfiles.slice(0, 4) as profile, i (profile.id)}
-									<li class="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer" on:click={() => goto(`/candidates/${profile.id}`)}>
-										<div class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium mr-3">
+									<li
+										class="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer"
+										on:click={() => goto(`/candidates/${profile.id}`)}
+									>
+										<div
+											class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium mr-3"
+										>
 											{profile.firstName[0]}{profile.lastName[0]}
 										</div>
 										<div class="flex-1 min-w-0">
 											<p class="text-sm font-medium text-gray-900 truncate">
-												{profile.firstName} {profile.lastName}
+												{profile.firstName}
+												{profile.lastName}
 											</p>
 											<p class="text-xs text-gray-500 truncate">
 												{profile.desiredPosition}
@@ -494,8 +525,13 @@
 						<Card.Content class="pt-4">
 							<ul class="space-y-3">
 								{#each newClientSignups.slice(0, 4) as client, i (client.id)}
-									<li class="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer" on:click={() => goto(`/clients/${client.id}`)}>
-										<div class="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium mr-3">
+									<li
+										class="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer"
+										on:click={() => goto(`/clients/${client.id}`)}
+									>
+										<div
+											class="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium mr-3"
+										>
 											{client.companyName[0]}
 										</div>
 										<div class="flex-1 min-w-0">
@@ -503,13 +539,16 @@
 												{client.companyName}
 											</p>
 											<p class="text-xs text-gray-500 truncate">
-												{client.contactFirstName} {client.contactLastName}
+												{client.contactFirstName}
+												{client.contactLastName}
 											</p>
 										</div>
 										<Badge
-											class={client.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-												   client.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-												   'bg-gray-100 text-gray-800'}
+											class={client.status === 'PENDING'
+												? 'bg-yellow-100 text-yellow-800'
+												: client.status === 'ACTIVE'
+													? 'bg-green-100 text-green-800'
+													: 'bg-gray-100 text-gray-800'}
 											value={client.status}
 										/>
 									</li>
@@ -544,7 +583,9 @@
 								{#each activityTimeline as activity, i}
 									<li class="relative pb-4">
 										<!-- Timeline dot -->
-										<div class={`absolute -left-6 mt-1.5 w-5 h-5 rounded-full ${activity.color} flex items-center justify-center`}>
+										<div
+											class={`absolute -left-6 mt-1.5 w-5 h-5 rounded-full ${activity.color} flex items-center justify-center`}
+										>
 											<svelte:component this={activity.icon} size={12} color="white" />
 										</div>
 

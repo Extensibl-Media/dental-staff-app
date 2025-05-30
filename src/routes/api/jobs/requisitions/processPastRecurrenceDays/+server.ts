@@ -25,7 +25,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	try {
 		const today = new Date().toISOString().split('T')[0];
 		const now = new Date();
-		const currentTimeString = now.toTimeString().split(' ')[0];
+		const currentTimeString = now;
 
 		const pastRecurrenceDays = await db
 			.select()
@@ -37,7 +37,7 @@ export const GET: RequestHandler = async ({ request }) => {
 						lt(recurrenceDayTable.date, today), // Earlier dates
 						and(
 							eq(recurrenceDayTable.date, today), // Today's date...
-							lt(recurrenceDayTable.dayEndTime, currentTimeString) // ...but end time passed
+							lt(recurrenceDayTable.dayEnd, currentTimeString) // ...but end time passed
 						)
 					)
 				)

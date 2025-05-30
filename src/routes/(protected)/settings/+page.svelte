@@ -4,6 +4,7 @@
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import type { UserSchema, UserUpdatePasswordSchema } from '$lib/config/zod-schemas';
 	import ClientStaffSettingsView from '$lib/views/client/clientStaffSettingsView.svelte';
+	import { page } from '$app/stores';
 
 	export let data: any;
 	export let userProfileForm: SuperValidated<UserSchema>;
@@ -18,6 +19,10 @@
 	$: billingInfo = data.billingInfo;
 
 	$: user = data.user;
+	$: URLTab = $page.url.searchParams.get('tab');
+	$: URLRole = $page.url.searchParams.get('role');
+
+	$: console.log('URLTab:', URLTab);
 
 	$: defaultTab =
 		user.role === USER_ROLES.CLIENT
@@ -26,7 +31,7 @@
 				? SETTINGS_MENU_OPTIONS.CLIENT_STAFF.PROFILE
 				: SETTINGS_MENU_OPTIONS.ADMIN.PROFILE;
 
-	$: selectedTab = defaultTab;
+	$: selectedTab = URLTab && URLRole ? SETTINGS_MENU_OPTIONS[URLRole][URLTab] : defaultTab;
 </script>
 
 <section class="grow h-screen overflow-y-auto">

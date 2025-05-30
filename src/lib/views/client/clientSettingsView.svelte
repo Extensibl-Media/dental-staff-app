@@ -40,53 +40,6 @@
 		{ id: '5', name: 'Friday' },
 		{ id: '6', name: 'Saturday' }
 	];
-
-	if (!$companyFormObj.operatingHours) {
-		$companyFormObj.operatingHours = JSON.stringify({
-			'0': {
-				isClosed: true,
-				openTime: '00:00:00-05',
-				timezone: localTimeZone,
-				closeTime: '00:00:00-05'
-			},
-			'1': {
-				isClosed: false,
-				openTime: '09:00:00-05',
-				timezone: localTimeZone,
-				closeTime: '17:00:00-05'
-			},
-			'2': {
-				isClosed: false,
-				openTime: '09:00:00-05',
-				timezone: localTimeZone,
-				closeTime: '17:00:00-05'
-			},
-			'3': {
-				isClosed: false,
-				openTime: '09:00:00-05',
-				timezone: localTimeZone,
-				closeTime: '17:00:00-05'
-			},
-			'4': {
-				isClosed: false,
-				openTime: '09:00:00-05',
-				timezone: localTimeZone,
-				closeTime: '17:00:00-05'
-			},
-			'5': {
-				isClosed: false,
-				openTime: '09:00:00-05',
-				timezone: localTimeZone,
-				closeTime: '17:00:00-05'
-			},
-			'6': {
-				isClosed: false,
-				openTime: '09:00:00-05',
-				timezone: localTimeZone,
-				closeTime: '17:00:00-05'
-			}
-		});
-	}
 </script>
 
 <div class="bg-white border border-gray-200 rounded-lg p-6 grid grid-cols-5 md:grow">
@@ -229,8 +182,8 @@
 
 												// If day is closed, reset times to midnight
 												if (hours[day.id].isClosed) {
-													hours[day.id].openTime = '00:00:00-05';
-													hours[day.id].closeTime = '00:00:00-05';
+													hours[day.id].openTime = 'T00:00:00.000Z';
+													hours[day.id].closeTime = 'T00:00:00.000Z';
 												}
 
 												// Update the form data

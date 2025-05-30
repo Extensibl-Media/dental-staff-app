@@ -13,8 +13,8 @@ import { regionTable } from './region';
 import { candidateProfileTable } from './candidate';
 
 export type DaySchedule = {
-	openTime: string; // ISO time with timezone e.g. "09:00:00-05"
-	closeTime: string; // ISO time with timezone e.g. "17:00:00-05"
+	openTime: string; // ISO time with timezone e.g. "09:00"
+	closeTime: string; // ISO time with timezone e.g. "17:00"
 	isClosed: boolean;
 	timezone: string; // IANA timezone e.g. "America/New_York"
 };
@@ -92,44 +92,44 @@ export const clientCompanyTable = pgTable('client_companies', {
 		.$type<OperatingHours>()
 		.default({
 			0: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			1: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			2: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			3: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			4: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			5: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			6: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			}
@@ -165,44 +165,44 @@ export const companyOfficeLocationTable = pgTable('company_office_locations', {
 		.$type<OperatingHours>()
 		.default({
 			0: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			1: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			2: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			3: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			4: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			5: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			},
 			6: {
-				openTime: '00:00:00Z',
-				closeTime: '00:00:00Z',
+				openTime: '00:00',
+				closeTime: '00:00',
 				isClosed: false,
 				timezone: 'America/New_York'
 			}

@@ -12,6 +12,7 @@ import {
 } from '$lib/server/database/queries/clients';
 import { getRegionByAbbreviation } from '$lib/server/database/queries/regions';
 import { setFlash } from 'sveltekit-flash-message/server';
+import { redirectIfNotValidCustomer } from '$lib/server/database/queries/billing';
 
 export const load: PageServerLoad = async (event) => {
 	const skip = Number(event.url.searchParams.get('skip'));
@@ -28,6 +29,7 @@ export const load: PageServerLoad = async (event) => {
 
 	if (user.role === USER_ROLES.CLIENT) {
 		const client = await getClientProfilebyUserId(user.id);
+		await redirectIfNotValidCustomer(client.id, user.role);
 		const clientCompany = await getClientCompanyByClientId(client.id);
 
 		const locationForm = await superValidate(event, clientCompanyLocationSchema);
@@ -50,6 +52,8 @@ export const load: PageServerLoad = async (event) => {
 
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
 		const client = await getClientProfileByStaffUserId(user.id);
+		await redirectIfNotValidCustomer(client?.id, user.role);
+
 		const clientCompany = await getClientCompanyByClientId(client?.id);
 
 		const locationForm = await superValidate(event, clientCompanyLocationSchema);
@@ -108,7 +112,51 @@ export const actions = {
 				zipcode: form.data.zipcode,
 				companyId: form.data.companyId,
 				regionId,
-				timezone: form.data.timezone
+				timezone: form.data.timezone,
+				operatingHours: {
+					0: {
+						openTime: '00:00',
+						closeTime: '00:00',
+						isClosed: false,
+						timezone: form.data.timezone || 'America/New_York'
+					},
+					1: {
+						openTime: '00:00',
+						closeTime: '00:00',
+						isClosed: false,
+						timezone: form.data.timezone || 'America/New_York'
+					},
+					2: {
+						openTime: '00:00',
+						closeTime: '00:00',
+						isClosed: false,
+						timezone: form.data.timezone || 'America/New_York'
+					},
+					3: {
+						openTime: '00:00',
+						closeTime: '00:00',
+						isClosed: false,
+						timezone: form.data.timezone || 'America/New_York'
+					},
+					4: {
+						openTime: '00:00',
+						closeTime: '00:00',
+						isClosed: false,
+						timezone: form.data.timezone || 'America/New_York'
+					},
+					5: {
+						openTime: '00:00',
+						closeTime: '00:00',
+						isClosed: false,
+						timezone: form.data.timezone || 'America/New_York'
+					},
+					6: {
+						openTime: '00:00',
+						closeTime: '00:00',
+						isClosed: false,
+						timezone: form.data.timezone || 'America/New_York'
+					}
+				}
 			});
 
 			if (result) {

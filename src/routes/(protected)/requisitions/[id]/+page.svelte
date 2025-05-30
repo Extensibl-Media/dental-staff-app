@@ -204,13 +204,14 @@
 		{
 			header: 'Status',
 			id: 'status',
-			accessorFn: (original) => (original.timeSheet.validated ? 'Validated' : 'Pending'),
+			accessorFn: (original) => original.timeSheet.status,
 			cell: (original) =>
 				flexRender(Badge, {
 					value: original.getValue(),
 					class: cn(
-						original.getValue() === 'Pending' && 'bg-yellow-300 hover:bg-yellow-400',
-						original.getValue() === 'Validated' && 'bg-green-400 hover:bg-green-500'
+						original.getValue() === 'PENDING' && 'bg-yellow-300 hover:bg-yellow-400',
+						original.getValue() === 'APPROVED' && 'bg-green-400 hover:bg-green-500',
+						original.getValue() === 'DISCREPANCY' && 'bg-red-500 hover:bg-red-600'
 					)
 				})
 		},

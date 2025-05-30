@@ -9,20 +9,33 @@ import { InboxService } from '$lib/server/inbox/service';
 import { setFlash } from 'sveltekit-flash-message/server';
 import { superValidate } from 'sveltekit-superforms/server';
 import { z } from 'zod';
+import { USER_ROLES } from '$lib/config/constants';
+import {
+	getClientProfileByStaffUserId,
+	getClientProfilebyUserId
+} from '$lib/server/database/queries/clients';
+import { redirectIfNotValidCustomer } from '$lib/server/database/queries/billing';
 
 export const load: PageServerLoad = async (event) => {
 	const { id, applicationId } = event.params;
 	const user = event.locals.user;
 
 	if (!user) {
-		redirect(302, '/sign-in');
+		redirect(302, '/auth/sign-in');
 	}
 
-	try {
-		const applicationDetails = await getRequisitionApplicationDetails(+id, applicationId);
+	if (user.role === USER_ROLES.SUPERADMIN) {
+		redirect(302, '/dashboard');
+	}
 
-		const messageForm = await superValidate(event, z.object({ id: z.string() }));
-		const approvalForm = await superValidate(event, z.object({ applicationId: z.string() }));
+	const messageForm = await superValidate(event, z.object({ id: z.string() }));
+	const approvalForm = await superValidate(event, z.object({ applicationId: z.string() }));
+	const applicationDetails = await getRequisitionApplicationDetails(+id, applicationId);
+
+	if (user.role === USER_ROLES.CLIENT) {
+		const client = await getClientProfilebyUserId(user.id);
+
+		await redirectIfNotValidCustomer(client.id, user.role);
 
 		return {
 			user,
@@ -30,9 +43,19 @@ export const load: PageServerLoad = async (event) => {
 			messageForm,
 			approvalForm
 		};
-	} catch (err) {
-		console.log(err);
-		throw error(500, `Error getting application details: ${err}`);
+	}
+
+	if (user.role === USER_ROLES.CLIENT_STAFF) {
+		const client = await getClientProfileByStaffUserId(user.id);
+
+		await redirectIfNotValidCustomer(client?.id, user.role);
+
+		return {
+			user,
+			application: applicationDetails || null,
+			messageForm,
+			approvalForm
+		};
 	}
 };
 

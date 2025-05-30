@@ -1,3 +1,4 @@
+import { time } from 'drizzle-orm/mysql-core';
 import { z } from 'zod';
 
 export type Primitive = string | number | boolean | null;
@@ -277,3 +278,32 @@ export const ApproveTimesheetSchema = z.object({
 	),
 	totalHours: z.number().min(1, 'Total hours is required')
 });
+
+export const NewAddressSchema = z.object({
+	streetOne: z.string().min(1, 'Street address is required'),
+	streetTwo: z.string().optional(),
+	city: z.string().min(1, 'City is required'),
+	state: z.string().min(1, 'State is required'),
+	zipcode: z.string().min(1, 'Zipcode is required')
+});
+
+export const ContactSchema = z.object({
+	companyPhone: z.string().optional(),
+	email: z.string().email('Invalid email address').optional()
+});
+
+export const OperatingHoursSchema = z.object({
+	operatingHours: z.string()
+});
+
+export const LocationSchema = z.object({
+	timezone: z.string().min(1, 'Timezone is required'),
+	regionId: z.string().min(1, 'Region ID is required')
+});
+
+export const ClientLocationDetailsSchema = NewAddressSchema.merge(ContactSchema).merge(
+	z.object({
+		name: z.string().min(1, 'Location name is required'),
+		timezone: z.string().min(1, 'Timezone is required')
+	})
+);

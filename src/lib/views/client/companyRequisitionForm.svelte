@@ -6,9 +6,11 @@
 	import { superForm } from 'sveltekit-superforms/client';
 	import { Label } from '$lib/components/ui/label';
 	import { Input } from '$lib/components/ui/input';
+	import type { ClientCompanyLocationSelect } from '$lib/server/database/schemas/client';
 
 	export let form: SuperValidated<ClientRequisitionSchema>;
 	export let drawerExpanded: boolean;
+	export let location: ClientCompanyLocationSelect | null | undefined = null;
 
 	const {
 		form: formObj,
@@ -24,7 +26,7 @@
 	let locations: any[] = [];
 	let disciplines: any[] = [];
 	let experienceLevels: any[] = [];
-	$: console.log(locations);
+
 	const handleGetLocations = async () => {
 		const req = await fetch(`/api/locations/getCompanyLocations`, {
 			method: 'GET'
@@ -79,6 +81,10 @@
 
 	$: if (!drawerExpanded) {
 		handleReset();
+	}
+	$: if (location) {
+		$formObj.locationId = location.id;
+		$formObj.timezone = location.timezone;
 	}
 	$: if ($formObj.locationId) {
 		const selectedLocation = locations.find((location) => location.id === $formObj.locationId);

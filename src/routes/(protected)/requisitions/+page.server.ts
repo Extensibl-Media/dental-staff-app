@@ -1,5 +1,6 @@
 import { USER_ROLES } from '$lib/config/constants.js';
 import { adminRequisitionSchema, clientRequisitionSchema } from '$lib/config/zod-schemas.js';
+import { redirectIfNotValidCustomer } from '$lib/server/database/queries/billing';
 import {
 	getClientCompanyByClientId,
 	getClientProfileByStaffUserId,
@@ -40,8 +41,11 @@ export const load = async (event) => {
 
 	if (user?.role === USER_ROLES.CLIENT) {
 		const client = await getClientProfilebyUserId(user.id);
+
+		await redirectIfNotValidCustomer(client.id, user.role);
+
 		const clientCompany = await getClientCompanyByClientId(client.id);
-		const form = superValidate(event, clientRequisitionSchema);
+		const form = await superValidate(event, clientRequisitionSchema);
 
 		const results = await getPaginatedRequisitionsforClient(clientCompany.id, {
 			limit: 10,
@@ -60,6 +64,9 @@ export const load = async (event) => {
 
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
 		const client = await getClientProfileByStaffUserId(user.id);
+
+		await redirectIfNotValidCustomer(client?.id, user.role);
+
 		const company = await getClientCompanyByClientId(client?.id);
 
 		const form = superValidate(event, clientRequisitionSchema);

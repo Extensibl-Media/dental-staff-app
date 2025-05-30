@@ -89,6 +89,7 @@ export function utcToLocalTime(
 		const utcDate = parse(`${utcDateString} ${utcTimeString}`, 'yyyy-MM-dd HH:mm', new Date());
 
 		if (!isValid(utcDate)) {
+			console.warn('Invalid UTC date:', utcDateString, utcTimeString);
 			return utcTimeString;
 		}
 
@@ -517,4 +518,35 @@ export function calculateMaxHours(recurrenceDay: any): number {
 		console.error('Error calculating max hours:', error, recurrenceDay);
 		return 0;
 	}
+}
+
+export function parseUTCTimeStringToLocal(utcTimeString, timezone) {
+	if (!utcTimeString || !timezone) return '';
+
+	// Extract just the time part (HH:MM:SS) from the UTC string like "T00:00:00.000Z"
+	const timeMatch = utcTimeString.match(/T(\d{2}:\d{2}:\d{2})/);
+	if (!timeMatch) return '';
+
+	const timeOnly = timeMatch[1].substring(0, 5); // Get HH:MM
+
+	// Use your existing utility with today's date
+	const today = format(new Date(), 'yyyy-MM-dd');
+	return utcToLocalTime(timeOnly, today, timezone);
+}
+
+export function localTimeToUTCTimeString(localTime, timezone) {
+	if (!localTime || !timezone) return '';
+
+	// Use your existing utility with today's date
+	const today = format(new Date(), 'yyyy-MM-dd');
+	const utcTime = localTimeToUTC(localTime, today, timezone);
+
+	// Convert back to your UTC time string format
+	return `T${utcTime}:00.000Z`;
+}
+
+export function formatTimeString(timeValue) {
+	if (!timeValue) return '';
+	// Ensure HH:MM format (some browsers might return HH:MM:SS)
+	return timeValue.substring(0, 5);
 }

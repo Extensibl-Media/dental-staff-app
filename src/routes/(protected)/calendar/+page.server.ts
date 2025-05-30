@@ -1,6 +1,11 @@
 import { USER_ROLES } from '$lib/config/constants.js';
 import { getCalendarEventsForAdmin } from '$lib/server/database/queries/admin';
-import { getCalendarEventsForClient, getClientProfileByStaffUserId, getClientProfilebyUserId } from '$lib/server/database/queries/clients';
+import { redirectIfNotValidCustomer } from '$lib/server/database/queries/billing';
+import {
+	getCalendarEventsForClient,
+	getClientProfileByStaffUserId,
+	getClientProfilebyUserId
+} from '$lib/server/database/queries/clients';
 import { redirect } from '@sveltejs/kit';
 
 export const load = async ({ locals }) => {
@@ -20,10 +25,10 @@ export const load = async ({ locals }) => {
 	}
 
 	if (user?.role === USER_ROLES.CLIENT) {
-		const profile = await getClientProfilebyUserId(user.id)
-		const events = await getCalendarEventsForClient(profile.id);
+		const profile = await getClientProfilebyUserId(user.id);
+		await redirectIfNotValidCustomer(profile.id, user.role);
 
-		console.log(events);
+		const events = await getCalendarEventsForClient(profile.id);
 
 		return {
 			user,
@@ -31,9 +36,10 @@ export const load = async ({ locals }) => {
 		};
 	}
 
-
 	if (user?.role === USER_ROLES.CLIENT_STAFF) {
-		const client = await getClientProfileByStaffUserId(user.id)
+		const client = await getClientProfileByStaffUserId(user.id);
+		await redirectIfNotValidCustomer(client?.id, user.role);
+
 		const events = await getCalendarEventsForClient(client?.id);
 
 		console.log(events);

@@ -1,4 +1,5 @@
 import { USER_ROLES } from '$lib/config/constants';
+import { redirectIfNotValidCustomer } from '$lib/server/database/queries/billing';
 import {
 	getClientProfileByStaffUserId,
 	getClientProfilebyUserId
@@ -25,6 +26,7 @@ export const load = async (event) => {
 
 	if (user.role === USER_ROLES.CLIENT) {
 		const client = await getClientProfilebyUserId(user.id);
+		await redirectIfNotValidCustomer(client.id, user.role);
 		const timesheets = await getAllTimesheetsForClient(client?.id);
 
 		return {
@@ -34,6 +36,7 @@ export const load = async (event) => {
 	}
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
 		const client = await getClientProfileByStaffUserId(user.id);
+		await redirectIfNotValidCustomer(client?.id, user.role);
 		const timesheets = await getAllTimesheetsForClient(client?.id);
 
 		return {
