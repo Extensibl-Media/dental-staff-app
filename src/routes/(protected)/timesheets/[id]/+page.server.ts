@@ -2,7 +2,8 @@ import { USER_ROLES } from '$lib/config/constants';
 import {
 	getClientCompanyByClientId,
 	getClientProfileByStaffUserId,
-	getClientProfilebyUserId
+	getClientProfilebyUserId,
+	getClientSubscription
 } from '$lib/server/database/queries/clients';
 import {
 	approveTimesheet,
@@ -29,6 +30,8 @@ import { desc, eq } from 'drizzle-orm';
 import { adminConfigTable } from '$lib/server/database/schemas/config';
 import { actionHistoryTable } from '$lib/server/database/schemas/admin';
 import { redirectIfNotValidCustomer } from '$lib/server/database/queries/billing';
+import { userTable } from '$lib/server/database/schemas/auth';
+import { getUserById } from '$lib/server/database/queries/users';
 
 export const load = async (event: RequestEvent) => {
 	const user = event.locals.user;
@@ -45,11 +48,23 @@ export const load = async (event: RequestEvent) => {
 		const workdays = await getWorkdaysForTimesheet(timesheet);
 		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
 		const invoice = await getInvoiceByTimesheetId(id);
-		const auditHistory = await db
+		const auditHistoryRaw = await db
 			.select()
 			.from(actionHistoryTable)
 			.where(eq(actionHistoryTable.entityId, id))
 			.orderBy(desc(actionHistoryTable.createdAt));
+
+		const auditHistory = await Promise.allSettled(
+			auditHistoryRaw.map(async (history) => {
+				const { user } = await getUserById(history.userId);
+				return {
+					...history,
+					user: user || null
+				};
+			})
+		);
+
+		console.log(auditHistory.map((h) => h.status === 'fulfilled' && h.value));
 
 		return {
 			user,
@@ -59,7 +74,7 @@ export const load = async (event: RequestEvent) => {
 			requisition: requisition.requisition,
 			discrepancies,
 			invoice,
-			auditHistory
+			auditHistory: auditHistory.map((h) => h.status === 'fulfilled' && h.value)
 		};
 	}
 
@@ -157,9 +172,11 @@ export const actions = {
 			} else if (adminFeeType === 'FIXED') {
 				finalAmt += adminFee;
 			}
+			const stripeCustomerId =
+				(await getClientSubscription(timesheet.associatedClientId)) || user.stripeCustomerId;
 
 			const stripeInvoice = await createStripeInvoice(
-				user.stripeCustomerId,
+				stripeCustomerId,
 				finalAmt,
 				`DentalStaff.US invoice: Hours worked for ${user.firstName} ${user.lastName} for timesheet ${id}`,
 				{ userId: user.id, timesheetId: timesheet.id }

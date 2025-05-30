@@ -17,6 +17,7 @@ import { getCandidateProfileByUserId } from '$lib/server/database/queries/candid
 import { z } from 'zod';
 import { getRequisitionByWorkdayId } from '$lib/server/database/queries/requisitions';
 import { createUTCDateTime } from '$lib/_helpers/UTCTimezoneUtils';
+import { writeActionHistory } from '$lib/server/database/queries/admin';
 
 const newTimesheetSchema = z.object({
 	userId: z.string().min(1, 'User ID is required'),
@@ -70,8 +71,6 @@ export const POST: RequestHandler = async ({ request }) => {
 		// Validate request body
 		const body = await request.json().catch((err) => console.log(err));
 
-		console.log({ body });
-
 		if (!body) {
 			return json(
 				{ success: false, message: 'Invalid JSON body' },
@@ -103,14 +102,12 @@ export const POST: RequestHandler = async ({ request }) => {
 		const workdayId = workdayIds[0];
 		const requisition = await getRequisitionByWorkdayId(workdayId);
 		const weekStart = new Date(weekStartDate).toISOString().split('T')[0];
-		console.log('Week Start Date:', weekStart);
 
 		const formattedEntries = timesheetEntries.map((entry) => ({
 			...entry,
 			startTime: createUTCDateTime(entry.date, entry.startTime, requisition!.referenceTimezone),
 			endTime: createUTCDateTime(entry.date, entry.endTime, requisition!.referenceTimezone)
 		}));
-		console.log('Formatted Entries:', formattedEntries);
 
 		const timesheetData = {
 			id: crypto.randomUUID(),
@@ -127,9 +124,16 @@ export const POST: RequestHandler = async ({ request }) => {
 			candidateRateOT: (candidateProfile.hourlyRateMin * 1.5).toString()
 		};
 
-		console.log('Timesheet Data submitted: ', timesheetData);
-
 		const [result] = await db.insert(timeSheetTable).values(timesheetData).returning();
+
+		await writeActionHistory({
+			action: 'CREATE',
+			userId: user.id,
+			entityId: result.id,
+			table: 'TIMESHEETS',
+			beforeState: {},
+			afterState: result
+		});
 
 		return json(
 			{ success: true, message: 'Timesheet submitted successfully', data: result },

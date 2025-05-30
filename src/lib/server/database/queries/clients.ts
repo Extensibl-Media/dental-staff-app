@@ -5,6 +5,7 @@ import {
 	clientProfileTable,
 	clientStaffLocationTable,
 	clientStaffProfileTable,
+	clientSubscriptionTable,
 	companyOfficeLocationTable,
 	type ClientCompany,
 	type ClientCompanyLocation,
@@ -570,7 +571,20 @@ export async function getPaginatedLocationsByCompanyId(
 
 export async function getClientStaffLocations(userId: string) {}
 
-export async function getClientSubscription(clientId: string) {}
+export async function getClientSubscription(clientId: string | undefined) {
+	if (!clientId) throw error(400, 'Client ID is required');
+
+	const [result] = await db
+		.select()
+		.from(clientSubscriptionTable)
+		.where(eq(clientSubscriptionTable.clientId, clientId));
+
+	if (!result) {
+		return null;
+	}
+
+	return result.stripeCustomerId || null;
+}
 
 export async function createCompanyLocation(values: ClientCompanyLocation) {
 	const result = await db

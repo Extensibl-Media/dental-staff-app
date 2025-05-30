@@ -53,8 +53,6 @@
 	export let data: PageData;
 	$: user = data.user;
 
-	$: console.log({ data });
-
 	// State variables
 	let approvalDialogOpen = false;
 	let rejectionDialogOpen = false;
@@ -265,13 +263,13 @@
 								</span>
 							{/if}
 						</TabsTrigger>
-						<TabsTrigger value="history">
+						<TabsTrigger value="history" class="relative">
 							Audit History
-							{#if correctionHistory && correctionHistory.length}
+							{#if data.auditHistory && data.auditHistory.length}
 								<span
-									class="absolute top-0.5 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-800"
+									class="absolute top-1 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-800"
 								>
-									{correctionHistory.length}
+									{data.auditHistory.length}
 								</span>
 							{/if}
 						</TabsTrigger>
@@ -494,9 +492,9 @@
 							</CardHeader>
 
 							<CardContent>
-								{#if correctionHistory && correctionHistory.length > 0}
+								{#if data.auditHistory && data.auditHistory.length > 0}
 									<div class="space-y-4">
-										{#each correctionHistory as record}
+										{#each data.auditHistory as record}
 											<div class="p-4 border rounded-lg flex gap-3">
 												<div class="mt-0.5">
 													<History class="h-5 w-5 text-blue-600" />
@@ -505,34 +503,14 @@
 													<div class="flex items-start justify-between">
 														<div>
 															<p class="font-medium">
-																{record.discrepancyType} Correction
+																{record.user.firstName}
+																{record.user.lastName}
 															</p>
 															<p class="text-xs text-gray-500">
-																{record.date} by {record.admin}
+																{format(record.createdAt, 'PPp')}
 															</p>
 														</div>
-														<Badge variant="outline" class="bg-gray-100">
-															Date: {record.affectedDate}
-														</Badge>
 													</div>
-
-													<div class="mt-2 grid grid-cols-2 gap-2 text-sm">
-														<div class="p-2 bg-red-50 rounded">
-															<span class="block text-xs text-red-600">Original Value</span>
-															<span class="font-medium">{record.originalValue}</span>
-														</div>
-														<div class="p-2 bg-green-50 rounded">
-															<span class="block text-xs text-green-600">Corrected Value</span>
-															<span class="font-medium">{record.newValue}</span>
-														</div>
-													</div>
-
-													{#if record.note}
-														<div class="mt-2 p-3 bg-gray-50 rounded-lg text-sm">
-															<span class="block text-xs text-gray-600 mb-1">Note</span>
-															{record.note}
-														</div>
-													{/if}
 												</div>
 											</div>
 										{/each}
@@ -564,7 +542,8 @@
 						<div class="space-y-3">
 							<Button
 								class="w-full bg-green-700 hover:bg-green-800 gap-2"
-								disabled={hasDiscrepancies()}
+								disabled={hasDiscrepancies() || data?.timesheet?.status === 'APPROVED'}
+								on:click={() => (approvalDialogOpen = true)}
 							>
 								<CheckCircle2 class="h-4 w-4" />
 								<span>Approve Timesheet</span>
@@ -584,6 +563,7 @@
 							<Button
 								variant="outline"
 								class="w-full border-red-200 text-red-700 hover:bg-red-50 gap-2"
+								on:click={() => (rejectionDialogOpen = true)}
 							>
 								<X class="h-4 w-4" />
 								<span>Reject Timesheet</span>
@@ -985,16 +965,6 @@
 				Please provide a reason for rejecting this timesheet. This will be sent to the candidate.
 			</DialogDescription>
 		</DialogHeader>
-
-		<div class="space-y-4">
-			<Textarea
-				bind:value={rejectionReason}
-				placeholder="Please explain why this timesheet is being rejected..."
-				rows={4}
-				required
-			/>
-		</div>
-
 		<DialogFooter class="mt-4">
 			<form method="POST" action="?/rejectTimesheet" use:enhance>
 				<Button type="button" variant="outline" on:click={() => (rejectionDialogOpen = false)}>
