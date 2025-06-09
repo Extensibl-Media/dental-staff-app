@@ -1,5 +1,8 @@
 import db from '$lib/server/database/drizzle';
-import { candidateProfileTable } from '$lib/server/database/schemas/candidate';
+import {
+	candidateDisciplineExperienceTable,
+	candidateProfileTable
+} from '$lib/server/database/schemas/candidate';
 import {
 	clientCompanyTable,
 	companyOfficeLocationTable
@@ -23,6 +26,11 @@ export const GET: RequestHandler = async ({ request }) => {
 		if (candidateProfile.length === 0) {
 			throw error(404, 'Candidate profile not found');
 		}
+
+		const candidateDisciplines = await db
+			.select()
+			.from(candidateDisciplineExperienceTable)
+			.where(eq(candidateDisciplineExperienceTable.candidateId, candidateProfile[0].id));
 
 		const candidateRegionId = candidateProfile[0].regionId;
 
@@ -67,7 +75,13 @@ export const GET: RequestHandler = async ({ request }) => {
 					inArray(requisitionTable.locationId, officeLocationIds),
 					eq(requisitionTable.status, 'OPEN'),
 					eq(requisitionTable.archived, false),
-					eq(requisitionTable.permanentPosition, true)
+					eq(requisitionTable.permanentPosition, true),
+
+					// Ensure the requisition's discipline matches one of the candidate's disciplines
+					inArray(
+						requisitionTable.disciplineId,
+						candidateDisciplines.map((d) => d.disciplineId)
+					)
 				)
 			);
 

@@ -12,7 +12,6 @@ import {
 	getStaffProfilesForLocation,
 	updateCompanyLocation
 } from '$lib/server/database/queries/clients';
-import type { ClientProfile } from '$lib/server/database/schemas/client';
 import { getRequsitionsForLocation } from '$lib/server/database/queries/requisitions';
 import { message, setError, superValidate } from 'sveltekit-superforms/server';
 import { z } from 'zod';

@@ -73,6 +73,33 @@ export const POST: RequestHandler = async ({ request }) => {
 				const invoiceCreated = event.data.object as Stripe.Invoice;
 				console.log(invoiceCreated);
 				break;
+
+			case 'invoice.updated':
+				console.log('Handling invoice updated');
+				const invoiceUpdated = event.data.object as Stripe.Invoice;
+				console.log(invoiceUpdated);
+				const [existingInvoice] = await db
+					.select()
+					.from(invoiceTable)
+					.where(eq(invoiceTable.stripeInvoiceId, invoiceUpdated.id))
+					.limit(1);
+				if (existingInvoice) {
+					console.log('Invoice exists in the database:', existingInvoice);
+					await db
+						.update(invoiceTable)
+						.set({
+							status: invoiceUpdated.status as 'paid' | 'open' | 'draft' | 'void' | 'uncollectible',
+							stripeStatus: invoiceUpdated.status,
+							amountDue: (invoiceUpdated.amount_due / 100).toFixed(2),
+							amountPaid: (invoiceUpdated.amount_paid / 100).toFixed(2),
+							amountRemaining: (invoiceUpdated.amount_remaining / 100).toFixed(2),
+							updatedAt: new Date()
+						})
+						.where(eq(invoiceTable.id, existingInvoice.id));
+				} else {
+					console.log('Invoice does not exist in the database, creating new record');
+				}
+				break;
 			case 'invoice.finalized':
 				console.log('Handling invoice finalized');
 				const invoiceFinalized = event.data.object as Stripe.Invoice;
@@ -126,6 +153,26 @@ export const POST: RequestHandler = async ({ request }) => {
 						.where(eq(invoiceTable.id, existingPaidInvoice.id));
 				}
 				break;
+			// case 'invoice.overdue':
+			// 	console.log('Handling invoice overdue');
+			// 	const invoiceOverdue = event.data.object as Stripe.Invoice;
+			// 	console.log(invoiceOverdue);
+			// 	const [existingOverdueInvoice] = await db
+			// 		.select()
+			// 		.from(invoiceTable)
+			// 		.where(eq(invoiceTable.stripeInvoiceId, invoiceOverdue.id))
+			// 		.limit(1);
+			// 	if (existingOverdueInvoice) {
+			// 		console.log('Invoice  exists in the database:', existingOverdueInvoice);
+			// 		await db
+			// 			.update(invoiceTable)
+			// 			.set({
+			// 				status: 'overdue',
+			// 				stripeStatus: invoiceOverdue.status
+			// 			})
+			// 			.where(eq(invoiceTable.id, existingOverdueInvoice.id));
+			// 	}
+			// 	break;
 			case 'invoice.voided':
 				console.log('Handling invoice voided');
 				const invoiceVoided = event.data.object as Stripe.Invoice;

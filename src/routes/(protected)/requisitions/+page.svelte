@@ -1,29 +1,32 @@
 <script lang="ts">
-	import { Tabs, TabItem } from 'flowbite-svelte';
+	import * as Tabs from '$lib/components/ui/tabs';
+	import * as Table from '$lib/components/ui/table';
+	import * as Sheet from '$lib/components/ui/sheet';
+	import { Button } from '$lib/components/ui/button';
+	import { Badge } from '$lib/components/ui/badge';
+	import { Input } from '$lib/components/ui/input';
+	import {
+		ArrowUpDown,
+		ArrowUp,
+		ArrowDown,
+		Plus,
+		Search,
+		Filter,
+		Eye,
+		MoreHorizontal,
+		ChevronLeft,
+		ChevronRight
+	} from 'lucide-svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
+	import { cn } from '$lib/utils';
 	import type { PageData } from './$types';
 	import type { SuperValidated } from 'sveltekit-superforms';
-	import Button from '$lib/components/ui/button/button.svelte';
-
 	import { USER_ROLES } from '$lib/config/constants';
 	import {
 		type AdminRequisitionSchema,
 		type ClientRequisitionSchema
 	} from '$lib/config/zod-schemas';
-	import { ArrowUpNarrowWide, ArrowDownWideNarrow, Plus } from 'lucide-svelte';
-	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
-	import {
-		getCoreRowModel,
-		type ColumnDef,
-		getSortedRowModel,
-		type TableOptions,
-		createSvelteTable,
-		flexRender
-	} from '@tanstack/svelte-table';
-	import { writable } from 'svelte/store';
-	import * as Table from '$lib/components/ui/table';
-	import { onMount } from 'svelte';
-	import ViewLink from '$lib/components/tables/ViewLink.svelte';
 	import type {
 		RequisitionDetailsRaw,
 		RequisitionResults
@@ -33,82 +36,106 @@
 	export let data: PageData;
 	export let adminForm: SuperValidated<AdminRequisitionSchema> | null = null;
 
-	const total = 10;
+	const ITEMS_PER_PAGE = 10;
 
-	let drawerExpanded: boolean = false;
-	let tableData: RequisitionResults = [];
+	let drawerExpanded = false;
+	let searchTerm = '';
+	let activeTab = 'open';
 
 	$: user = data.user;
-	$: requisitions = data.requisitions;
+	$: requisitions = data.requisitions as RequisitionResults;
 	$: clientForm = data.clientForm as SuperValidated<ClientRequisitionSchema>;
-
 	$: count = data.count;
 	$: sortOn = $page.url.searchParams.get('sortOn');
 	$: sortBy = $page.url.searchParams.get('sortBy');
 	$: currentPage = Number($page.url.searchParams.get('skip')) || 0;
-	$: totalPages = count ? Math.ceil(count / total) : 0;
+	$: totalPages = count ? Math.ceil(count / ITEMS_PER_PAGE) : 0;
 
-	$: {
-		tableData = (requisitions as RequisitionResults) ?? [];
-		// pendingOptions.update((o) => ({
-		// 	...o,
-		// 	data: tableData.filter((req) => req.status === 'PENDING')
-		// }));
-		filledOptions.update((o) => ({
-			...o,
-			data: tableData.filter((req) => req.status === 'FILLED')
-		}));
-		unfulfilledOptions.update((o) => ({
-			...o,
-			data: tableData.filter((req) => req.status === 'UNFULFILLED')
-		}));
-		openOptions.update((o) => ({ ...o, data: tableData.filter((req) => req.status === 'OPEN') }));
-		canceledOptions.update((o) => ({
-			...o,
-			data: tableData.filter((req) => req.status === 'CANCELED')
-		}));
-	}
-
-	const resetQueryParams = (clearAll = false) => {
-		const query = new URLSearchParams($page.url.searchParams.toString());
-		const thisPage = window.location.pathname;
-		query.delete('sortBy');
-		query.delete('sortOn');
-		clearAll && query.delete('skip');
-		goto(thisPage);
+	// Group requisitions by status
+	$: groupedRequisitions = {
+		open: (requisitions || []).filter((req) => req.status === 'OPEN'),
+		filled: (requisitions || []).filter((req) => req.status === 'FILLED'),
+		unfulfilled: (requisitions || []).filter((req) => req.status === 'UNFULFILLED'),
+		canceled: (requisitions || []).filter((req) => req.status === 'CANCELED')
 	};
 
-	const handlePrev = () => {
-		if (currentPage < 1) {
-			return;
+	// Apply search filter
+	$: filteredRequisitions = Object.fromEntries(
+		Object.entries(groupedRequisitions || {}).map(([status, reqs]) => [
+			status,
+			(reqs || []).filter(
+				(req) =>
+					req.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+					req.location_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+					`${req.first_name} ${req.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
+			)
+		])
+	);
+
+	// Column definitions
+	const getColumns = (isAdmin: boolean) => {
+		const baseColumns = [
+			{
+				id: 'id',
+				header: 'Req #',
+				accessorKey: 'id',
+				sortable: false
+			},
+			{
+				id: 'name',
+				header: 'Title',
+				accessorKey: 'name',
+				sortable: true
+			}
+		];
+
+		if (isAdmin) {
+			baseColumns.push({
+				id: 'client',
+				header: 'Client',
+				accessorKey: 'client',
+				sortable: true
+			});
 		}
-		const query = new URLSearchParams($page.url.searchParams.toString());
-		if (currentPage <= totalPages * total) {
-			const newPage = Math.ceil(currentPage - 1 * total);
-			query.set('skip', String(newPage));
-			goto(`?${query.toString()}`);
+
+		baseColumns.push(
+			{
+				id: 'location_name',
+				header: 'Office',
+				accessorKey: 'location_name',
+				sortable: true
+			},
+			{
+				id: 'region_abbreviation',
+				header: 'Region',
+				accessorKey: 'region_abbreviation',
+				sortable: true
+			}
+		);
+
+		if (!isAdmin) {
+			baseColumns.push({
+				id: 'permanent_position',
+				header: 'Type',
+				accessorKey: 'permanent_position',
+				sortable: true
+			});
 		}
-	};
-	const handleNext = () => {
-		const query = new URLSearchParams($page.url.searchParams.toString());
-		if (currentPage < totalPages * total) {
-			const newPage = Math.ceil(currentPage + 1 * total);
-			query.set('skip', String(newPage));
-			goto(`?${query.toString()}`);
-		}
+
+		return baseColumns;
 	};
 
-	const handleColumnSort = (columnId: string) => {
-		if (columnId === 'id') return;
-		const query = new URLSearchParams($page.url.searchParams.toString());
+	$: columns = getColumns(user?.role === USER_ROLES.SUPERADMIN);
+	$: isAdmin = user?.role === USER_ROLES.SUPERADMIN;
 
-		// Get current sort parameters
+	function handleSort(columnId: string) {
+		if (!columns.find((col) => col.id === columnId)?.sortable) return;
+
+		const query = new URLSearchParams($page.url.searchParams.toString());
 		const currentSortOn = query.get('sortOn');
 		const currentSortBy = query.get('sortBy');
 
-		// Determine the new sorting state
 		if (currentSortOn === columnId) {
-			// Cycle through sorting states: asc -> desc -> none
 			if (currentSortBy === 'asc') {
 				query.set('sortBy', 'desc');
 			} else if (currentSortBy === 'desc') {
@@ -116,616 +143,237 @@
 				query.delete('sortOn');
 			} else {
 				query.set('sortBy', 'asc');
+				query.set('sortOn', columnId);
 			}
 		} else {
-			// If the column changes, reset to ascending sort
 			query.set('sortOn', columnId);
 			query.set('sortBy', 'asc');
 		}
 
-		// Navigate to the new URL with updated query parameters
 		goto(`?${query.toString()}`);
-	};
+	}
 
-	const adminColumns: ColumnDef<RequisitionDetailsRaw>[] = [
-		{
-			header: '',
-			id: 'id',
-			accessorFn: (original) => original.id,
-			cell: (original) =>
-				flexRender(ViewLink, {
-					value: original.getValue(),
-					href: `/requisitions/${original.getValue()}`
-				})
-		},
-		{ header: 'Title', id: 'name', accessorKey: 'name' },
-		{
-			header: 'Client',
-			id: 'last_name',
-			accessorFn: (original) => `${original.last_name}, Dr. ${original.first_name}`
-		},
-		{ header: 'Office', id: 'location_name', accessorKey: 'location_name' },
-		{ header: 'Region', id: 'region_abbreviation', accessorKey: 'region_abbreviation' }
-	];
+	function handlePagination(direction: 'prev' | 'next') {
+		const query = new URLSearchParams($page.url.searchParams.toString());
 
-	const clientColumns: ColumnDef<RequisitionDetailsRaw>[] = [
-		{
-			header: 'Req #',
-			id: 'id',
-			accessorFn: (original) => original.id,
-			cell: (original) =>
-				flexRender(ViewLink, {
-					value: original.getValue(),
-					href: `/requisitions/${original.getValue()}`
-				})
-		},
-		{ header: 'Title', id: 'name', accessorKey: 'name' },
-		{ header: 'Office', id: 'location_name', accessorKey: 'location_name' },
-		{ header: 'Region', id: 'region_abbreviation', accessorKey: 'region_abbreviation' },
-		{
-			header: 'Type',
-			id: 'permanent_position',
-			accessorFn: (original) => (original.permanent_position ? 'Permanent' : 'Temporary')
+		if (direction === 'prev' && currentPage > 0) {
+			const newPage = currentPage - ITEMS_PER_PAGE;
+			query.set('skip', String(newPage));
+		} else if (direction === 'next' && currentPage < (totalPages - 1) * ITEMS_PER_PAGE) {
+			const newPage = currentPage + ITEMS_PER_PAGE;
+			query.set('skip', String(newPage));
 		}
-	];
 
-	// const pendingOptions = writable<TableOptions<RequisitionDetailsRaw>>({
-	// 	data: tableData.filter((req) => req.status === 'PENDING'),
-	// 	columns: user?.role === USER_ROLES.SUPERADMIN ? adminColumns : clientColumns,
-	// 	getCoreRowModel: getCoreRowModel(),
-	// 	getSortedRowModel: getSortedRowModel()
-	// });
+		goto(`?${query.toString()}`);
+	}
 
-	const filledOptions = writable<TableOptions<RequisitionDetailsRaw>>({
-		data: tableData.filter((req) => req.status === 'FILLED'),
-		columns: user?.role === USER_ROLES.SUPERADMIN ? adminColumns : clientColumns,
-		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel()
-	});
+	function resetQuery() {
+		const query = new URLSearchParams();
+		goto(`?${query.toString()}`);
+	}
 
-	const unfulfilledOptions = writable<TableOptions<RequisitionDetailsRaw>>({
-		data: tableData.filter((req) => req.status === 'UNFULFILLED'),
-		columns: user?.role === USER_ROLES.SUPERADMIN ? adminColumns : clientColumns,
-		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel()
-	});
+	function getSortIcon(columnId: string) {
+		if (sortOn !== columnId) return ArrowUpDown;
+		return sortBy === 'asc' ? ArrowUp : ArrowDown;
+	}
 
-	const canceledOptions = writable<TableOptions<RequisitionDetailsRaw>>({
-		data: tableData.filter((req) => req.status === 'CANCELED'),
-		columns: user?.role === USER_ROLES.SUPERADMIN ? adminColumns : clientColumns,
-		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel()
-	});
+	function formatClientName(req: RequisitionDetailsRaw) {
+		return `${req.last_name}, Dr. ${req.first_name}`;
+	}
 
-	const openOptions = writable<TableOptions<RequisitionDetailsRaw>>({
-		data: tableData.filter((req) => req.status === 'OPEN'),
-		columns: user?.role === USER_ROLES.SUPERADMIN ? adminColumns : clientColumns,
-		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel()
-	});
+	function getTabCounts() {
+		if (!groupedRequisitions) {
+			return {
+				open: 0,
+				filled: 0,
+				unfulfilled: 0,
+				canceled: 0
+			};
+		}
+		return {
+			open: groupedRequisitions.open?.length || 0,
+			filled: groupedRequisitions.filled?.length || 0,
+			unfulfilled: groupedRequisitions.unfulfilled?.length || 0,
+			canceled: groupedRequisitions.canceled?.length || 0
+		};
+	}
 
-	onMount(() => {
-		tableData = (requisitions as RequisitionResults) ?? [];
-		// pendingOptions.update((o) => ({
-		// 	...o,
-		// 	data: tableData.filter((req) => req.status === 'PENDING')
-		// }));
-		filledOptions.update((o) => ({
-			...o,
-			data: tableData.filter((req) => req.status === 'FILLED')
-		}));
-		unfulfilledOptions.update((o) => ({
-			...o,
-			data: tableData.filter((req) => req.status === 'UNFULFILLED')
-		}));
-		openOptions.update((o) => ({ ...o, data: tableData.filter((req) => req.status === 'OPEN') }));
-		canceledOptions.update((o) => ({
-			...o,
-			data: tableData.filter((req) => req.status === 'CANCELED')
-		}));
-	});
+	$: tabCounts = getTabCounts();
 
-	// const pendingTable = createSvelteTable(pendingOptions);
-	const filledTable = createSvelteTable(filledOptions);
-	const unfulfilledTable = createSvelteTable(unfulfilledOptions);
-	const openTable = createSvelteTable(openOptions);
-	const canceledTable = createSvelteTable(canceledOptions);
+	// Get current tab data
+	$: currentTabData = (filteredRequisitions && filteredRequisitions[activeTab]) || [];
+	$: currentTabCount = currentTabData.length;
 </script>
 
-<section class="grow h-screen overflow-y-auto p-6 flex flex-col gap-6">
-	<div class=" flex items-center justify-between flex-wrap">
-		<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">Requisitions</h1>
-		{#if user?.role !== USER_ROLES.SUPERADMIN}
-			<Button
-				on:click={() => {
-					drawerExpanded = true;
-				}}
-				class="bg-blue-800 hover:bg-blue-900 text-white"
-			>
-				<Plus class="inline mr-2" size={18} />
-				New Requisition
-			</Button>
-		{/if}
+<section class="flex flex-col h-full p-6 space-y-6">
+	<!-- Header -->
+	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+		<div>
+			<h1 class="text-3xl font-bold tracking-tight">Requisitions</h1>
+			<p class="text-muted-foreground">Manage and track job requisitions</p>
+		</div>
+
+		<div class="flex items-center gap-3">
+			{#if !isAdmin}
+				<Button on:click={() => (drawerExpanded = true)}>
+					<Plus class="h-4 w-4 mr-2" />
+					New Requisition
+				</Button>
+			{/if}
+		</div>
 	</div>
-	<div class="">
-		<Tabs
-			tabStyle="underline"
-			contentClass="py-4"
-			inactiveClasses="p-4 text-gray-500 rounded-t-lg hover:text-gray-600 hover:bg-gray-50"
-			activeClasses="border-b-2 border-b-blue-500 p-4 text-primary-600 bg-gray-100 rounded-t-lg"
-		>
-			<!-- <TabItem open title="Pending" on:click={() => resetQueryParams(true)}>
-				<div class="p-4">
-					<div class="column">
-						{#if user?.role === USER_ROLES.SUPERADMIN}
-							<Table.Root class="table">
-								<Table.TableHeader>
-									{#each $pendingTable.getHeaderGroups() as headerGroup}
-										<Table.TableRow class="bg-white">
-											{#each headerGroup.headers as header}
-												<Table.TableHead
-													class="hover:bg-white cursor-pointer relative"
-													colspan={header.colSpan}
-													click={() => handleColumnSort(header.getContext().header.id)}
-												>
-													<svelte:component
-														this={flexRender(header.column.columnDef.header, header.getContext())}
-													/>
-													{#if sortBy && sortOn && header.getContext().header.id === sortOn}
-														{#if sortBy === 'asc'}
-															<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-														{:else}
-															<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-														{/if}
-													{/if}
-												</Table.TableHead>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableHeader>
-								<Table.TableBody>
-									{#each $pendingTable.getRowModel().rows as row}
-										<Table.TableRow class="bg-gray-50">
-											{#each row.getVisibleCells() as cell}
-												<Table.TableCell>
-													<svelte:component
-														this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-													/>
-												</Table.TableCell>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableBody>
-							</Table.Root>
-						{/if}
-						{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
-							<Table.Root class="table">
-								<Table.TableHeader>
-									{#each $pendingTable.getHeaderGroups() as headerGroup}
-										<Table.TableRow class="bg-white">
-											{#each headerGroup.headers as header}
-												<Table.TableHead
-													class="hover:bg-white cursor-pointer relative"
-													colspan={header.colSpan}
-													click={() => handleColumnSort(header.getContext().header.id)}
-												>
-													<svelte:component
-														this={flexRender(header.column.columnDef.header, header.getContext())}
-													/>
-													{#if sortBy && sortOn && header.getContext().header.id === sortOn}
-														{#if sortBy === 'asc'}
-															<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-														{:else}
-															<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-														{/if}
-													{/if}
-												</Table.TableHead>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableHeader>
-								<Table.TableBody>
-									{#each $pendingTable.getRowModel().rows as row}
-										<Table.TableRow class="bg-gray-50">
-											{#each row.getVisibleCells() as cell}
-												<Table.TableCell>
-													<svelte:component
-														this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-													/>
-												</Table.TableCell>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableBody>
-							</Table.Root>
-						{/if}
-					</div>
-				</div>
-				<div class="flex justify-end gap-4 p-4">
-					<Button disabled={currentPage === 0} on:click={handlePrev}>prev</Button>
-					<Button disabled={currentPage === (totalPages - 1) * total} on:click={handleNext}
-						>next</Button
-					>
-				</div>
-			</TabItem> -->
-			<TabItem open title="Open" on:click={() => resetQueryParams(true)}>
-				<div class="p-4">
-					<div class="column">
-						{#if user?.role === USER_ROLES.SUPERADMIN}
-							<Table.Root class="table">
-								<Table.TableHeader>
-									{#each $openTable.getHeaderGroups() as headerGroup}
-										<Table.TableRow class="bg-white">
-											{#each headerGroup.headers as header}
-												<Table.TableHead
-													class="hover:bg-white cursor-pointer relative"
-													colspan={header.colSpan}
-													click={() => handleColumnSort(header.getContext().header.id)}
-												>
-													<svelte:component
-														this={flexRender(header.column.columnDef.header, header.getContext())}
-													/>
-													{#if sortBy && sortOn && header.getContext().header.id === sortOn}
-														{#if sortBy === 'asc'}
-															<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-														{:else}
-															<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-														{/if}
-													{/if}
-												</Table.TableHead>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableHeader>
-								<Table.TableBody>
-									{#each $openTable.getRowModel().rows as row}
-										<Table.TableRow class="bg-gray-50">
-											{#each row.getVisibleCells() as cell}
-												<Table.TableCell>
-													<svelte:component
-														this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-													/>
-												</Table.TableCell>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableBody>
-							</Table.Root>
-						{/if}
-						{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
-							<Table.Root class="table">
-								<Table.TableHeader>
-									{#each $openTable.getHeaderGroups() as headerGroup}
-										<Table.TableRow class="bg-white">
-											{#each headerGroup.headers as header}
-												<Table.TableHead
-													class="hover:bg-white cursor-pointer relative"
-													colspan={header.colSpan}
-													click={() => handleColumnSort(header.getContext().header.id)}
-												>
-													<svelte:component
-														this={flexRender(header.column.columnDef.header, header.getContext())}
-													/>
-													{#if sortBy && sortOn && header.getContext().header.id === sortOn}
-														{#if sortBy === 'asc'}
-															<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-														{:else}
-															<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-														{/if}
-													{/if}
-												</Table.TableHead>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableHeader>
-								<Table.TableBody>
-									{#each $openTable.getRowModel().rows as row}
-										<Table.TableRow class="bg-gray-50">
-											{#each row.getVisibleCells() as cell}
-												<Table.TableCell>
-													<svelte:component
-														this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-													/>
-												</Table.TableCell>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableBody>
-							</Table.Root>
-						{/if}
-					</div>
-				</div>
-				<div class="flex justify-end gap-4 p-4">
-					<Button disabled={currentPage === 0} on:click={handlePrev}>prev</Button>
-					<Button disabled={currentPage === (totalPages - 1) * total} on:click={handleNext}
-						>next</Button
-					>
-				</div>
-			</TabItem>
-			<TabItem title="Filled" on:click={() => resetQueryParams(true)}>
-				<div class="p-4">
-					<div class="column">
-						{#if user?.role === USER_ROLES.SUPERADMIN}
-							<Table.Root class="table">
-								<Table.TableHeader>
-									{#each $filledTable.getHeaderGroups() as headerGroup}
-										<Table.TableRow class="bg-white">
-											{#each headerGroup.headers as header}
-												<Table.TableHead
-													class="hover:bg-white cursor-pointer relative"
-													colspan={header.colSpan}
-													click={() => handleColumnSort(header.getContext().header.id)}
-												>
-													<svelte:component
-														this={flexRender(header.column.columnDef.header, header.getContext())}
-													/>
-													{#if sortBy && sortOn && header.getContext().header.id === sortOn}
-														{#if sortBy === 'asc'}
-															<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-														{:else}
-															<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-														{/if}
-													{/if}
-												</Table.TableHead>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableHeader>
-								<Table.TableBody>
-									{#each $filledTable.getRowModel().rows as row}
-										<Table.TableRow class="bg-gray-50">
-											{#each row.getVisibleCells() as cell}
-												<Table.TableCell>
-													<svelte:component
-														this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-													/>
-												</Table.TableCell>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableBody>
-							</Table.Root>
-						{/if}
-						{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
-							<Table.Root class="table">
-								<Table.TableHeader>
-									{#each $filledTable.getHeaderGroups() as headerGroup}
-										<Table.TableRow class="bg-white">
-											{#each headerGroup.headers as header}
-												<Table.TableHead
-													class="hover:bg-white cursor-pointer relative"
-													colspan={header.colSpan}
-													click={() => handleColumnSort(header.getContext().header.id)}
-												>
-													<svelte:component
-														this={flexRender(header.column.columnDef.header, header.getContext())}
-													/>
-													{#if sortBy && sortOn && header.getContext().header.id === sortOn}
-														{#if sortBy === 'asc'}
-															<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-														{:else}
-															<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-														{/if}
-													{/if}
-												</Table.TableHead>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableHeader>
-								<Table.TableBody>
-									{#each $filledTable.getRowModel().rows as row}
-										<Table.TableRow class="bg-gray-50">
-											{#each row.getVisibleCells() as cell}
-												<Table.TableCell>
-													<svelte:component
-														this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-													/>
-												</Table.TableCell>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableBody>
-							</Table.Root>
-						{/if}
-					</div>
-				</div>
-				<div class="flex justify-end gap-4 p-4">
-					<Button disabled={currentPage === 0} on:click={handlePrev}>prev</Button>
-					<Button disabled={currentPage === (totalPages - 1) * total} on:click={handleNext}
-						>next</Button
-					>
-				</div>
-			</TabItem>
-			<TabItem title="Canceled" on:click={() => resetQueryParams(true)}>
-				<div class="p-4">
-					<div class="column">
-						{#if user?.role === USER_ROLES.SUPERADMIN}
-							<Table.Root class="table">
-								<Table.TableHeader>
-									{#each $canceledTable.getHeaderGroups() as headerGroup}
-										<Table.TableRow class="bg-white">
-											{#each headerGroup.headers as header}
-												<Table.TableHead
-													class="hover:bg-white cursor-pointer relative"
-													colspan={header.colSpan}
-													click={() => handleColumnSort(header.getContext().header.id)}
-												>
-													<svelte:component
-														this={flexRender(header.column.columnDef.header, header.getContext())}
-													/>
-													{#if sortBy && sortOn && header.getContext().header.id === sortOn}
-														{#if sortBy === 'asc'}
-															<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-														{:else}
-															<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-														{/if}
-													{/if}
-												</Table.TableHead>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableHeader>
-								<Table.TableBody>
-									{#each $canceledTable.getRowModel().rows as row}
-										<Table.TableRow class="bg-gray-50">
-											{#each row.getVisibleCells() as cell}
-												<Table.TableCell>
-													<svelte:component
-														this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-													/>
-												</Table.TableCell>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableBody>
-							</Table.Root>
-						{/if}
-						{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
-							<Table.Root class="table">
-								<Table.TableHeader>
-									{#each $canceledTable.getHeaderGroups() as headerGroup}
-										<Table.TableRow class="bg-white">
-											{#each headerGroup.headers as header}
-												<Table.TableHead
-													class="hover:bg-white cursor-pointer relative"
-													colspan={header.colSpan}
-													click={() => handleColumnSort(header.getContext().header.id)}
-												>
-													<svelte:component
-														this={flexRender(header.column.columnDef.header, header.getContext())}
-													/>
-													{#if sortBy && sortOn && header.getContext().header.id === sortOn}
-														{#if sortBy === 'asc'}
-															<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-														{:else}
-															<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-														{/if}
-													{/if}
-												</Table.TableHead>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableHeader>
-								<Table.TableBody>
-									{#each $canceledTable.getRowModel().rows as row}
-										<Table.TableRow class="bg-gray-50">
-											{#each row.getVisibleCells() as cell}
-												<Table.TableCell>
-													<svelte:component
-														this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-													/>
-												</Table.TableCell>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableBody>
-							</Table.Root>
-						{/if}
-					</div>
-				</div>
-				<div class="flex justify-end gap-4 p-4">
-					<Button disabled={currentPage === 0} on:click={handlePrev}>prev</Button>
-					<Button disabled={currentPage === (totalPages - 1) * total} on:click={handleNext}
-						>next</Button
-					>
-				</div>
-			</TabItem>
-			<TabItem title="Unfullfilled" on:click={() => resetQueryParams(true)}>
-				<div class="p-4">
-					<div class="column">
-						{#if user?.role === USER_ROLES.SUPERADMIN}
-							<Table.Root class="table">
-								<Table.TableHeader>
-									{#each $unfulfilledTable.getHeaderGroups() as headerGroup}
-										<Table.TableRow class="bg-white">
-											{#each headerGroup.headers as header}
-												<Table.TableHead
-													class="hover:bg-white cursor-pointer relative"
-													colspan={header.colSpan}
-													click={() => handleColumnSort(header.getContext().header.id)}
-												>
-													<svelte:component
-														this={flexRender(header.column.columnDef.header, header.getContext())}
-													/>
-													{#if sortBy && sortOn && header.getContext().header.id === sortOn}
-														{#if sortBy === 'asc'}
-															<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-														{:else}
-															<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-														{/if}
-													{/if}
-												</Table.TableHead>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableHeader>
-								<Table.TableBody>
-									{#each $unfulfilledTable.getRowModel().rows as row}
-										<Table.TableRow class="bg-gray-50">
-											{#each row.getVisibleCells() as cell}
-												<Table.TableCell>
-													<svelte:component
-														this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-													/>
-												</Table.TableCell>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableBody>
-							</Table.Root>
-						{/if}
-						{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
-							<Table.Root class="table">
-								<Table.TableHeader>
-									{#each $unfulfilledTable.getHeaderGroups() as headerGroup}
-										<Table.TableRow class="bg-white">
-											{#each headerGroup.headers as header}
-												<Table.TableHead
-													class="hover:bg-white cursor-pointer relative"
-													colspan={header.colSpan}
-													click={() => handleColumnSort(header.getContext().header.id)}
-												>
-													<svelte:component
-														this={flexRender(header.column.columnDef.header, header.getContext())}
-													/>
-													{#if sortBy && sortOn && header.getContext().header.id === sortOn}
-														{#if sortBy === 'asc'}
-															<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-														{:else}
-															<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-														{/if}
-													{/if}
-												</Table.TableHead>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableHeader>
-								<Table.TableBody>
-									{#each $unfulfilledTable.getRowModel().rows as row}
-										<Table.TableRow class="bg-gray-50">
-											{#each row.getVisibleCells() as cell}
-												<Table.TableCell>
-													<svelte:component
-														this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-													/>
-												</Table.TableCell>
-											{/each}
-										</Table.TableRow>
-									{/each}
-								</Table.TableBody>
-							</Table.Root>
-						{/if}
-					</div>
-				</div>
-				<div class="flex justify-end gap-4 p-4">
-					<Button disabled={currentPage === 0} on:click={handlePrev}>prev</Button>
-					<Button disabled={currentPage === (totalPages - 1) * total} on:click={handleNext}
-						>next</Button
-					>
-				</div>
-			</TabItem>
-		</Tabs>
+
+	<!-- Search and Filters -->
+	<div class="flex flex-col sm:flex-row gap-4">
+		<div class="relative flex-1 max-w-sm">
+			<Search
+				class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
+			/>
+			<Input bind:value={searchTerm} placeholder="Search requisitions..." class="pl-9" />
+		</div>
+
+		<div class="flex items-center gap-2">
+			<Button variant="outline" size="sm" on:click={resetQuery}>Reset Filters</Button>
+		</div>
 	</div>
+
+	<!-- Tabs with Tables -->
+	<Tabs.Root bind:value={activeTab} class="flex-1 flex flex-col">
+		<Tabs.List class="grid w-full grid-cols-4">
+			<Tabs.Trigger value="open" class="relative">
+				Open
+				{#if tabCounts.open > 0}
+					<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.open} />
+				{/if}
+			</Tabs.Trigger>
+			<Tabs.Trigger value="filled" class="relative">
+				Filled
+				{#if tabCounts.filled > 0}
+					<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.filled} />
+				{/if}
+			</Tabs.Trigger>
+			<Tabs.Trigger value="unfulfilled" class="relative">
+				Unfulfilled
+				{#if tabCounts.unfulfilled > 0}
+					<Badge
+						variant="secondary"
+						class="ml-2 h-5 min-w-5 text-xs"
+						value={tabCounts.unfulfilled}
+					/>
+				{/if}
+			</Tabs.Trigger>
+			<Tabs.Trigger value="canceled" class="relative">
+				Canceled
+				{#if tabCounts.canceled > 0}
+					<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.canceled} />
+				{/if}
+			</Tabs.Trigger>
+		</Tabs.List>
+
+		<!-- Single Tab Content that changes based on activeTab -->
+		<Tabs.Content value={activeTab} class="flex-1 flex flex-col">
+			<div class="rounded-md border flex flex-col bg-white shadow-sm">
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							{#each columns as column}
+								<Table.Head
+									class={cn(
+										'cursor-pointer hover:bg-muted/50 transition-colors',
+										!column.sortable && 'cursor-default'
+									)}
+									on:click={() => handleSort(column.id)}
+								>
+									<div class="flex items-center gap-2">
+										{column.header}
+										{#if column.sortable}
+											<svelte:component this={getSortIcon(column.id)} class="h-4 w-4" />
+										{/if}
+									</div>
+								</Table.Head>
+							{/each}
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each currentTabData as req (req.id)}
+							<Table.Row
+								class="hover:bg-muted/50 cursor-pointer"
+								on:click={() => goto(`/requisitions/${req.id}`)}
+							>
+								<Table.Cell class="font-medium">
+									<a href="/requisitions/{req.id}" class="text-primary hover:underline font-mono">
+										#{req.id}
+									</a>
+								</Table.Cell>
+								<Table.Cell class="max-w-xs truncate" title={req.name}>
+									{req.name}
+								</Table.Cell>
+								{#if isAdmin}
+									<Table.Cell>
+										{formatClientName(req)}
+									</Table.Cell>
+								{/if}
+								<Table.Cell>{req.location_name || '-'}</Table.Cell>
+								<Table.Cell>{req.region_abbreviation || '-'}</Table.Cell>
+								{#if !isAdmin}
+									<Table.Cell>
+										<Badge
+											variant={req.permanent_position ? 'default' : 'secondary'}
+											value={req.permanent_position ? 'Permanent' : 'Temporary'}
+										/>
+									</Table.Cell>
+								{/if}
+							</Table.Row>
+						{:else}
+							<Table.Row>
+								<Table.Cell colspan={columns.length} class="text-center py-8">
+									<div class="flex flex-col items-center gap-2 text-muted-foreground">
+										<Filter class="h-8 w-8" />
+										<p>No {activeTab} requisitions found</p>
+										{#if searchTerm}
+											<p class="text-sm">Try adjusting your search terms</p>
+										{/if}
+									</div>
+								</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</div>
+
+			<!-- Pagination -->
+			{#if currentTabCount > 0 && totalPages > 1}
+				<div class="flex items-center justify-between px-2 py-4">
+					<div class="text-sm text-muted-foreground">
+						Showing {currentPage + 1} to {Math.min(currentPage + ITEMS_PER_PAGE, currentTabCount)} of
+						{currentTabCount}
+						results
+					</div>
+					<div class="flex items-center gap-2">
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={currentPage === 0}
+							on:click={() => handlePagination('prev')}
+						>
+							<ChevronLeft class="h-4 w-4 mr-1" />
+							Previous
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							disabled={currentPage >= (totalPages - 1) * ITEMS_PER_PAGE}
+							on:click={() => handlePagination('next')}
+						>
+							Next
+							<ChevronRight class="h-4 w-4 ml-1" />
+						</Button>
+					</div>
+				</div>
+			{/if}
+		</Tabs.Content>
+	</Tabs.Root>
 </section>
 
+<!-- Add Requisition Drawer -->
 <AddRequisitionDrawer {user} bind:drawerExpanded {clientForm} adminForm={adminForm ?? null} />

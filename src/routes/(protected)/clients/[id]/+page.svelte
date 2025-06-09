@@ -21,13 +21,6 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Input } from '$lib/components/ui/input';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import {
-		Select,
-		SelectContent,
-		SelectItem,
-		SelectTrigger,
-		SelectValue
-	} from '$lib/components/ui/select';
 	import { Badge } from '$lib/components/ui/badge';
 	import {
 		Table,
@@ -45,6 +38,7 @@
 		Building,
 		Calendar as CalendarIcon,
 		ChevronRight,
+		ChevronLeft,
 		Clock,
 		ClipboardList,
 		CreditCard,
@@ -61,7 +55,8 @@
 		User,
 		Users,
 		CalendarDays,
-		UserMinus
+		UserMinus,
+		Trash2
 	} from 'lucide-svelte';
 
 	// Table library
@@ -69,6 +64,7 @@
 		getCoreRowModel,
 		type ColumnDef,
 		getSortedRowModel,
+		getPaginationRowModel,
 		type TableOptions,
 		createSvelteTable,
 		flexRender
@@ -81,6 +77,11 @@
 	import { cn } from '$lib/utils';
 	import type { CalendarEvent } from '$lib/types';
 	import { goto } from '$app/navigation';
+	import type {
+		InvoiceSelect,
+		InvoiceWithRelations
+	} from '$lib/server/database/schemas/requisition';
+	import { superForm } from 'sveltekit-superforms/client';
 
 	export let data: PageData;
 	let initials: string = '';
@@ -91,6 +92,28 @@
 	let detailsDialogOpen: boolean = false;
 	let selectedProfile: StaffProfileData | null = null;
 	let tableData: StaffProfileData[] = [];
+	let invoiceTableData: InvoiceWithRelations[] = [];
+
+	const {
+		form: invoiceForm,
+		enhance,
+		submitting: invoiceFormSubmitting,
+		errors: invoiceFormError
+	} = superForm(data.invoiceForm, {
+		resetForm: true,
+		onResult: ({ result }) => {
+			if (result.type === 'success') {
+				showInvoiceDialog = false;
+				// Reset form to initial state
+				$invoiceForm = {
+					amount: 0,
+					dueDate: '',
+					description: '',
+					items: [{ description: '', quantity: 1, rate: 0, amount: 0 }]
+				};
+			}
+		}
+	});
 
 	type StaffProfileData = {
 		profile: {
@@ -112,19 +135,17 @@
 		};
 	};
 
+	type SupportTicket = {
+		id: string;
+		title: string;
+		status: string | null;
+		createdAt: string | Date;
+		// Add other properties as needed
+	};
+
 	const selectEvent = (event: CalendarEvent) => {
 		selectedEvent = event;
 		dialogOpen = true;
-	};
-
-	// Invoice form state
-	let invoiceForm = {
-		title: '',
-		amount: 0,
-		dueDate: '',
-		description: '',
-		location: '',
-		items: [{ description: '', quantity: 1, rate: 0, amount: 0 }]
 	};
 
 	// Reactive declarations
@@ -135,6 +156,7 @@
 	$: requisitions = data.requisitions || [];
 	$: supportTickets = data.supportTickets || [];
 	$: staff = data.staff || [];
+	$: invoices = data.invoices || [];
 
 	$: {
 		locationTableData = locations;
@@ -146,29 +168,51 @@
 		}
 	}
 
-	// Mock data for invoices
-	const invoices = [
+	$: {
+		invoiceTableData = invoices;
+	}
+
+	const supportColumns: ColumnDef<SupportTicket>[] = [
 		{
-			id: 'INV-001',
-			date: '2025-03-15',
-			amount: 1250.0,
-			status: 'Paid'
+			header: 'Title',
+			accessorFn: (original) => original.title
 		},
 		{
-			id: 'INV-002',
-			date: '2025-04-01',
-			amount: 875.5,
-			status: 'Pending'
+			header: 'Status',
+			id: 'status',
+			accessorFn: (original) => original.status,
+			cell: ({ getValue }) => {
+				const status = getValue() as string;
+				return flexRender(Badge, {
+					value: status,
+					class: cn(
+						status === 'PENDING' && 'bg-yellow-300 hover:bg-yellow-400',
+						status === 'NEW' && 'bg-green-400 hover:bg-bg-green-500',
+						status === 'CLOSED' && 'bg-red-500 hover:bg-red-600'
+					)
+				});
+			}
 		},
 		{
-			id: 'INV-003',
-			date: '2025-04-10',
-			amount: 2150.75,
-			status: 'Overdue'
+			header: 'Created At',
+			accessorFn: (original) => new Date(original.createdAt).toLocaleDateString()
 		}
 	];
 
-	// Table configuration
+	const supportOptions = writable<TableOptions<SupportTicket>>({
+		data: supportTickets,
+		columns: supportColumns,
+		getCoreRowModel: getCoreRowModel(),
+		getSortedRowModel: getSortedRowModel(),
+		getPaginationRowModel: getPaginationRowModel(),
+		initialState: {
+			pagination: {
+				pageSize: 5
+			}
+		}
+	});
+
+	// Table configuration for locations (unchanged)
 	const locationColumns: ColumnDef<ClientCompanyLocation>[] = [
 		{
 			header: 'Name',
@@ -188,55 +232,16 @@
 		data: locationTableData,
 		columns: locationColumns,
 		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel()
-	});
-	$: {
-		locationTableData = (locations as ClientCompanyLocation[]) ?? [];
-		locationOptions.update((o) => ({ ...o, data: locationTableData }));
-
-		tableData = (staff as StaffProfileData[]) || [];
-		options.update((o) => ({ ...o, data: tableData }));
-	}
-
-	onMount(() => {
-		locationTableData = (locations as ClientCompanyLocation[]) ?? [];
-		locationOptions.update((o) => ({ ...o, data: locationTableData }));
-
-		tableData = (staff as StaffProfileData[]) || [];
-		options.update((o) => ({ ...o, data: tableData }));
+		getSortedRowModel: getSortedRowModel(),
+		getPaginationRowModel: getPaginationRowModel(), // Add this line
+		initialState: {
+			pagination: {
+				pageSize: 5 // Add this configuration
+			}
+		}
 	});
 
-	const locationTable = createSvelteTable(locationOptions);
-
-	function handleCreateInvoice() {
-		// Handle invoice creation logic here
-		console.log('Creating invoice:', invoiceForm);
-		showInvoiceDialog = false;
-		// Reset form
-		invoiceForm = {
-			title: '',
-			amount: 0,
-			dueDate: '',
-			description: '',
-			location: '',
-			items: [{ description: '', quantity: 1, rate: 0, amount: 0 }]
-		};
-	}
-
-	function addInvoiceItem() {
-		invoiceForm.items = [
-			...invoiceForm.items,
-			{ description: '', quantity: 1, rate: 0, amount: 0 }
-		];
-	}
-
-	function updateItemAmount(index: number) {
-		const item = invoiceForm.items[index];
-		item.amount = item.quantity * item.rate;
-		invoiceForm.items = [...invoiceForm.items];
-		invoiceForm.amount = invoiceForm.items.reduce((total, item) => total + item.amount, 0);
-	}
-
+	// Staff table configuration with pagination
 	const staffColumns: ColumnDef<StaffProfileData>[] = [
 		{
 			header: 'Name',
@@ -258,12 +263,119 @@
 		}
 	];
 
-	const options = writable<TableOptions<StaffProfileData>>({
+	const staffOptions = writable<TableOptions<StaffProfileData>>({
 		data: tableData,
 		columns: staffColumns,
 		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel()
+		getSortedRowModel: getSortedRowModel(),
+		getPaginationRowModel: getPaginationRowModel(),
+		initialState: {
+			pagination: {
+				pageSize: 5
+			}
+		}
 	});
+
+	// Invoice table configuration with pagination
+	const invoiceColumns: ColumnDef<InvoiceWithRelations>[] = [
+		{
+			header: 'Invoice ID',
+			accessorFn: (original) => original.invoice.invoiceNumber
+		},
+		{
+			header: 'Amount',
+			accessorFn: (original) => {
+				const amount = original.invoice.amountDue || original.invoice.total || 0;
+				return `$${(+amount).toFixed(2)}`;
+			}
+		},
+		{
+			header: 'Status',
+			accessorFn: (original) => original.invoice.status,
+			cell: ({ getValue }) => {
+				const status = getValue() as string;
+				return flexRender(Badge, {
+					value: status.toLocaleUpperCase(),
+					class: cn(
+						status === 'open' && 'bg-blue-500 hover:bg-blue-600',
+						status === 'paid' && 'bg-green-400 hover:bg-bg-green-500',
+						status === 'void' && 'bg-gray-300 hover:bg-gray-400'
+					)
+				});
+			}
+		},
+		{
+			header: 'Due Date',
+			accessorFn: (original) => {
+				const dueDate = original.invoice.dueDate;
+				return dueDate ? new Date(dueDate).toLocaleDateString() : 'No due date';
+			}
+		},
+		{
+			header: 'Created',
+			accessorFn: (original) => new Date(original.invoice.createdAt).toLocaleDateString()
+		}
+	];
+
+	const invoiceOptions = writable<TableOptions<InvoiceWithRelations>>({
+		data: invoiceTableData,
+		columns: invoiceColumns,
+		getCoreRowModel: getCoreRowModel(),
+		getSortedRowModel: getSortedRowModel(),
+		getPaginationRowModel: getPaginationRowModel(),
+		initialState: {
+			pagination: {
+				pageSize: 5
+			}
+		}
+	});
+
+	$: {
+		locationTableData = (locations as ClientCompanyLocation[]) ?? [];
+		locationOptions.update((o) => ({ ...o, data: locationTableData }));
+
+		tableData = (staff as StaffProfileData[]) || [];
+		staffOptions.update((o) => ({ ...o, data: tableData }));
+
+		invoiceTableData = invoices || [];
+		invoiceOptions.update((o) => ({ ...o, data: invoiceTableData }));
+		supportOptions.update((o) => ({ ...o, data: supportTickets }));
+	}
+
+	onMount(() => {
+		locationTableData = (locations as ClientCompanyLocation[]) ?? [];
+		locationOptions.update((o) => ({ ...o, data: locationTableData }));
+
+		tableData = (staff as StaffProfileData[]) || [];
+		staffOptions.update((o) => ({ ...o, data: tableData }));
+
+		invoiceTableData = invoices || [];
+		invoiceOptions.update((o) => ({ ...o, data: invoiceTableData }));
+		supportOptions.update((o) => ({ ...o, data: supportTickets }));
+	});
+
+	const locationTable = createSvelteTable(locationOptions);
+	const staffTable = createSvelteTable(staffOptions);
+	const invoiceTable = createSvelteTable(invoiceOptions);
+	const supportTable = createSvelteTable(supportOptions);
+
+	function addInvoiceItem() {
+		items = [...items, { description: '', quantity: 1, rate: 0, amount: 0 }];
+	}
+
+	function removeInvoiceItem(index: number) {
+		if (items.length > 1) {
+			items = items.filter((_, i) => i !== index);
+		}
+	}
+
+	function updateItemAmount(index: number) {
+		const item = items[index];
+		if (item) {
+			item.amount = (item.quantity || 0) * (item.rate || 0);
+			items = [...items];
+		}
+	}
 
 	const handleViewStaff = (profile: StaffProfileData) => {
 		selectedProfile = profile;
@@ -275,7 +387,12 @@
 		selectedProfile = null;
 	};
 
-	const table = createSvelteTable(options);
+	$: $invoiceForm.amount = items.reduce((total, item) => total + item.amount, 0);
+	// Separate reactive variable for items management
+	let items = [{ description: '', quantity: 1, rate: 0, amount: 0 }];
+
+	// Sync items to form whenever items change
+	$: $invoiceForm.items = JSON.stringify(items);
 </script>
 
 {#if client}
@@ -311,18 +428,6 @@
 							</div>
 
 							<div class="flex gap-2 mt-3 md:mt-0">
-								{#if isAdmin}
-									<Button
-										variant="outline"
-										size="sm"
-										class="gap-1"
-										href={`${client.profile.id}/edit`}
-									>
-										<Edit class="h-4 w-4" />
-										<span>Edit Profile</span>
-									</Button>
-								{/if}
-
 								<Button
 									variant="outline"
 									size="sm"
@@ -357,106 +462,134 @@
 						</DialogDescription>
 					</DialogHeader>
 
-					<div class="grid gap-4 py-4">
-						<div class="grid grid-cols-2 gap-4">
+					<form method="POST" action="?/createInvoice" use:enhance>
+						<div class="grid gap-4 py-4">
+							<div class="grid grid-cols-2 gap-4">
+								<div class="space-y-2">
+									<Label for="dueDate">Due Date</Label>
+									<Input
+										id="dueDate"
+										name="dueDate"
+										type="date"
+										bind:value={$invoiceForm.dueDate}
+									/>
+									{#if $invoiceFormError.dueDate}
+										<p class="text-sm text-destructive">{$invoiceFormError.dueDate}</p>
+									{/if}
+								</div>
+							</div>
+
 							<div class="space-y-2">
-								<Label for="title">Invoice Title</Label>
-								<Input
-									id="title"
-									bind:value={invoiceForm.title}
-									placeholder="Enter invoice title"
-								/>
-							</div>
-							<div class="space-y-2">
-								<Label for="dueDate">Due Date</Label>
-								<Input id="dueDate" type="date" bind:value={invoiceForm.dueDate} />
-							</div>
-						</div>
+								<div class="flex items-center justify-between">
+									<Label>Invoice Items</Label>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										on:click={addInvoiceItem}
+										class="gap-1"
+									>
+										<Plus class="h-4 w-4" />
+										<span>Add Item</span>
+									</Button>
+								</div>
 
-						<div class="space-y-2">
-							<Label for="location">Location</Label>
-							<Select>
-								<SelectTrigger>
-									<SelectValue placeholder="Select location" />
-								</SelectTrigger>
-								<SelectContent>
-									{#each locations as location}
-										<SelectItem value={location.id}>{location.name}</SelectItem>
-									{/each}
-								</SelectContent>
-							</Select>
-						</div>
-
-						<div class="space-y-2">
-							<div class="flex items-center justify-between">
-								<Label>Invoice Items</Label>
-								<Button variant="outline" size="sm" on:click={addInvoiceItem} class="gap-1">
-									<Plus class="h-4 w-4" />
-									<span>Add Item</span>
-								</Button>
-							</div>
-
-							<div class="border rounded-md">
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>Description</TableHead>
-											<TableHead class="w-20">Qty</TableHead>
-											<TableHead class="w-24">Rate</TableHead>
-											<TableHead class="w-24">Amount</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{#each invoiceForm.items as item, i}
+								<div class="border rounded-md">
+									<Table>
+										<TableHeader>
 											<TableRow>
-												<TableCell>
-													<Input bind:value={item.description} placeholder="Item description" />
-												</TableCell>
-												<TableCell>
-													<Input
-														type="number"
-														bind:value={item.quantity}
-														on:change={() => updateItemAmount(i)}
-														min="1"
-													/>
-												</TableCell>
-												<TableCell>
-													<Input
-														type="number"
-														bind:value={item.rate}
-														on:change={() => updateItemAmount(i)}
-														min="0"
-														step="0.01"
-													/>
-												</TableCell>
-												<TableCell>
-													${item.amount.toFixed(2)}
-												</TableCell>
+												<TableHead>Description</TableHead>
+												<TableHead class="w-20">Qty</TableHead>
+												<TableHead class="w-24">Rate</TableHead>
+												<TableHead class="w-24">Amount</TableHead>
+												<TableHead class="w-12"></TableHead>
 											</TableRow>
-										{/each}
-										<TableRow>
-											<TableCell colspan={3} class="text-right font-bold">Total:</TableCell>
-											<TableCell class="font-bold">${invoiceForm.amount.toFixed(2)}</TableCell>
-										</TableRow>
-									</TableBody>
-								</Table>
+										</TableHeader>
+										<TableBody>
+											{#each items as item, i}
+												<TableRow>
+													<TableCell>
+														<Input bind:value={item.description} placeholder="Item description" />
+													</TableCell>
+													<TableCell>
+														<Input
+															type="number"
+															bind:value={item.quantity}
+															on:change={() => updateItemAmount(i)}
+															min="1"
+														/>
+													</TableCell>
+													<TableCell>
+														<Input
+															type="number"
+															bind:value={item.rate}
+															on:change={() => updateItemAmount(i)}
+															min="0"
+															step="0.01"
+														/>
+													</TableCell>
+													<TableCell>
+														${(item.amount || 0).toFixed(2)}
+													</TableCell>
+													<TableCell>
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															class="h-8 w-8 p-0 text-destructive hover:text-destructive"
+															on:click={() => removeInvoiceItem(i)}
+															disabled={items.length <= 1}
+														>
+															<Trash2 class="h-4 w-4" />
+														</Button>
+													</TableCell>
+												</TableRow>
+											{/each}
+											<TableRow>
+												<TableCell colspan={4} class="text-right font-bold">Total:</TableCell>
+												<TableCell class="font-bold"
+													>${($invoiceForm.amount || 0).toFixed(2)}</TableCell
+												>
+											</TableRow>
+										</TableBody>
+									</Table>
+								</div>
+								{#if $invoiceFormError.items}
+									<p class="text-sm text-destructive">{$invoiceFormError.items}</p>
+								{/if}
 							</div>
+
+							<div class="space-y-2">
+								<Label for="description">Additional Notes</Label>
+								<Textarea
+									id="description"
+									name="description"
+									bind:value={$invoiceForm.description}
+									placeholder="Add any additional notes or information"
+								/>
+								{#if $invoiceFormError.description}
+									<p class="text-sm text-destructive">{$invoiceFormError.description}</p>
+								{/if}
+							</div>
+
+							<!-- Hidden fields to sync with form -->
+							<input type="hidden" name="items" bind:value={$invoiceForm.items} />
+							<input type="hidden" name="amount" bind:value={$invoiceForm.amount} />
 						</div>
 
-						<div class="space-y-2">
-							<Label for="description">Additional Notes</Label>
-							<Textarea
-								id="description"
-								bind:value={invoiceForm.description}
-								placeholder="Add any additional notes or information"
-							/>
-						</div>
-					</div>
-
-					<DialogFooter>
-						<Button variant="outline" on:click={() => (showInvoiceDialog = false)}>Cancel</Button>
-						<Button on:click={handleCreateInvoice}>Create Invoice</Button>
-					</DialogFooter>
+						<DialogFooter>
+							<Button type="button" variant="outline" on:click={() => (showInvoiceDialog = false)}
+								>Cancel</Button
+							>
+							<Button type="submit" disabled={$invoiceFormSubmitting}>
+								{#if $invoiceFormSubmitting}
+									Creating...
+								{:else}
+									Create Invoice
+								{/if}
+							</Button>
+						</DialogFooter>
+					</form>
 				</DialogContent>
 			</Dialog>
 
@@ -536,7 +669,7 @@
 							<CardHeader class="flex flex-row items-center justify-between">
 								<CardTitle class="flex items-center gap-2">
 									<Receipt class="h-5 w-5 text-blue-600" />
-									<span>Recent Invoices</span>
+									<span>Invoices</span>
 								</CardTitle>
 								<Button
 									variant="outline"
@@ -550,35 +683,84 @@
 							</CardHeader>
 							<CardContent>
 								{#if invoices && invoices.length > 0}
-									<div class="space-y-3">
-										{#each invoices as invoice}
-											<div
-												class="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0"
+									<div class="rounded-md border">
+										<Table>
+											<TableHeader>
+												{#each $invoiceTable.getHeaderGroups() as headerGroup}
+													<TableRow>
+														{#each headerGroup.headers as header}
+															<TableHead>
+																<svelte:component
+																	this={flexRender(
+																		header.column.columnDef.header,
+																		header.getContext()
+																	)}
+																/>
+															</TableHead>
+														{/each}
+														<TableHead class="text-right">Actions</TableHead>
+													</TableRow>
+												{/each}
+											</TableHeader>
+											<TableBody>
+												{#each $invoiceTable.getRowModel().rows as row}
+													<TableRow>
+														{#each row.getVisibleCells() as cell}
+															<TableCell>
+																<svelte:component
+																	this={flexRender(cell.column.columnDef.cell, cell.getContext())}
+																/>
+															</TableCell>
+														{/each}
+														<TableCell class="text-right">
+															<div class="flex justify-end gap-2">
+																<Button
+																	href={`/invoices/${row.getAllCells()[0].row.original.invoice.id}`}
+																	variant="ghost"
+																	size="icon"
+																	class="h-8 w-8"
+																>
+																	<Eye class="h-4 w-4" />
+																</Button>
+															</div>
+														</TableCell>
+													</TableRow>
+												{/each}
+											</TableBody>
+										</Table>
+									</div>
+
+									<!-- Invoice Pagination Controls -->
+									<div class="flex items-center justify-between space-x-2 py-4">
+										<div class="flex-1 text-sm text-muted-foreground">
+											Showing {$invoiceTable.getState().pagination.pageIndex *
+												$invoiceTable.getState().pagination.pageSize +
+												1} to {Math.min(
+												($invoiceTable.getState().pagination.pageIndex + 1) *
+													$invoiceTable.getState().pagination.pageSize,
+												$invoiceTable.getFilteredRowModel().rows.length
+											)} of {$invoiceTable.getFilteredRowModel().rows.length} invoices
+										</div>
+										<div class="flex items-center space-x-2">
+											<Button
+												variant="outline"
+												size="sm"
+												on:click={() => $invoiceTable.previousPage()}
+												disabled={!$invoiceTable.getCanPreviousPage()}
 											>
-												<div>
-													<p class="font-medium">{invoice.id}</p>
-													<p class="text-sm text-gray-500">{invoice.date}</p>
-												</div>
-												<div class="text-right">
-													<p class="font-medium">${invoice.amount.toFixed(2)}</p>
-													<Badge
-														class={cn(
-															'text-white',
-															invoice.status.toLowerCase() === 'paid' && 'bg-green-400',
-															invoice.status.toLowerCase() === 'overdue' && 'bg-red-500',
-															invoice.status.toLowerCase() === 'pending' &&
-																'bg-yellow-300 text-gray-700'
-														)}
-														variant={invoice.status.toLowerCase() === 'paid'
-															? 'default'
-															: invoice.status.toLowerCase() === 'overdue'
-																? 'destructive'
-																: 'secondary'}
-														value={invoice.status}
-													/>
-												</div>
-											</div>
-										{/each}
+												<ChevronLeft class="h-4 w-4" />
+												Previous
+											</Button>
+											<Button
+												variant="outline"
+												size="sm"
+												on:click={() => $invoiceTable.nextPage()}
+												disabled={!$invoiceTable.getCanNextPage()}
+											>
+												Next
+												<ChevronRight class="h-4 w-4" />
+											</Button>
+										</div>
 									</div>
 								{:else}
 									<div class="flex flex-col items-center justify-center py-6 text-center">
@@ -599,65 +781,106 @@
 									</div>
 								{/if}
 							</CardContent>
-							{#if invoices && invoices.length > 0}
-								<CardFooter>
-									<Button variant="ghost" size="sm" class="gap-1 ml-auto">
-										View All <ChevronRight class="h-4 w-4" />
-									</Button>
-								</CardFooter>
-							{/if}
 						</Card>
 
 						<!-- Staff -->
 						<Card class="w-full max-w-none col-span-4">
 							<CardHeader class="flex flex-row items-center justify-between">
 								<CardTitle class="flex items-center gap-2">
-									<Receipt class="h-5 w-5 text-blue-600" />
+									<Users class="h-5 w-5 text-blue-600" />
 									<span>Client Staff</span>
 								</CardTitle>
 							</CardHeader>
 							<CardContent>
-								<Table class="bg-white">
-									<TableHeader>
-										{#each $table.getHeaderGroups() as headerGroup}
-											<TableRow>
-												{#each headerGroup.headers as header}
-													<TableHead>
-														<svelte:component
-															this={flexRender(header.column.columnDef.header, header.getContext())}
-														/>
-													</TableHead>
+								{#if staff && staff.length > 0}
+									<div class="rounded-md border">
+										<Table>
+											<TableHeader>
+												{#each $staffTable.getHeaderGroups() as headerGroup}
+													<TableRow>
+														{#each headerGroup.headers as header}
+															<TableHead>
+																<svelte:component
+																	this={flexRender(
+																		header.column.columnDef.header,
+																		header.getContext()
+																	)}
+																/>
+															</TableHead>
+														{/each}
+														<TableHead class="text-right">Actions</TableHead>
+													</TableRow>
 												{/each}
-											</TableRow>
-										{/each}
-									</TableHeader>
-									<TableBody>
-										{#each $table.getRowModel().rows as row}
-											<TableRow>
-												{#each row.getVisibleCells() as cell}
-													<TableCell>
-														<svelte:component
-															this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-														/>
-													</TableCell>
+											</TableHeader>
+											<TableBody>
+												{#each $staffTable.getRowModel().rows as row}
+													<TableRow>
+														{#each row.getVisibleCells() as cell}
+															<TableCell>
+																<svelte:component
+																	this={flexRender(cell.column.columnDef.cell, cell.getContext())}
+																/>
+															</TableCell>
+														{/each}
+														<TableCell class="text-right">
+															<div class="flex justify-end gap-2">
+																<Button
+																	on:click={() => handleViewStaff(row.original)}
+																	variant="ghost"
+																	size="icon"
+																	class="h-8 w-8"
+																>
+																	<Eye class="h-4 w-4" />
+																</Button>
+															</div>
+														</TableCell>
+													</TableRow>
 												{/each}
-												<!-- Add Actions column -->
-												<TableCell>
-													<div class="flex justify-end gap-2">
-														<Button
-															on:click={() => handleViewStaff(row.getAllCells()[0].row.original)}
-															variant="ghost"
-															size="icon"
-															class="h-8 w-8"
-														>
-															<Eye class="h-4 w-4" />
-														</Button>
-													</div>
-												</TableCell>
-											</TableRow>
-										{/each}
-									</TableBody>
-								</Table>
+											</TableBody>
+										</Table>
+									</div>
+
+									<!-- Staff Pagination Controls -->
+									<div class="flex items-center justify-between space-x-2 py-4">
+										<div class="flex-1 text-sm text-muted-foreground">
+											Showing {$staffTable.getState().pagination.pageIndex *
+												$staffTable.getState().pagination.pageSize +
+												1} to {Math.min(
+												($staffTable.getState().pagination.pageIndex + 1) *
+													$staffTable.getState().pagination.pageSize,
+												$staffTable.getFilteredRowModel().rows.length
+											)} of {$staffTable.getFilteredRowModel().rows.length} staff members
+										</div>
+										<div class="flex items-center space-x-2">
+											<Button
+												variant="outline"
+												size="sm"
+												on:click={() => $staffTable.previousPage()}
+												disabled={!$staffTable.getCanPreviousPage()}
+											>
+												<ChevronLeft class="h-4 w-4" />
+												Previous
+											</Button>
+											<Button
+												variant="outline"
+												size="sm"
+												on:click={() => $staffTable.nextPage()}
+												disabled={!$staffTable.getCanNextPage()}
+											>
+												Next
+												<ChevronRight class="h-4 w-4" />
+											</Button>
+										</div>
+									</div>
+								{:else}
+									<div class="flex flex-col items-center justify-center py-6 text-center">
+										<Users class="h-12 w-12 text-gray-300 mb-2" />
+										<h3 class="text-lg font-medium">No Staff</h3>
+										<p class="text-sm text-gray-500">
+											This client doesn't have any staff members yet.
+										</p>
+									</div>
+								{/if}
 							</CardContent>
 						</Card>
 					</div>
@@ -737,6 +960,39 @@
 										</TableBody>
 									</Table>
 								</div>
+
+								<!-- Location Pagination Controls -->
+								<div class="flex items-center justify-between space-x-2 py-4">
+									<div class="flex-1 text-sm text-muted-foreground">
+										Showing {$locationTable.getState().pagination.pageIndex *
+											$locationTable.getState().pagination.pageSize +
+											1} to {Math.min(
+											($locationTable.getState().pagination.pageIndex + 1) *
+												$locationTable.getState().pagination.pageSize,
+											$locationTable.getFilteredRowModel().rows.length
+										)} of {$locationTable.getFilteredRowModel().rows.length} locations
+									</div>
+									<div class="flex items-center space-x-2">
+										<Button
+											variant="outline"
+											size="sm"
+											on:click={() => $locationTable.previousPage()}
+											disabled={!$locationTable.getCanPreviousPage()}
+										>
+											<ChevronLeft class="h-4 w-4" />
+											Previous
+										</Button>
+										<Button
+											variant="outline"
+											size="sm"
+											on:click={() => $locationTable.nextPage()}
+											disabled={!$locationTable.getCanNextPage()}
+										>
+											Next
+											<ChevronRight class="h-4 w-4" />
+										</Button>
+									</div>
+								</div>
 							{/if}
 						</CardContent>
 					</Card>
@@ -768,38 +1024,85 @@
 						</CardHeader>
 						<CardContent>
 							{#if supportTickets.length > 0}
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>Title</TableHead>
-											<TableHead>Status</TableHead>
-											<TableHead>Created At</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{#each supportTickets as ticket}
-											<TableRow
-												class="cursor-pointer"
-												on:click={() => goto(`/support/ticket/${ticket.id}`)}
-											>
-												<TableCell>{ticket.title}</TableCell>
-												<TableCell>
-													<Badge
-														variant="default"
-														value={ticket.status}
-														class={cn(
-															ticket.status === 'NEW' && 'bg-yellow-300',
-															ticket.status === 'PENDING' && 'bg-green-500',
-															ticket.status === 'CLOSED' && 'bg-gray-400',
-															'text-white'
-														)}
-													/>
-												</TableCell>
-												<TableCell>{new Date(ticket.createdAt).toLocaleDateString()}</TableCell>
-											</TableRow>
-										{/each}
-									</TableBody>
-								</Table>
+								<div class="rounded-md border">
+									<Table>
+										<TableHeader>
+											{#each $supportTable.getHeaderGroups() as headerGroup}
+												<TableRow>
+													{#each headerGroup.headers as header}
+														<TableHead>
+															<svelte:component
+																this={flexRender(
+																	header.column.columnDef.header,
+																	header.getContext()
+																)}
+															/>
+														</TableHead>
+													{/each}
+													<TableHead class="text-right">Actions</TableHead>
+												</TableRow>
+											{/each}
+										</TableHeader>
+										<TableBody>
+											{#each $supportTable.getRowModel().rows as row}
+												<TableRow>
+													{#each row.getVisibleCells() as cell}
+														<TableCell>
+															<svelte:component
+																this={flexRender(cell.column.columnDef.cell, cell.getContext())}
+															/>
+														</TableCell>
+													{/each}
+													<TableCell class="text-right">
+														<div class="flex justify-end gap-2">
+															<Button
+																variant="ghost"
+																size="icon"
+																class="h-8 w-8"
+																on:click={() => goto(`/support/ticket/${row.original.id}`)}
+															>
+																<Eye class="h-4 w-4" />
+															</Button>
+														</div>
+													</TableCell>
+												</TableRow>
+											{/each}
+										</TableBody>
+									</Table>
+								</div>
+
+								<!-- Support Pagination Controls -->
+								<div class="flex items-center justify-between space-x-2 py-4">
+									<div class="flex-1 text-sm text-muted-foreground">
+										Showing {$supportTable.getState().pagination.pageIndex *
+											$supportTable.getState().pagination.pageSize +
+											1} to {Math.min(
+											($supportTable.getState().pagination.pageIndex + 1) *
+												$supportTable.getState().pagination.pageSize,
+											$supportTable.getFilteredRowModel().rows.length
+										)} of {$supportTable.getFilteredRowModel().rows.length} tickets
+									</div>
+									<div class="flex items-center space-x-2">
+										<Button
+											variant="outline"
+											size="sm"
+											on:click={() => $supportTable.previousPage()}
+											disabled={!$supportTable.getCanPreviousPage()}
+										>
+											<ChevronLeft class="h-4 w-4" />
+											Previous
+										</Button>
+										<Button
+											variant="outline"
+											size="sm"
+											on:click={() => $supportTable.nextPage()}
+											disabled={!$supportTable.getCanNextPage()}
+										>
+											Next
+											<ChevronRight class="h-4 w-4" />
+										</Button>
+									</div>
+								</div>
 							{:else}
 								<div class="flex flex-col items-center justify-center py-8 text-center">
 									<AlertCircle class="h-12 w-12 text-gray-300 mb-2" />

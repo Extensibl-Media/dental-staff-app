@@ -105,8 +105,6 @@
 		}
 	];
 
-	$: console.log({ totalPages, currentPage, sortBy, sortOn });
-
 	const options = writable<TableOptions<SkillsWithCategoryRaw>>({
 		data: tableData,
 		columns,

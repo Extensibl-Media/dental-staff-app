@@ -26,6 +26,7 @@ import {
 import { candidateProfileTable, type CandidateProfileSelect } from './candidate';
 import { disciplineTable, experienceLevelTable } from './skill';
 import { sql } from 'drizzle-orm/sql';
+import type Stripe from 'stripe';
 
 export type RawTimesheetHours = {
 	date: string;
@@ -429,20 +430,6 @@ export type TimesheetWithRelations = {
 	requisition: RequisitionSelect | null; // null because of leftJoin
 };
 
-export interface InvoiceLineItem {
-	id?: string;
-	description: string;
-	quantity: number;
-	unitAmount: number;
-	amount: number;
-	taxAmount?: number;
-	period?: {
-		start: string;
-		end: string;
-	};
-	metadata?: Record<string, any>;
-}
-
 export type InvoiceWithRelations = {
 	invoice: InvoiceSelect;
 	candidate: {
@@ -456,8 +443,9 @@ export type InvoiceWithRelations = {
 	} | null;
 	timesheet: TimeSheetSelect | null;
 	requisition: RequisitionSelect | null;
-	lineItems: InvoiceLineItem[];
+	lineItems: Stripe.InvoiceLineItem[];
 	client: ClientProfileSelect;
+	company: ClientCompanySelect | null;
 	clientUser: {
 		id: string;
 		firstName: string | null;

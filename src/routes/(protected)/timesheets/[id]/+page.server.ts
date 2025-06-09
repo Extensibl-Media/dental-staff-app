@@ -56,15 +56,13 @@ export const load = async (event: RequestEvent) => {
 
 		const auditHistory = await Promise.allSettled(
 			auditHistoryRaw.map(async (history) => {
-				const { user } = await getUserById(history.userId);
+				const user = await getUserById(history.userId);
 				return {
 					...history,
-					user: user || null
+					user: user?.user || null
 				};
 			})
 		);
-
-		console.log(auditHistory.map((h) => h.status === 'fulfilled' && h.value));
 
 		return {
 			user,
@@ -170,16 +168,19 @@ export const actions = {
 			if (adminFeeType === 'PERCENTAGE') {
 				finalAmt += Math.round((amountInCents * adminFee) / 100);
 			} else if (adminFeeType === 'FIXED') {
-				finalAmt += adminFee;
+				finalAmt += Math.round(adminFee * 100);
 			}
+
+			finalAmt = Math.round(finalAmt);
+
 			const stripeCustomerId =
 				(await getClientSubscription(timesheet.associatedClientId)) || user.stripeCustomerId;
 
 			const stripeInvoice = await createStripeInvoice(
 				stripeCustomerId,
-				finalAmt,
-				`DentalStaff.US invoice: Hours worked for ${user.firstName} ${user.lastName} for timesheet ${id}`,
-				{ userId: user.id, timesheetId: timesheet.id }
+				[{ amountInCents: finalAmt, description: `Invoice for timesheet ${id}` }],
+				{ userId: user.id, timesheetId: timesheet.id },
+				`DentalStaff.US invoice: Hours worked for ${user.firstName} ${user.lastName} for timesheet ${id}`
 			);
 
 			await createInvoiceRecord({
@@ -194,7 +195,6 @@ export const actions = {
 				success: true,
 				message: 'Timesheet approved',
 				timesheet,
-				// invoice,
 				stripeInvoice
 			};
 		} catch (err) {

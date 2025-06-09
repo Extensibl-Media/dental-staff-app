@@ -5,7 +5,7 @@ import {
 	getClientProfilebyUserId,
 	getClientProfileByStaffUserId
 } from '$lib/server/database/queries/clients';
-import { getClientInvoices } from '$lib/server/database/queries/requisitions';
+import { getAllInvoicesAdmin, getClientInvoices } from '$lib/server/database/queries/requisitions';
 import { redirectIfNotValidCustomer } from '$lib/server/database/queries/billing';
 
 export const load: PageServerLoad = async (event) => {
@@ -23,8 +23,7 @@ export const load: PageServerLoad = async (event) => {
 
 		return {
 			user,
-			invoices,
-			timesheets: []
+			invoices
 		};
 	}
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
@@ -35,14 +34,21 @@ export const load: PageServerLoad = async (event) => {
 
 		return {
 			user,
-			invoices,
-			timesheets: []
+			invoices
 		};
 	}
 	if (user.role === USER_ROLES.SUPERADMIN) {
+		const invoices = await getAllInvoicesAdmin();
+
 		return {
 			user,
-			invoices: []
+			invoices
 		};
 	}
+
+	return {
+		user: null,
+		invoices: [],
+		count: 0
+	};
 };

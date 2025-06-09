@@ -13,6 +13,15 @@ import {
 import { authenticateUser } from '$lib/server/serverUtils';
 import { and, eq } from 'drizzle-orm';
 import { env } from '$env/dynamic/private';
+import { EmailService } from '$lib/server/email/emailService';
+import {
+	getClientCompanyByClientId,
+	getClientIdByCompanyId,
+	getClientProfileById,
+	getLocationByIdForCompany
+} from '$lib/server/database/queries/clients';
+import { format } from 'date-fns';
+import { disciplineTable } from '$lib/server/database/schemas/skill';
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': env.CANDIDATE_APP_DOMAIN,
@@ -58,6 +67,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		const { recurrenceDayId } = body;
+		const emailService = new EmailService();
 
 		return await db.transaction(async (tx) => {
 			// Get candidate profile
@@ -67,11 +77,6 @@ export const POST: RequestHandler = async ({ request }) => {
 				.where(eq(candidateProfileTable.userId, user.id))
 				.limit(1)
 				.then((rows) => rows[0]);
-
-			console.log('Candidate profile found:', {
-				candidateId: candidateProfile.id,
-				userId: user.id
-			});
 
 			if (!candidateProfile) {
 				return json(
@@ -91,13 +96,6 @@ export const POST: RequestHandler = async ({ request }) => {
 				.where(and(eq(recurrenceDayTable.id, recurrenceDayId), eq(requisitionTable.status, 'OPEN')))
 				.limit(1);
 
-			console.log('Recurrence day details:', {
-				recurrenceDayId,
-				requisitionId: recurrenceDay.requisition.id,
-				status: recurrenceDay.requisition.status,
-				disciplineId: recurrenceDay.requisition.disciplineId
-			});
-
 			if (!recurrenceDay) {
 				return json(
 					{ success: false, message: 'Requisition not found or not active' },
@@ -105,7 +103,13 @@ export const POST: RequestHandler = async ({ request }) => {
 				);
 			}
 
-			// const clientId = await getClientIdByCompanyId(recurrenceDay.requisition.companyId);
+			const clientId = await getClientIdByCompanyId(recurrenceDay.requisition.companyId);
+			const company = await getClientCompanyByClientId(clientId);
+			const client = await getClientProfileById(clientId);
+			const location = await getLocationByIdForCompany(
+				recurrenceDay.requisition.locationId,
+				recurrenceDay.requisition.companyId
+			);
 
 			// TODO CHeck if workday exists for this candidate and this recurrence day/requisition
 			const [existingWorkday] = await db
@@ -131,15 +135,6 @@ export const POST: RequestHandler = async ({ request }) => {
 				.select()
 				.from(candidateDisciplineExperienceTable)
 				.where(eq(candidateDisciplineExperienceTable.candidateId, candidateProfile.id));
-
-			console.log('Candidate discipline check:', {
-				candidateId: candidateProfile.id,
-				requiredDisciplineId: recurrenceDay.requisition.disciplineId,
-				candidateDisciplines: disciplines.map((d) => d.disciplineId),
-				isQualified: disciplines.some(
-					(disc) => disc.disciplineId === recurrenceDay.requisition.disciplineId
-				)
-			});
 
 			// Check if Candidate is qualified for this workday
 			if (
@@ -167,13 +162,6 @@ export const POST: RequestHandler = async ({ request }) => {
 				})
 				.returning();
 
-			console.log('New workday created:', {
-				workdayId: newWorkday.id,
-				candidateId: candidateProfile.id,
-				requisitionId: recurrenceDay.requisition.id,
-				recurrenceDayId
-			});
-
 			// Change Status of the recurrence day
 			const [updatedRecurrenceDay] = await db
 				.update(recurrenceDayTable)
@@ -181,14 +169,33 @@ export const POST: RequestHandler = async ({ request }) => {
 				.where(eq(recurrenceDayTable.id, recurrenceDayId))
 				.returning();
 
-			console.log('Updated recurrence day status:', {
-				recurrenceDayId,
-				newStatus: 'FILLED',
-				success: !!updatedRecurrenceDay
-			});
-
-			// TODO Update any relevant data for the candidate
 			// TODO Notify the client of a claimed workday
+			console.log('Recurrence day claimed:', {
+				recurrenceDayId,
+				workdayId: newWorkday.id,
+				candidateId: candidateProfile.id
+			});
+			await emailService.sendRecurrenceDayClaimedEmail(
+				location.email || client.user.email,
+				{
+					url: `${env.BASE_URL}/requisitions/${recurrenceDay.requisition.id}/workday/${recurrenceDayId}`,
+					companyName: company.companyName as string,
+					location: {
+						address: location.streetOne + (location.streetTwo ? `, ${location.streetTwo}` : ''),
+						city: location.city as string,
+						state: location.state as string,
+						zip: location.zipcode as string
+					},
+					date: recurrenceDay.recurrenceDay.date,
+					workdayStart: format(recurrenceDay.recurrenceDay.dayStart, 'hh:mm a'),
+					workdayEnd: format(recurrenceDay.recurrenceDay.dayEnd, 'hh:mm a'),
+					discipline: recurrenceDay.requisition.title
+				},
+				{
+					firstName: user.firstName,
+					lastName: user.lastName
+				}
+			);
 
 			return json(
 				{

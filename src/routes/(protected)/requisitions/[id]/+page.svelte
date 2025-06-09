@@ -574,6 +574,10 @@
 										>
 									</div>
 									<div class="flex justify-between items-center border-b pb-2">
+										<span class="text-gray-600">Discipline</span>
+										<span class="font-medium">{requisition.discipline.name}</span>
+									</div>
+									<div class="flex justify-between items-center border-b pb-2">
 										<span class="text-gray-600">Experience Level</span>
 										<span class="font-medium">{requisition.experienceLevel?.value}</span>
 									</div>

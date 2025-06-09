@@ -1,18 +1,14 @@
 <script lang="ts">
-import type {PageData} from "./$types"
-export let data: PageData
-import DataTable from "./data-table.svelte";
-import DataTableEmptyState from "./data-table-empty-state.svelte";
-// import type { InvoiceWithRelations } from "$lib/server/database/schemas/requisition";
+	import type { PageData } from './$types';
+	import DataTable from './data-table.svelte';
+	import DataTableEmptyState from './data-table-empty-state.svelte';
 
-$: console.log(data)
-$: invoices = data.invoices || [];
-
-
+	export let data: PageData;
+	$: invoices = data.invoices || [];
 </script>
 
 <svelte:head>
-    <title>Invoices | DentalStaff.US</title>
+	<title>Invoices | DentalStaff.US</title>
 </svelte:head>
 
 <section class="grow h-screen overflow-y-auto p-6 flex flex-col gap-6">
@@ -21,10 +17,10 @@ $: invoices = data.invoices || [];
 	</div>
 
 	<div class="">
-        {#if invoices.length === 0}
-            <DataTableEmptyState />
-        {:else}
-            <DataTable data={invoices} />
-        {/if}
-    </div>
+		{#if invoices.length === 0}
+			<DataTableEmptyState />
+		{:else}
+			<DataTable role={data.user?.role} data={invoices} />
+		{/if}
+	</div>
 </section>

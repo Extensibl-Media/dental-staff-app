@@ -49,10 +49,11 @@ export async function getPaginatedSkills({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-    ORDER BY ${orderBy.direction === 'asc'
-					? sql`${sql.raw(orderSelector)} ASC`
-					: sql`${sql.raw(orderSelector)} DESC`
-				}
+    ORDER BY ${
+			orderBy.direction === 'asc'
+				? sql`${sql.raw(orderSelector)} ASC`
+				: sql`${sql.raw(orderSelector)} DESC`
+		}
   `);
 		} else {
 			query.append(sql`
@@ -68,8 +69,6 @@ export async function getPaginatedSkills({
 		const countResult = await db.select({ value: count() }).from(skillTable);
 
 		const results = await db.execute(query);
-
-		console.log({ results });
 
 		return {
 			skills: results.rows,
@@ -115,10 +114,11 @@ export async function getPaginatedSkillGategories({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-    ORDER BY ${orderBy.direction === 'asc'
-					? sql`${sql.raw(orderSelector)} ASC`
-					: sql`${sql.raw(orderSelector)} DESC`
-				}
+    ORDER BY ${
+			orderBy.direction === 'asc'
+				? sql`${sql.raw(orderSelector)} ASC`
+				: sql`${sql.raw(orderSelector)} DESC`
+		}
   `);
 		} else {
 			query.append(sql`
@@ -189,9 +189,10 @@ export async function getPaginatedExperienceLevels({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-				ORDER BY ${orderBy.direction === 'asc'
-					? sql`${sql.raw(orderSelector)} ASC`
-					: sql`${sql.raw(orderSelector)} DESC`
+				ORDER BY ${
+					orderBy.direction === 'asc'
+						? sql`${sql.raw(orderSelector)} ASC`
+						: sql`${sql.raw(orderSelector)} DESC`
 				}
 			`);
 		} else {

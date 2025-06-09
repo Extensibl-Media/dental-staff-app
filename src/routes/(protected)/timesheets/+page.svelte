@@ -7,7 +7,6 @@
 	import AdminDataTable from './admin-data-table.svelte';
 
 	export let data: PageData;
-	$: console.log(data);
 	$: user = data.user;
 	$: timesheets = data.timesheets;
 </script>

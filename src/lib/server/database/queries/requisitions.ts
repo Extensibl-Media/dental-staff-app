@@ -20,13 +20,12 @@ import {
 	type TimeSheetSelect,
 	type WorkdaySelect,
 	type RequisitionSelect,
-	type InvoiceLineItem,
 	type InvoiceStatus,
 	type InvoiceSourceType,
-	type Invoice
+	type Invoice,
+	type UpdateTimeSheet
 } from '../schemas/requisition';
 import { userTable, type User } from '../schemas/auth';
-import type { User as AuthUser } from 'lucia';
 import {
 	clientCompanyTable,
 	clientProfileTable,
@@ -48,12 +47,10 @@ import {
 } from '../schemas/candidate';
 import { error } from '@sveltejs/kit';
 import { writeActionHistory } from './admin';
-import { parseISO, differenceInMinutes, format, getDay } from 'date-fns';
 import type { PaginateOptions } from '$lib/types';
 import { normalizeDate } from '$lib/_helpers';
-import { createStripeInvoice } from '$lib/server/stripe';
 import type Stripe from 'stripe';
-import { calculateHours, calculateMaxHours, toUTCDateString } from '$lib/_helpers/UTCTimezoneUtils';
+import { calculateMaxHours, toUTCDateString } from '$lib/_helpers/UTCTimezoneUtils';
 
 // Types and Interfaces
 export interface TimesheetDiscrepancy {
@@ -722,7 +719,7 @@ export const getRequisitionApplications = async (
 
 		// Build the base query
 		const query = db
-			.select({
+			.selectDistinctOn([candidateProfileTable.id], {
 				application: requisitionApplicationTable,
 				candidateProfile: candidateProfileTable,
 				user: {
@@ -807,6 +804,8 @@ export const getRequisitionApplicationDetails = async (
 					eq(requisitionApplicationTable.requisitionId, requisitionId)
 				)
 			);
+
+		console.log('application', application);
 
 		const [resume] = await db
 			.select()
@@ -1045,16 +1044,12 @@ export async function getAllTimesheetsForClient(clientId: string | undefined) {
 	}
 }
 export async function getTimesheetsDueCount(clientId: string) {
-	console.log('getting timesheets count');
 	try {
 		const [result] = await db
 			.select({ count: count() })
 			.from(timeSheetTable)
 			.where(
-				and(
-					eq(timeSheetTable.associatedClientId, clientId),
-					eq(timeSheetTable.awaitingClientSignature, true)
-				)
+				and(eq(timeSheetTable.associatedClientId, clientId), eq(timeSheetTable.status, 'PENDING'))
 			);
 
 		return result.count;
@@ -1508,7 +1503,7 @@ export function validateTimesheet(
 
 			// Validate hours against schedule
 			const maxHours = calculateMaxHours(validRecurrenceDay);
-			console.log({ maxHours, validRecurrenceDay });
+
 			if (entry.hours > maxHours) {
 				discrepancies.push({
 					...createBaseDiscrepancy(timesheet),
@@ -1651,13 +1646,12 @@ export async function getClientInvoices(
 		sourceType?: InvoiceSourceType;
 		includeStripeData?: boolean;
 		limit?: number;
-		offset?: number;
 	}
 ): Promise<InvoiceWithRelations[]> {
 	if (!clientId) throw error(400, 'Must provide client ID');
 
 	// Build dynamic where conditions
-	const whereConditions = [eq(invoiceTable.clientId, clientId)];
+	const whereConditions: SQL[] = [eq(invoiceTable.clientId, clientId)];
 
 	if (options?.status) {
 		whereConditions.push(eq(invoiceTable.status, options.status));
@@ -1680,6 +1674,7 @@ export async function getClientInvoices(
 			timesheet: timeSheetTable,
 			requisition: requisitionTable,
 			client: clientProfileTable,
+			clientCompany: clientCompanyTable,
 			clientUser: {
 				id: sql<string>`client_user.id`,
 				firstName: sql<string>`client_user.first_name`,
@@ -1697,16 +1692,12 @@ export async function getClientInvoices(
 		.leftJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
 		.leftJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
 		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
+		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
 		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
 		.orderBy(desc(invoiceTable.createdAt));
 
-	// Apply pagination if specified
 	if (options?.limit) {
 		query.limit(options.limit);
-	}
-
-	if (options?.offset) {
-		query.offset(options.offset);
 	}
 
 	const results = await query;
@@ -1727,10 +1718,72 @@ export async function getClientInvoices(
 				: null,
 		timesheet: row.timesheet,
 		requisition: row.requisition,
-		lineItems: (row.invoice.lineItems as InvoiceLineItem[]) || [],
+		lineItems: (row.invoice.lineItems as Stripe.InvoiceLineItem[]) || [],
 		client: row.client,
-		clientUser: row.clientUser
+		clientUser: row.clientUser,
+		company: row.clientCompany
 	}));
+}
+
+export async function getAllInvoicesAdmin(): Promise<InvoiceWithRelations[]> {
+	try {
+		const result = await db
+			.select({
+				invoice: invoiceTable,
+				candidateProfile: candidateProfileTable,
+				candidateUser: {
+					id: sql<string>`candidate_user.id`,
+					firstName: sql<string>`candidate_user.first_name`,
+					lastName: sql<string>`candidate_user.last_name`,
+					avatarUrl: sql<string>`candidate_user.avatar_url`
+				},
+				timesheet: timeSheetTable,
+				requisition: requisitionTable,
+				client: clientProfileTable,
+				clientCompany: clientCompanyTable,
+				clientUser: {
+					id: sql<string>`client_user.id`,
+					firstName: sql<string>`client_user.first_name`,
+					lastName: sql<string>`client_user.last_name`,
+					avatarUrl: sql<string>`client_user.avatar_url`
+				}
+			})
+			.from(invoiceTable)
+			.leftJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
+			.leftJoin(
+				sql`${userTable} as candidate_user`,
+				sql`${candidateProfileTable.userId} = candidate_user.id`
+			)
+			.leftJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
+			.leftJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
+			.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
+			.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
+			.innerJoin(
+				sql`${userTable} as client_user`,
+				sql`${clientProfileTable.userId} = client_user.id`
+			)
+			.orderBy(desc(invoiceTable.createdAt));
+
+		return result.map((row) => ({
+			invoice: row.invoice,
+			candidate:
+				row.candidateProfile && row.candidateUser
+					? {
+							profile: row.candidateProfile,
+							user: row.candidateUser
+						}
+					: null,
+			timesheet: row.timesheet,
+			requisition: row.requisition,
+			lineItems: (row.invoice.lineItems as Stripe.InvoiceLineItem[]) || [],
+			client: row.client,
+			clientUser: row.clientUser,
+			company: row.clientCompany
+		}));
+	} catch (err) {
+		console.error('Error fetching all invoices:', err);
+		throw error(500, `Error fetching all invoices: ${err}`);
+	}
 }
 
 export async function getTimesheetInvoices(
@@ -1772,6 +1825,7 @@ export async function getTimesheetInvoices(
 			timesheet: timeSheetTable,
 			requisition: requisitionTable,
 			client: clientProfileTable,
+			clientCompany: clientCompanyTable,
 			clientUser: {
 				id: sql<string>`client_user.id`,
 				firstName: sql<string>`client_user.first_name`,
@@ -1789,6 +1843,7 @@ export async function getTimesheetInvoices(
 		.innerJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
 		.innerJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
 		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
+		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
 		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
 		.orderBy(desc(invoiceTable.createdAt));
 
@@ -1800,9 +1855,10 @@ export async function getTimesheetInvoices(
 		},
 		timesheet: row.timesheet,
 		requisition: row.requisition,
-		lineItems: (row.invoice.lineItems as InvoiceLineItem[]) || [],
+		lineItems: (row.invoice.lineItems as Stripe.InvoiceLineItem[]) || [],
 		client: row.client,
-		clientUser: row.clientUser
+		clientUser: row.clientUser,
+		company: row.clientCompany
 	}));
 }
 
@@ -1835,6 +1891,7 @@ export async function getManualInvoices(
 		.select({
 			invoice: invoiceTable,
 			client: clientProfileTable,
+			clientCompany: clientCompanyTable,
 			clientUser: {
 				id: sql<string>`client_user.id`,
 				firstName: sql<string>`client_user.first_name`,
@@ -1845,6 +1902,7 @@ export async function getManualInvoices(
 		.from(invoiceTable)
 		.where(and(...whereConditions))
 		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
+		.innerJoin(clientCompanyTable, eq(clientProfileTable.id, clientCompanyTable.clientId))
 		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
 		.orderBy(desc(invoiceTable.createdAt));
 
@@ -1852,7 +1910,8 @@ export async function getManualInvoices(
 		invoice: row.invoice,
 		client: row.client,
 		clientUser: row.clientUser,
-		lineItems: (row.invoice.lineItems as InvoiceLineItem[]) || [],
+		company: row.clientCompany,
+		lineItems: (row.invoice.lineItems as Stripe.InvoiceLineItem[]) || [],
 		// These will be null for manual invoices
 		candidate: null,
 		timesheet: null,
@@ -1860,7 +1919,7 @@ export async function getManualInvoices(
 	}));
 }
 
-export async function getInvoiceById(invoiceId: string): Promise<InvoiceWithRelations | null> {
+export async function getInvoiceByIdAdmin(invoiceId: string): Promise<InvoiceWithRelations | null> {
 	const result = await db
 		.select({
 			invoice: invoiceTable,
@@ -1874,6 +1933,7 @@ export async function getInvoiceById(invoiceId: string): Promise<InvoiceWithRela
 			timesheet: timeSheetTable,
 			requisition: requisitionTable,
 			client: clientProfileTable,
+			clientCompany: clientCompanyTable,
 			clientUser: {
 				id: sql<string>`client_user.id`,
 				firstName: sql<string>`client_user.first_name`,
@@ -1891,6 +1951,8 @@ export async function getInvoiceById(invoiceId: string): Promise<InvoiceWithRela
 		.leftJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
 		.leftJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
 		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
+		.innerJoin(clientCompanyTable, eq(clientProfileTable.id, clientCompanyTable.clientId))
+
 		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
 		.limit(1);
 
@@ -1910,9 +1972,73 @@ export async function getInvoiceById(invoiceId: string): Promise<InvoiceWithRela
 				: null,
 		timesheet: row.timesheet,
 		requisition: row.requisition,
-		lineItems: (row.invoice.lineItems as InvoiceLineItem[]) || [],
+		lineItems: (row.invoice.lineItems as Stripe.InvoiceLineItem[]) || [],
 		client: row.client,
-		clientUser: row.clientUser
+		clientUser: row.clientUser,
+		company: row.clientCompany
+	};
+}
+export async function getInvoiceById(
+	invoiceId: string,
+	clientId: string | undefined
+): Promise<InvoiceWithRelations | null> {
+	if (!clientId) throw error(400, 'Client ID is required');
+	const result = await db
+		.select({
+			invoice: invoiceTable,
+			candidateProfile: candidateProfileTable,
+			candidateUser: {
+				id: sql<string>`candidate_user.id`,
+				firstName: sql<string>`candidate_user.first_name`,
+				lastName: sql<string>`candidate_user.last_name`,
+				avatarUrl: sql<string>`candidate_user.avatar_url`
+			},
+			timesheet: timeSheetTable,
+			requisition: requisitionTable,
+			client: clientProfileTable,
+			clientCompany: clientCompanyTable,
+			clientUser: {
+				id: sql<string>`client_user.id`,
+				firstName: sql<string>`client_user.first_name`,
+				lastName: sql<string>`client_user.last_name`,
+				avatarUrl: sql<string>`client_user.avatar_url`
+			}
+		})
+		.from(invoiceTable)
+		.where(and(eq(invoiceTable.id, invoiceId), eq(invoiceTable.clientId, clientId)))
+		.leftJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
+		.leftJoin(
+			sql`${userTable} as candidate_user`,
+			sql`${candidateProfileTable.userId} = candidate_user.id`
+		)
+		.leftJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
+		.leftJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
+		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
+		.innerJoin(clientCompanyTable, eq(clientProfileTable.id, clientCompanyTable.clientId))
+
+		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
+		.limit(1);
+
+	if (!result.length) {
+		return null;
+	}
+
+	const row = result[0];
+	return {
+		invoice: row.invoice,
+		candidate:
+			row.candidateProfile && row.candidateUser
+				? {
+						profile: row.candidateProfile,
+						user: row.candidateUser
+					}
+				: null,
+		timesheet: row.timesheet,
+		requisition: row.requisition,
+		lineItems: (row.invoice.lineItems as Stripe.InvoiceLineItem[]) || [],
+		client: row.client,
+		clientUser: row.clientUser,
+		company: row.clientCompany
 	};
 }
 
@@ -2225,6 +2351,53 @@ export async function approveTimesheet(timesheetId: string, userId: string) {
 	}
 }
 
+export const adminOverrideTimesheet = async (
+	timesheetId: string,
+	userId: string,
+	values: UpdateTimeSheet
+) => {
+	try {
+		const [original] = await db
+			.select()
+			.from(timeSheetTable)
+			.where(eq(timeSheetTable.id, timesheetId));
+
+		if (!original) {
+			throw error(404, 'Timesheet not found');
+		}
+
+		const updatedValues: UpdateTimeSheet = {
+			...values,
+			status: 'APPROVED' // Force status to APPROVED
+		};
+
+		const [result] = await db
+			.update(timeSheetTable)
+			.set(updatedValues)
+			.where(eq(timeSheetTable.id, timesheetId))
+			.returning();
+
+		await writeActionHistory({
+			table: 'TIMESHEETS',
+			userId,
+			action: 'UPDATE',
+			entityId: timesheetId,
+			beforeState: original,
+			afterState: result,
+			metadata: {
+				status: 'APPROVED',
+				overriddenBy: userId,
+				overriddenFields: Object.keys(updatedValues).join(', ')
+			}
+		});
+
+		return result;
+	} catch (err) {
+		console.error('Error in adminOverrideTimesheet:', err);
+		throw error(500, `Error overriding timesheet: ${err}`);
+	}
+};
+
 export async function getInvoiceByTimesheetId(
 	timesheetId: string | undefined
 ): Promise<Invoice | null> {
@@ -2283,7 +2456,9 @@ export async function createInvoiceRecord({
 					stripeStatus: stripeInvoice.status,
 					customerEmail: stripeInvoice.customer_email,
 					customerName: stripeInvoice.customer_name, // You might want to include a more friendly name if available
-					dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Due in 30 days
+					dueDate: stripeInvoice.due_date
+						? new Date(stripeInvoice.due_date * 1000)
+						: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000), // Default to 1 day from now if no due date
 					periodStart: startDate,
 					periodEnd: endDate,
 					description: stripeInvoice.description,
@@ -2313,7 +2488,9 @@ export async function createInvoiceRecord({
 					stripeStatus: stripeInvoice.status,
 					customerEmail: stripeInvoice.customer_email,
 					customerName: stripeInvoice.customer_name, // You might want to include a more friendly name if available
-					dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Due in 30 days
+					dueDate: stripeInvoice.due_date
+						? new Date(stripeInvoice.due_date * 1000)
+						: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000), // Default to 1 day from now if no due date
 					description: stripeInvoice.description,
 					lineItems: JSON.stringify(stripeInvoice.lines.data)
 				})

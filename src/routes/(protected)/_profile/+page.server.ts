@@ -4,10 +4,10 @@ import { setFlash } from 'sveltekit-flash-message/server';
 import {
 	userSchema,
 	userUpdatePasswordSchema,
-	UserUpdatePasswordSchema
+	type UserUpdatePasswordSchema
 } from '$lib/config/zod-schemas';
-import { updateEmailAddressSuccessEmail } from '$lib/config/email-messages';
 import { updateUser } from '$lib/server/database/queries/users';
+import { EmailService } from '$lib/server/email/emailService';
 
 const profileSchema = userSchema.pick({
 	firstName: true,
@@ -38,13 +38,13 @@ export const load = async (event) => {
 export const actions = {
 	default: async (event) => {
 		const form = await superValidate(event, profileSchema);
-		//console.log(form);
 
 		if (!form.valid) {
 			return fail(400, {
 				form
 			});
 		}
+		const emailService = new EmailService();
 
 		//add user to db
 		try {
@@ -64,7 +64,13 @@ export const actions = {
 					await updateUser(user?.userId, {
 						verified: false
 					});
-					await updateEmailAddressSuccessEmail(form.data.email, user?.email, user?.token);
+					// await updateEmailAddressSuccessEmail(form.data.email, user?.email, user?.token);
+					await emailService.sendEmailAddressUpdateSuccessEmail(
+						form.data.email,
+						user?.email,
+						user?.token
+					);
+					await emailService.sendPossibleHijackEmail(form.data.email, user?.email);
 				}
 			}
 		} catch (e) {

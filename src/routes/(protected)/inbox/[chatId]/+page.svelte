@@ -1,33 +1,44 @@
+<!-- /inbox/[id]/+page.svelte -->
 <script lang="ts">
 	import * as Avatar from '$lib/components/ui/avatar';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import { Loader2 } from 'lucide-svelte';
-	import { afterUpdate, onMount } from 'svelte';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { Input } from '$lib/components/ui/input';
+	import { Button } from '$lib/components/ui/button';
+	import { Badge } from '$lib/components/ui/badge';
+	import { Separator } from '$lib/components/ui/separator';
+	import { Loader2, Send, MoreVertical, Phone, Video, Info, Paperclip, Smile } from 'lucide-svelte';
+	import { afterUpdate, onMount, tick } from 'svelte';
 	import { superForm } from 'sveltekit-superforms/client';
+	import { cn } from '$lib/utils';
+	import { invalidateAll } from '$app/navigation';
 
 	export let data;
 
 	let shouldScroll = false;
+	let chatContainer: HTMLElement;
 
 	const { enhance, submitting, form, reset } = superForm(data.form, {
-      resetForm: true,
-      clearOnSubmit: 'message',
-      onResult: ({result}) => {
-        console.log({result})
-        reset({
-          data: {
-            body: $form.body
-          }
-        })
-      }
+		resetForm: true,
+		clearOnSubmit: 'message',
+		onResult: async ({ result }) => {
+			console.log({ result });
+			if (result.type === 'success') {
+				await tick();
+				scrollToBottom();
+			}
+			reset({
+				data: {
+					body: ''
+				}
+			});
+		}
 	});
 
 	$: user = data.user;
 	$: conversation = data.conversation;
 	$: ({ messages } = conversation);
-	$: ({participants} = conversation)
-	$: [chatUser] = participants.filter(u => u.userId !== user.id)
+	$: ({ participants } = conversation);
+	$: [chatUser] = participants.filter((u) => u.userId !== user.id);
 
 	$: if (messages) {
 		shouldScroll = true;
@@ -35,6 +46,7 @@
 
 	onMount(() => {
 		scrollToBottom();
+		invalidateAll();
 	});
 
 	afterUpdate(() => {
@@ -45,86 +57,217 @@
 	});
 
 	const scrollToBottom = () => {
-		if (typeof document !== 'undefined') {
-			const bottom = document?.getElementById('bottom');
-			bottom?.scrollIntoView();
+		if (chatContainer) {
+			chatContainer.scrollTop = chatContainer.scrollHeight;
 		}
 	};
+
+	function formatMessageTime(timestamp: string | Date) {
+		const date = new Date(timestamp);
+		return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+	}
+
+	function formatMessageDate(timestamp: string | Date) {
+		const date = new Date(timestamp);
+		const today = new Date();
+		const yesterday = new Date(today);
+		yesterday.setDate(yesterday.getDate() - 1);
+
+		if (date.toDateString() === today.toDateString()) {
+			return 'Today';
+		} else if (date.toDateString() === yesterday.toDateString()) {
+			return 'Yesterday';
+		} else {
+			return date.toLocaleDateString();
+		}
+	}
+
+	function shouldShowDateDivider(currentMessage: any, previousMessage: any) {
+		if (!previousMessage) return true;
+
+		const currentDate = new Date(currentMessage.createdAt).toDateString();
+		const previousDate = new Date(previousMessage.createdAt).toDateString();
+
+		return currentDate !== previousDate;
+	}
+
+	function handleKeyPress(event: KeyboardEvent) {
+		if (event.key === 'Enter' && !event.shiftKey) {
+			event.preventDefault();
+			const form = event.target?.closest('form');
+			if (form && $form.body.trim()) {
+				form.requestSubmit();
+			}
+		}
+	}
 </script>
 
-<div class="h-full flex flex-col overflow-hidden">
-	<div class="p-6 border-b border-b-gray-200 flex gap-6 items-center bg-white">
-		<Avatar.Root class="h-14 w-14">
-			<Avatar.Image src={chatUser?.avatarUrl} />
-		</Avatar.Root>
-		<p class=" text-3xl font-semibold">{chatUser?.firstName} {chatUser?.lastName}</p>
+<div class="flex flex-col h-full bg-background">
+	<!-- Header -->
+	<div class="flex items-center justify-between p-4 border-b bg-card">
+		<div class="flex items-center gap-3">
+			<Avatar.Root class="h-10 w-10">
+				<Avatar.Image src={chatUser?.avatarUrl} alt={chatUser?.firstName} />
+				<Avatar.Fallback>
+					{chatUser?.firstName?.[0]}{chatUser?.lastName?.[0]}
+				</Avatar.Fallback>
+			</Avatar.Root>
+			<div>
+				<h2 class="font-semibold">
+					{chatUser?.firstName}
+					{chatUser?.lastName}
+				</h2>
+			</div>
+		</div>
+
+		<div class="flex items-center gap-2">
+			<Button variant="ghost" size="sm" class="h-9 w-9 p-0">
+				<Phone class="h-4 w-4" />
+			</Button>
+			<Button variant="ghost" size="sm" class="h-9 w-9 p-0">
+				<Video class="h-4 w-4" />
+			</Button>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger asChild let:builder>
+					<Button variant="ghost" size="sm" class="h-9 w-9 p-0" builders={[builder]}>
+						<MoreVertical class="h-4 w-4" />
+					</Button>
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="end">
+					<DropdownMenu.Item>
+						<Info class="h-4 w-4 mr-2" />
+						View Profile
+					</DropdownMenu.Item>
+					<DropdownMenu.Separator />
+					<DropdownMenu.Item class="text-destructive">Delete Conversation</DropdownMenu.Item>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+		</div>
 	</div>
 
-	<div id="chat-window" class="h-full grow p-4 overflow-y-auto bg-white">
-		<div class="flex flex-col justify-end gap-4">
-			{#if messages}
-				{#each messages as message}
-					{#if message.senderId === user?.id}
-						<div
-							class="self-end p-4 max-w-[400px] w-fit ml-6 bg-blue-500 rounded-t-lg rounded-bl-lg text-white relative"
-						>
-							<p>{message.body}</p>
-							<svg
-								class="absolute -right-2 bottom-0"
-								width="9"
-								height="8"
-								viewBox="0 0 9 8"
-								fill="none"
-								xmlns="http://www.w3.org/2000/svg"
-							>
-								<path
-									d="M0.941197 7.86149L0.920348 0.533866L8.26882 7.88233L0.941197 7.86149Z"
-									fill="#3f83f8"
-								/>
-							</svg>
+	<!-- Messages -->
+	<div bind:this={chatContainer} class="flex-1 overflow-y-auto p-4 space-y-4">
+		{#if messages && messages.length > 0}
+			{#each messages as message, index}
+				<!-- Date divider -->
+				{#if shouldShowDateDivider(message, messages[index - 1])}
+					<div class="flex items-center justify-center my-6">
+						<div class="flex items-center">
+							<Separator class="flex-1" />
+							<div class="px-3">
+								<Badge
+									variant="secondary"
+									class="text-xs"
+									value={formatMessageDate(message.createdAt)}
+								></Badge>
+							</div>
+							<Separator class="flex-1" />
 						</div>
-					{:else}
-						<div
-							class="relative self-start p-4 max-w-[400px] w-fit mr-6 bg-gray-200 rounded-t-lg rounded-br-lg"
-						>
-							<p>{message.body}</p>
-							<svg
-								class="absolute -left-2 bottom-0"
-								width="8"
-								height="8"
-								viewBox="0 0 8 8"
-								fill="none"
-								xmlns="http://www.w3.org/2000/svg"
-							>
-								<path
-									d="M7.81222 7.86149L7.83307 0.533866L0.484601 7.88233L7.81222 7.86149Z"
-									fill="#e5e7eb"
-								/>
-							</svg>
-						</div>
+					</div>
+				{/if}
+
+				<!-- Message -->
+				<div
+					class={cn(
+						'flex gap-2 max-w-[80%]',
+						message.senderId === user?.id ? 'ml-auto flex-row-reverse' : 'mr-auto'
+					)}
+				>
+					{#if message.senderId !== user?.id}
+						<Avatar.Root class="h-8 w-8 mt-auto">
+							<Avatar.Image src={chatUser?.avatarUrl} alt={chatUser?.firstName} />
+							<Avatar.Fallback class="text-xs">
+								{chatUser?.firstName?.[0]}
+							</Avatar.Fallback>
+						</Avatar.Root>
 					{/if}
-				{/each}
-				<div id="bottom" />
-			{/if}
-		</div>
+
+					<div
+						class={cn(
+							'flex flex-col gap-1',
+							message.senderId === user?.id ? 'items-end' : 'items-start'
+						)}
+					>
+						<div
+							class={cn(
+								'px-4 py-2 rounded-2xl max-w-sm word-wrap break-words',
+								message.senderId === user?.id
+									? 'bg-blue-600 text-primary-foreground rounded-br-md'
+									: 'bg-muted rounded-bl-md'
+							)}
+						>
+							<p class="text-sm whitespace-pre-wrap">{message.body}</p>
+						</div>
+						<div class="flex items-center gap-2">
+							<span class="text-xs text-muted-foreground">
+								{formatMessageTime(message.createdAt)}
+							</span>
+						</div>
+					</div>
+				</div>
+			{/each}
+		{:else}
+			<div class="flex flex-col items-center justify-center h-full text-center">
+				<div class="p-6 rounded-full bg-muted mb-4">
+					<Avatar.Root class="h-16 w-16">
+						<Avatar.Image src={chatUser?.avatarUrl} alt={chatUser?.firstName} />
+						<Avatar.Fallback class="text-2xl">
+							{chatUser?.firstName?.[0]}{chatUser?.lastName?.[0]}
+						</Avatar.Fallback>
+					</Avatar.Root>
+				</div>
+				<h3 class="font-semibold text-lg mb-2">
+					{chatUser?.firstName}
+					{chatUser?.lastName}
+				</h3>
+				<p class="text-muted-foreground mb-4">
+					Start your conversation with {chatUser?.firstName}
+				</p>
+			</div>
+		{/if}
 	</div>
-	<form
-		method="POST"
-		action="?/sendNewMessage"
-		use:enhance
-	>
-		<div class="p-6 flex gap-4 border-t border-t-gray-200 bg-white">
-            <Input
-                class="grow-1"
-                placeholder="New Message..."
-                name="body"
-                bind:value={$form.body}
-            />
-			<Button type="submit">
-			    {#if $submitting}
-					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-				{:else}Send{/if}
+
+	<!-- Message Input -->
+	<div class="border-t bg-card p-4">
+		<form method="POST" action="?/sendNewMessage" use:enhance class="flex items-end gap-3">
+			<div class="flex-1">
+				<div class="flex items-center gap-2 p-3 border rounded-lg bg-background">
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						class="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+					>
+						<Paperclip class="h-4 w-4" />
+					</Button>
+
+					<Input
+						name="body"
+						bind:value={$form.body}
+						placeholder="Type a message..."
+						class="border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+						on:keypress={handleKeyPress}
+						disabled={$submitting}
+					/>
+
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						class="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+					>
+						<Smile class="h-4 w-4" />
+					</Button>
+				</div>
+			</div>
+
+			<Button type="submit" disabled={$submitting || !$form.body.trim()} class="h-12 w-12 p-0">
+				{#if $submitting}
+					<Loader2 class="h-4 w-4 animate-spin" />
+				{:else}
+					<Send class="h-4 w-4" />
+				{/if}
 			</Button>
-		</div>
-	</form>
+		</form>
+	</div>
 </div>

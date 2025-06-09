@@ -1,9 +1,12 @@
+import type { PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
-import { sendVerificationEmail } from '$lib/config/email-messages';
+// import { sendVerificationEmail } from '$lib/config/email-messages';
+import { EmailService } from '$lib/server/email/emailService';
 import { getUserByEmail, updateUser } from '$lib/server/database/queries/users';
 
-export async function load({ params }) {
+export const load: PageServerLoad = async ({ params }) => {
 	try {
+		const emailService = new EmailService();
 		const email = decodeURIComponent(params.email) as string;
 
 		const user = await getUserByEmail(email);
@@ -17,7 +20,8 @@ export async function load({ params }) {
 				'A new verification email was sent.  Please check your email for the message. (Check the spam folder if it is not in your inbox)';
 			await updateUser(user.id, { verified: false });
 			if (user.token) {
-				sendVerificationEmail(user.email, user.token);
+				// sendVerificationEmail(user.email, user.token);
+				await emailService.sendVerificationEmail(user.email, user.token);
 			}
 		}
 		return { heading: heading, message: message };
@@ -26,4 +30,4 @@ export async function load({ params }) {
 			error: e
 		});
 	}
-}
+};

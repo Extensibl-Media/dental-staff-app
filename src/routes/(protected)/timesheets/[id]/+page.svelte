@@ -505,6 +505,12 @@
 															<p class="font-medium">
 																{record.user.firstName}
 																{record.user.lastName}
+																<span class="font-regular text-sm"
+																	>{#if record.action === 'CREATE'}created{/if}
+																	{#if record.action === 'UPDATE'}updated{/if}
+																	{#if record.action === 'DELETE'}deleted{/if}
+																	timesheet
+																</span>
 															</p>
 															<p class="text-xs text-gray-500">
 																{format(record.createdAt, 'PPp')}
@@ -583,7 +589,7 @@
 				</Card>
 
 				<!-- Export Options -->
-				<Card>
+				<!-- <Card>
 					<CardHeader>
 						<CardTitle>Export Options</CardTitle>
 					</CardHeader>
@@ -597,13 +603,8 @@
 							<Printer class="h-4 w-4" />
 							<span>Print Timesheet</span>
 						</Button>
-
-						<Button variant="outline" class="w-full gap-2">
-							<Clipboard class="h-4 w-4" />
-							<span>Export Audit Log</span>
-						</Button>
 					</CardContent>
-				</Card>
+				</Card> -->
 			</div>
 		</div>
 

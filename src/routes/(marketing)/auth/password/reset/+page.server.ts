@@ -1,7 +1,8 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { setError, superValidate } from 'sveltekit-superforms/server';
 import { userSchema } from '$lib/config/zod-schemas';
-import { sendPasswordResetEmail } from '$lib/config/email-messages';
+// import { sendPasswordResetEmail } from '$lib/config/email-messages';
+import { EmailService } from '$lib/server/email/emailService';
 import { getUserByEmail, updateUser } from '$lib/server/database/queries/users';
 
 const resetPasswordSchema = userSchema.pick({ email: true });
@@ -22,6 +23,7 @@ export const actions = {
 				form
 			});
 		}
+		const emailService = new EmailService();
 
 		try {
 			const user = await getUserByEmail(form.data.email);
@@ -31,7 +33,7 @@ export const actions = {
 			console.log('reset user password');
 			const token = crypto.randomUUID();
 			await updateUser(user.id, { token: token });
-			await sendPasswordResetEmail(form.data.email, token);
+			await emailService.sendPasswordResetEmail(form.data.email, token);
 		} catch (e) {
 			console.error(e);
 			return setError(

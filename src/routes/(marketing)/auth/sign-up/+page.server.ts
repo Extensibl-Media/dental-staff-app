@@ -6,7 +6,8 @@ import { lucia } from '$lib/server/lucia';
 import { createUser } from '$lib/server/database/queries/users';
 
 import { userSchema } from '$lib/config/zod-schemas';
-import { sendVerificationEmail } from '$lib/config/email-messages';
+// import { sendVerificationEmail } from '$lib/config/email-messages';
+import { EmailService } from '$lib/server/email/emailService';
 import db from '$lib/server/database/drizzle';
 import { eq } from 'drizzle-orm';
 import { companyStaffInviteLocations, userInviteTable } from '$lib/server/database/schemas/auth';
@@ -16,6 +17,7 @@ import {
 } from '$lib/server/database/schemas/client.js';
 import { getClientIdByCompanyId } from '$lib/server/database/queries/clients.js';
 import type { PageServerLoad, RequestEvent } from './$types';
+import { getUserTimezone } from '$lib/_helpers/UTCTimezoneUtils';
 
 const signUpSchema = userSchema.pick({
 	firstName: true,
@@ -61,6 +63,8 @@ export const actions = {
 				form
 			});
 		}
+
+		const emailService = new EmailService();
 
 		try {
 			const password = await new Argon2id().hash(form.data.password);
@@ -109,7 +113,8 @@ export const actions = {
 				completedOnboarding: inviteData.invitedRole === 'CLIENT_STAFF' ? true : false,
 				blacklisted: null,
 				onboardingStep: 1,
-				stripeCustomerId: null
+				stripeCustomerId: null,
+				timezone: getUserTimezone()
 			};
 
 			const newUser = await db.transaction(async (tx) => {
@@ -190,7 +195,8 @@ export const actions = {
 						event
 					);
 				} else {
-					await sendVerificationEmail(newUser.email, user.token);
+					// await sendVerificationEmail(newUser.email, user.token);
+					await emailService.sendVerificationEmail(newUser.email, user.token);
 					setFlash(
 						{
 							type: 'success',

@@ -10,7 +10,6 @@ import {
 	type ClientCompany,
 	type ClientCompanyLocation,
 	type ClientCompanyLocationSelect,
-	type ClientCompanyStaffProfile,
 	type ClientProfile,
 	type NewClientCompanyStaffLocation,
 	type OperatingHours,
@@ -25,7 +24,7 @@ import {
 import { convertRecurrenceDayToEvent } from '$lib/components/calendar/utils';
 import { recurrenceDayTable, requisitionTable } from '../schemas/requisition';
 import { error } from '@sveltejs/kit';
-import { getSupportTicketsForUser, getSupportTicketsForUserWithLimit } from './support';
+import { getSupportTicketsForUserWithLimit } from './support';
 import {
 	getClientCompanyTimesheetDiscrepancies,
 	getClientInvoices,
@@ -34,8 +33,8 @@ import {
 	getRecentTimesheetsDueForClient,
 	getTimesheetsDueCount
 } from './requisitions';
-import { sendClientStaffInviteEmail } from '$lib/config/email-messages';
 import type { PaginateOptions } from '$lib/types';
+import { EmailService } from '$lib/server/email/emailService';
 
 export type ClientWithCompanyRaw = {
 	birthday: string | null;
@@ -778,7 +777,7 @@ export async function getClientDashboardData(
 		await getSupportTicketsForUserWithLimit(userId, 5),
 		await getRecentRequisitionApplications(company.id),
 		await getRecentTimesheetsDueForClient(clientId),
-		await getClientInvoices(clientId, { limit: 5, offset: 0 })
+		await getClientInvoices(clientId, { limit: 5 })
 	]);
 
 	return {
@@ -846,6 +845,8 @@ export async function inviteStaffUsersToAccount(locationId: string, invitees: Ne
 		throw new Error('Company not found');
 	}
 
+	const emailService = new EmailService();
+
 	const inviteResults = await Promise.all(
 		invitees.map(async (invitee) => {
 			const token = crypto.randomUUID();
@@ -878,7 +879,7 @@ export async function inviteStaffUsersToAccount(locationId: string, invitees: Ne
 
 					// Send the invite email
 					try {
-						await sendClientStaffInviteEmail(
+						await emailService.sendClientStaffInviteEmail(
 							invitee.email,
 							token,
 							company.name || 'unknown company'

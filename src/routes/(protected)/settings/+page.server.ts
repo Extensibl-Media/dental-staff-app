@@ -2,7 +2,6 @@ import { fail } from '@sveltejs/kit';
 import { setError, superValidate, message } from 'sveltekit-superforms/server';
 import { setFlash } from 'sveltekit-flash-message/server';
 import { clientCompanySchema, userSchema, userUpdatePasswordSchema } from '$lib/config/zod-schemas';
-import { updateEmailAddressSuccessEmail } from '$lib/config/email-messages';
 import { getUserByEmail, updateUser } from '$lib/server/database/queries/users';
 import { USER_ROLES } from '$lib/config/constants.js';
 import {
@@ -15,6 +14,7 @@ import { getClientBillingInfo } from '$lib/server/database/queries/billing.js';
 import db from '$lib/server/database/drizzle.js';
 import { eq } from 'drizzle-orm';
 import { clientCompanyTable } from '$lib/server/database/schemas/client.js';
+import { EmailService } from '$lib/server/email/emailService';
 
 const userProfileSchema = userSchema.pick({
 	firstName: true,
@@ -136,6 +136,8 @@ export const actions = {
 			});
 		}
 
+		const emailService = new EmailService();
+
 		//add user to db
 		try {
 			console.log('updating profile');
@@ -154,7 +156,12 @@ export const actions = {
 					await updateUser(user?.userId, {
 						verified: false
 					});
-					await updateEmailAddressSuccessEmail(form.data.email, user?.email, user?.token);
+					await emailService.sendEmailAddressUpdateSuccessEmail(
+						form.data.email,
+						user?.email,
+						user?.token
+					);
+					await emailService.sendPossibleHijackEmail(form.data.email, user?.email);
 				}
 			}
 		} catch (e) {

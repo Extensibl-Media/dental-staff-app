@@ -4,7 +4,9 @@ import { env } from '$env/dynamic/private';
 import db from '$lib/server/database/drizzle';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { userTable } from '$lib/server/database/schemas/auth';
+import { userTable, type User } from '$lib/server/database/schemas/auth';
+import { EmailService } from '$lib/server/email/emailService';
+import { updateUser } from '$lib/server/database/queries/users';
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': env.CANDIDATE_APP_DOMAIN,
@@ -21,6 +23,7 @@ export const OPTIONS: RequestHandler = async () => {
 
 export const POST: RequestHandler = async ({ request }) => {
 	try {
+		const emailService = new EmailService();
 		const user = await authenticateUser(request);
 		if (!user) {
 			return json(
@@ -56,11 +59,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			);
 		}
 
-		const [updatedUser] = await db
-			.update(userTable)
-			.set(parsedProfile.data)
-			.where(eq(userTable.id, user.id))
-			.returning();
+		const newData: Partial<User> = { ...parsedProfile.data };
+
+		const updatedUser = await updateUser(user.id, newData);
 
 		return json(
 			{
@@ -71,7 +72,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			{ status: 200, headers: corsHeaders }
 		);
 	} catch (error) {
-		console.error('Error updating user data:', error);
+		// console.error('Error updating user data:', error);
 		return json(
 			{ success: false, message: 'An unexpected error occurred' },
 			{ status: 500, headers: corsHeaders }

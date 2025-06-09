@@ -54,13 +54,6 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 		const requisitionTimesheets = await getRequisitionTimesheets(idAsNum);
 		const requisitionRecurrenceDays = await getRecurrenceDaysForRequisition(idAsNum);
 
-		console.log({
-			requisition,
-			requisitionApplications,
-			requisitionTimesheets,
-			requisitionRecurrenceDays
-		});
-
 		return {
 			user,
 			hasRequisitionRights: true,
@@ -83,10 +76,7 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 
 		const company = await getClientCompanyByClientId(client.id);
 		const result = await getRequisitionDetailsById(idAsNum);
-		const requisitionApplications = await getRequisitionApplications(
-			idAsNum,
-			result.requisition.disciplineId
-		);
+		const requisitionApplications = await getRequisitionApplications(idAsNum);
 		const requisitionTimesheets = await getRequisitionTimesheets(idAsNum);
 		const requisitionRecurrenceDays = await getRecurrenceDaysForRequisition(idAsNum);
 
@@ -195,7 +185,6 @@ export const actions = {
 		const requisition = await getRequisitionDetailsById(idAsNum);
 
 		try {
-			// Get the original form data
 			const daysToAdd = form.data.recurrenceDays;
 			console.log('Received recurrence days:', daysToAdd);
 			// Parse the recurrence days from the form data
@@ -224,7 +213,7 @@ export const actions = {
 		}
 
 		// Helper function to process each day
-		async function processDay(day) {
+		async function processDay(day: Record<string, any>) {
 			// Convert the day to UTC format
 			const utcDay = convertRecurrenceDayToUTC(day, requisition.requisition.referenceTimezone);
 
@@ -286,6 +275,13 @@ export const actions = {
 			};
 
 			await editRecurrenceDay(id, values, user.id);
+			setFlash(
+				{
+					type: 'success',
+					message: 'Recurrence day edited successfully'
+				},
+				request
+			);
 
 			return message(
 				{
@@ -303,7 +299,14 @@ export const actions = {
 				'Edited Recurrence Day'
 			);
 		} catch (error) {
-			console.log(error);
+			console.error(error);
+			setFlash(
+				{
+					type: 'error',
+					message: 'Failed to edit recurrence day'
+				},
+				request
+			);
 			return setError(form, 'Something went wrong');
 		}
 	},
@@ -327,10 +330,24 @@ export const actions = {
 			}
 
 			await deleteRecurrenceDay(id, user.id);
+			setFlash(
+				{
+					type: 'success',
+					message: 'Recurrence day deleted successfully'
+				},
+				request
+			);
 
 			return message(form, 'Deleted Recurrence Day');
 		} catch (error) {
-			console.log(error);
+			console.error(error);
+			setFlash(
+				{
+					type: 'error',
+					message: 'Failed to delete recurrence day'
+				},
+				request
+			);
 			return setError(form, 'Something went wrong');
 		}
 	}

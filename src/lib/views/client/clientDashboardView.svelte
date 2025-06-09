@@ -190,7 +190,7 @@
 											<span
 												class={cn(
 													'text-sm',
-													new Date(invoiceData.invoice.dueDate) < new Date() &&
+													invoiceData.invoice.dueDate < new Date() &&
 														invoiceData.invoice.status !== 'paid' &&
 														'text-red-600 font-semibold'
 												)}

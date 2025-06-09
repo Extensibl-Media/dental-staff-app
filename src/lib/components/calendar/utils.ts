@@ -23,7 +23,7 @@ export function convertRecurrenceDayToEvent(
 	recurrenceDay: RecurrenceDay,
 	requisition: Requisition
 ) {
-	const { date, dayStart, dayEnd, lunchStart, lunchEnd, status } = recurrenceDay;
+	const { dayStart, dayEnd, status } = recurrenceDay;
 
 	// Get reference timezone from the requisition
 	const timezone = getUserTimezone() || 'America/New_York'; // Default to EST if no timezone is set
@@ -32,16 +32,6 @@ export function convertRecurrenceDayToEvent(
 	// We need to create proper Date objects from the timestamps
 	const localDayStart = formatTimestampForDisplay(dayStart, timezone);
 	const localDayEnd = formatTimestampForDisplay(dayEnd, timezone);
-
-	console.log({
-		originalDate: date,
-		dateObj: new Date(date),
-		dayStart,
-		localDayStart,
-		dayEnd,
-		localDayEnd,
-		timezone
-	});
 
 	// Create event with local time display values
 	return {

@@ -15,10 +15,18 @@ export const load: PageServerLoad = async (event) => {
 
 	const form = await superValidate(event, newMessageSchema);
 	const inboxService = new InboxService();
+	const conversation = await inboxService.getConversationDetails(chatId, user.id);
+
+	const lastMessage = conversation.messages[conversation.messages.length - 1];
+
+	if (lastMessage) {
+		await inboxService.markAsRead(chatId, user.id, lastMessage.id);
+	}
+
 	return {
 		form,
 		user,
-		conversation: await inboxService.getConversationDetails(chatId, user.id)
+		conversation
 	};
 };
 

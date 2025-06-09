@@ -38,8 +38,11 @@
 			class="w-full text-left flex gap-x-4 p-2 text-white hover:bg-blue-800 cursor-pointer rounded-sm items-center transition-all duration-100"
 		>
 			<slot />
-			<span class={cn('grow origin-left text-white text-sm leading-none', !expanded && 'hidden')}
-				>{link.name}</span
+			<span
+				class={cn(
+					'grow origin-left text-white text-sm whitespace-nowrap text-nowrap leading-none',
+					!expanded && 'hidden'
+				)}>{link.name}</span
 			>
 			<ChevronDown
 				class={cn(

@@ -28,7 +28,11 @@ export const load = async (event) => {
 	}
 
 	if (user?.role === USER_ROLES.SUPERADMIN) {
-		const results = await getPaginatedRequisitionsAdmin({ limit: 10, offset: 0 });
+		const results = await getPaginatedRequisitionsAdmin({
+			limit: 10,
+			offset: skip || 0,
+			orderBy
+		});
 		const form = superValidate(event, adminRequisitionSchema);
 		return {
 			user: event.locals.user,
@@ -69,7 +73,7 @@ export const load = async (event) => {
 
 		const company = await getClientCompanyByClientId(client?.id);
 
-		const form = superValidate(event, clientRequisitionSchema);
+		const form = await superValidate(event, clientRequisitionSchema);
 
 		const results = await getPaginatedRequisitionsforClient(company.id, {
 			limit: 10,

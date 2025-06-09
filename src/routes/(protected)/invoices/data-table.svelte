@@ -12,8 +12,12 @@
 	import type { InvoiceWithRelations } from '$lib/server/database/schemas/requisition';
 	import DataTableActions from './data-table-actions.svelte';
 	import { writable } from 'svelte/store';
+	import { USER_ROLES } from '$lib/config/constants';
 
 	export let data: InvoiceWithRelations[];
+	export let role;
+
+	$: isAdmin = role === USER_ROLES.SUPERADMIN;
 
 	// Define columns
 	const columns: ColumnDef<InvoiceWithRelations>[] = [
@@ -22,12 +26,15 @@
 			accessorFn: (row) => row.invoice.invoiceNumber
 		},
 		{
-			header: 'Requisition',
+			header: 'Req #',
 			accessorFn: (row) => row.requisition?.id
 		},
 		{
-			header: 'Candidate',
-			accessorFn: (row) => `${row.candidate?.user.firstName} ${row.candidate?.user.lastName}`
+			header: isAdmin ? 'Client' : 'Candidate',
+			accessorFn: (row) =>
+				isAdmin
+					? `${row.company?.companyName}`
+					: `${row.candidate?.user.firstName} ${row.candidate?.user.lastName}`
 		},
 		{
 			header: 'Status',
@@ -68,9 +75,9 @@
 		getCoreRowModel: getCoreRowModel(),
 		getPaginationRowModel: getPaginationRowModel(),
 		getSortedRowModel: getSortedRowModel(),
-		state: {
+		initialState: {
 			pagination: {
-				pageSize: 10,
+				pageSize: 10, // Set your desired page size
 				pageIndex: 0
 			}
 		}
@@ -78,6 +85,8 @@
 
 	// Create table
 	const table = createSvelteTable(tableOptions);
+
+	$: tableOptions.update((opts) => ({ ...opts, data }));
 </script>
 
 <div>
@@ -127,22 +136,32 @@
 		</Table.Root>
 	</div>
 
-	<div class="flex items-center justify-end space-x-2 py-4">
-		<Button
-			variant="outline"
-			size="sm"
-			on:click={() => $table.previousPage()}
-			disabled={!$table.getCanPreviousPage()}
-		>
-			Previous
-		</Button>
-		<Button
-			variant="outline"
-			size="sm"
-			on:click={() => $table.nextPage()}
-			disabled={!$table.getCanNextPage()}
-		>
-			Next
-		</Button>
+	<!-- Client-side pagination controls -->
+	<div class="flex items-center justify-between space-x-2 py-4">
+		<div class="text-sm text-muted-foreground">
+			Showing {$table.getState().pagination.pageIndex * $table.getState().pagination.pageSize + 1} to
+			{Math.min(
+				($table.getState().pagination.pageIndex + 1) * $table.getState().pagination.pageSize,
+				data.length
+			)} of {data.length} results
+		</div>
+		<div class="flex items-center space-x-2">
+			<Button
+				variant="outline"
+				size="sm"
+				on:click={() => $table.previousPage()}
+				disabled={!$table.getCanPreviousPage()}
+			>
+				Previous
+			</Button>
+			<Button
+				variant="outline"
+				size="sm"
+				on:click={() => $table.nextPage()}
+				disabled={!$table.getCanNextPage()}
+			>
+				Next
+			</Button>
+		</div>
 	</div>
 </div>

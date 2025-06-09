@@ -15,9 +15,7 @@
 		ScrollText,
 		LifeBuoy,
 		MessageCircleQuestion,
-
 		FileClock
-
 	} from 'lucide-svelte';
 	import { cn } from '$lib/utils';
 	import DashboardNavLink from './dashboard-nav-link.svelte';
@@ -92,13 +90,14 @@
 			<DashboardNavLink
 				bind:expanded
 				link={{
-					name: 'Admin',
-					children: [
-						{ name: 'Admin Menu', path: '/admin/menu' },
-						{ name: 'Reports', path: '/admin/reports' },
-						{ name: 'Action History', path: '/admin/history' },
-						{ name: 'Support Tickets', path: '/admin/support-tickets' }
-					]
+					name: 'Admin Menu',
+					path: '/admin/menu'
+					// children: [
+					// 	{ name: 'Admin Menu', path: '/admin/menu' },
+					// 	{ name: 'Reports', path: '/admin/reports' },
+					// 	{ name: 'Action History', path: '/admin/history' },
+					// 	{ name: 'Support Tickets', path: '/admin/support-tickets' }
+					// ]
 				}}
 			>
 				<Shield class="shrink-0" />
