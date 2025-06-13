@@ -1,16 +1,16 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { USER_ROLES } from '$lib/config/constants';
-import { getAllClientProfiles, getClientProfilesCount } from '$lib/server/database/queries/clients';
+import { getAllCandidateProfiles } from '$lib/server/database/queries/candidates';
 
 export const load: PageServerLoad = async ({ url, locals, setHeaders }) => {
-	const searchTerm = url.searchParams.get('search') || '';
+	const searchTerm = url.searchParams.get('search')?.toString();
 
 	setHeaders({
 		'cache-control': 'max-age=60'
 	});
-	const user = locals.user;
 
+	const user = locals.user;
 	if (!user) {
 		redirect(302, '/auth/sign-in');
 	}
@@ -19,11 +19,11 @@ export const load: PageServerLoad = async ({ url, locals, setHeaders }) => {
 		redirect(302, '/dashboard');
 	}
 
-	const results = await getAllClientProfiles(searchTerm);
-	const count = await getClientProfilesCount();
+	const results = await getAllCandidateProfiles(searchTerm);
 
 	return {
-		clients: results || [],
-		count: count || 0
+		candidates: results?.candidates || [],
+		count: results?.count || 0,
+		searchTerm: searchTerm || ''
 	};
 };

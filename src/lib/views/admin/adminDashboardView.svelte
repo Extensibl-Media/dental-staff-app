@@ -17,7 +17,8 @@
 		CheckCircle2,
 		XCircle,
 		Clock3,
-		Building
+		Building,
+		DollarSign
 	} from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { formatCurrency, formatDate, formatTicketDate } from '$lib/_helpers';
@@ -30,118 +31,39 @@
 	export let user;
 	export let data;
 
-	// Stats data
-	$: timesheetsDueCount = data.timesheetsDueCount;
-	$: supportTicketsCount = data.supportTicketsCount;
-	$: timesheetDiscrepancies = data.discrepanciesCount;
+	// Stats data from actual API response
+	$: timesheetsDueCount = data.timesheetsDueCount || 0;
+	$: supportTicketsCount = data.openSupportTicketsCount || 0;
+	$: discrepanciesCount = data.discrepancies?.length || 0;
+	$: invoicesDueCount = data.invoicesDueCount || 0;
 
-	// Table data
-	$: supportTickets = data.supportTickets;
-	$: timesheetsWithDiscrepancies = data.timesheetsWithDiscrepancies;
-	$: recentMessages = data.recentMessages;
-	$: newCandidateProfiles = data.newCandidateProfiles;
-	$: newClientSignups = data.newClientSignups;
+	// Table data from actual API response
+	$: supportTickets = data.supportTickets || [];
+	$: discrepancies = data.discrepancies || [];
+	$: newCandidateProfiles = data.newCandidateProfiles || [];
+	$: newClientSignups = data.newClientSignups || [];
+	$: invoicesDue = data.invoicesDue || [];
 
-	// Calculate the % change in timesheets due from previous period (dummy data for demo)
-	const timesheetsTrendPercent = 12; // 12% increase
-	const supportTicketsTrendPercent = -5; // 5% decrease
-	const discrepanciesTrendPercent = 8; // 8% increase
+	// Calculate the % change in timesheets due from previous period (placeholder - you'll need to implement actual trend calculation)
+	const timesheetsTrendPercent = 12; // This should be calculated based on historical data
+	const supportTicketsTrendPercent = -5;
+	const discrepanciesTrendPercent = 8;
+	const invoicesTrendPercent = 15;
 
 	let activeTab = 'timesheets';
-
-	// Simplified activity history for timeline
-	const activityTimeline = [
-		{
-			time: '9:32 AM',
-			date: 'Today',
-			title: 'New timesheet submitted',
-			description: 'Robert Jones submitted a timesheet for review',
-			icon: FileClock,
-			color: 'bg-blue-500'
-		},
-		{
-			time: '8:15 AM',
-			date: 'Today',
-			title: 'Support ticket resolved',
-			description: "Amanda Taylor's login issue was resolved",
-			icon: CheckCircle2,
-			color: 'bg-green-500'
-		},
-		{
-			time: '4:45 PM',
-			date: 'Yesterday',
-			title: 'New client onboarded',
-			description: 'Quantum Solutions completed onboarding',
-			icon: Building,
-			color: 'bg-indigo-500'
-		},
-		{
-			time: '2:30 PM',
-			date: 'Yesterday',
-			title: 'Timesheet discrepancy flagged',
-			description: "Discrepancy in Emily Davis's timesheet",
-			icon: AlertCircle,
-			color: 'bg-orange-500'
-		},
-		{
-			time: '11:20 AM',
-			date: 'Yesterday',
-			title: 'New candidate profile',
-			description: 'Daniel Clark submitted application',
-			icon: UserPlus,
-			color: 'bg-purple-500'
-		}
-	];
-
-	// Demo chart data (for visualization purposes)
-	let chartCanvas;
-
-	onMount(() => {
-		if (typeof window !== 'undefined' && chartCanvas) {
-			// This would be replaced with a proper chart library like Chart.js
-			// For now, just drawing a simple line to simulate a chart
-			const ctx = chartCanvas.getContext('2d');
-			const width = chartCanvas.width;
-			const height = chartCanvas.height;
-
-			// Clear canvas
-			ctx.clearRect(0, 0, width, height);
-
-			// Draw a line chart
-			ctx.beginPath();
-			ctx.moveTo(0, height * 0.8);
-			ctx.lineTo(width * 0.2, height * 0.6);
-			ctx.lineTo(width * 0.4, height * 0.7);
-			ctx.lineTo(width * 0.6, height * 0.4);
-			ctx.lineTo(width * 0.8, height * 0.5);
-			ctx.lineTo(width, height * 0.3);
-
-			// Style the line
-			ctx.strokeStyle = '#3b82f6';
-			ctx.lineWidth = 2;
-			ctx.stroke();
-
-			// Fill area under the line
-			ctx.lineTo(width, height);
-			ctx.lineTo(0, height);
-			ctx.closePath();
-			ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
-			ctx.fill();
-		}
-	});
 
 	// Function to determine status color class
 	function getStatusColorClass(status) {
 		return cn(
-			status === 'PENDING' && 'bg-yellow-300 hover:bg-yellow-400',
-			status === 'NEW' && 'bg-green-400 hover:bg-green-500',
-			status === 'ACTIVE' && 'bg-green-400 hover:bg-green-500',
-			status === 'DISCREPANCY' && 'bg-orange-400 hover:bg-orange-500',
-			status === 'CLOSED' && 'bg-red-500 hover:bg-red-600',
-			status === 'APPROVED' && 'bg-green-400 hover:bg-green-600',
-			status === 'VOID' && 'bg-gray-200 hover:bg-gray-300',
-			status === 'INACTIVE' && 'bg-gray-200 hover:bg-gray-300',
-			status === 'REJECTED' && 'bg-red-500 hover:bg-red-600'
+			status === 'PENDING' && 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
+			status === 'NEW' && 'bg-blue-100 text-blue-800 hover:bg-blue-200',
+			status === 'ACTIVE' && 'bg-green-100 text-green-800 hover:bg-green-200',
+			status === 'DISCREPANCY' && 'bg-orange-100 text-orange-800 hover:bg-orange-200',
+			status === 'CLOSED' && 'bg-gray-100 text-gray-800 hover:bg-gray-200',
+			status === 'APPROVED' && 'bg-green-100 text-green-800 hover:bg-green-200',
+			status === 'VOID' && 'bg-gray-100 text-gray-800 hover:bg-gray-200',
+			status === 'INACTIVE' && 'bg-gray-100 text-gray-800 hover:bg-gray-200',
+			status === 'REJECTED' && 'bg-red-100 text-red-800 hover:bg-red-200'
 		);
 	}
 
@@ -154,29 +76,33 @@
 	function getTrendColorClass(value) {
 		return value > 0 ? 'text-green-500' : 'text-red-500';
 	}
+
+	// Function to get discrepancy type badge color
+	function getDiscrepancyTypeColor(type) {
+		switch (type) {
+			case 'MISSING_HOURS':
+				return 'bg-red-100 text-red-800';
+			case 'OVERTIME_MISMATCH':
+				return 'bg-orange-100 text-orange-800';
+			case 'SCHEDULE_MISMATCH':
+				return 'bg-yellow-100 text-yellow-800';
+			default:
+				return 'bg-gray-100 text-gray-800';
+		}
+	}
+
+	// Function to format discrepancy type for display
+	function formatDiscrepancyType(type) {
+		return (
+			type
+				?.replace(/_/g, ' ')
+				.toLowerCase()
+				.replace(/\b\w/g, (l) => l.toUpperCase()) || 'Unknown'
+		);
+	}
 </script>
 
 <section class="min-h-screen bg-gray-50">
-	<!-- Header area -->
-	<!-- <div class="px-6 py-4 bg-white shadow-sm border-b border-gray-200">
-		<div class="flex justify-between items-center max-w-7xl mx-auto">
-			<h1 class="text-2xl font-bold text-gray-900">
-				<span class="text-blue-600">Admin</span> Dashboard
-			</h1>
-			<div class="flex items-center space-x-4">
-				<NotificationsMenu notifications={data.notifications || []} />
-				<div class="flex items-center space-x-2">
-					<div class="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
-						{user?.firstName?.[0]}{user?.lastName?.[0]}
-					</div>
-					<span class="font-medium text-gray-700 hidden md:inline-block">
-						{user?.firstName} {user?.lastName}
-					</span>
-				</div>
-			</div>
-		</div>
-	</div> -->
-
 	<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 		<!-- Welcome and date -->
 		<div class="mb-8">
@@ -189,9 +115,9 @@
 		</div>
 
 		<!-- Stat cards row -->
-		<div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
 			<!-- Timesheets due -->
-			<Card.Root class="">
+			<Card.Root>
 				<Card.Content class="p-6">
 					<div class="flex justify-between items-start">
 						<div>
@@ -225,13 +151,13 @@
 			</Card.Root>
 
 			<!-- Discrepancies card -->
-			<Card.Root class="">
+			<Card.Root>
 				<Card.Content class="p-6">
 					<div class="flex justify-between items-start">
 						<div>
 							<p class="text-gray-500 text-sm font-medium">Discrepancies</p>
 							<div class="flex items-baseline mt-1">
-								<p class="text-4xl font-bold text-gray-900">{timesheetDiscrepancies}</p>
+								<p class="text-4xl font-bold text-gray-900">{discrepanciesCount}</p>
 								<span
 									class={`ml-2 ${getTrendColorClass(discrepanciesTrendPercent)} text-sm font-medium flex items-center`}
 								>
@@ -263,7 +189,7 @@
 			</Card.Root>
 
 			<!-- Support tickets card -->
-			<Card.Root class="">
+			<Card.Root>
 				<Card.Content class="p-6">
 					<div class="flex justify-between items-start">
 						<div>
@@ -295,12 +221,46 @@
 					</div>
 				</Card.Content>
 			</Card.Root>
+
+			<!-- Invoices due card -->
+			<Card.Root>
+				<Card.Content class="p-6">
+					<div class="flex justify-between items-start">
+						<div>
+							<p class="text-gray-500 text-sm font-medium">Invoices Due</p>
+							<div class="flex items-baseline mt-1">
+								<p class="text-4xl font-bold text-gray-900">{invoicesDueCount}</p>
+								<span
+									class={`ml-2 ${getTrendColorClass(invoicesTrendPercent)} text-sm font-medium flex items-center`}
+								>
+									{formatTrendValue(invoicesTrendPercent)}
+									{#if invoicesTrendPercent > 0}
+										<TrendingUp size={16} class="ml-1" />
+									{:else}
+										<TrendingUp size={16} class="ml-1 transform rotate-180" />
+									{/if}
+								</span>
+							</div>
+							<p class="text-gray-400 text-xs mt-1">vs. previous period</p>
+						</div>
+						<div class="bg-green-100 p-3 rounded-full">
+							<DollarSign size={24} class="text-green-600" />
+						</div>
+					</div>
+					<div class="mt-4">
+						<Button variant="link" class="text-green-600 p-0 h-auto" href="/invoices">
+							View invoices
+							<ArrowRight size={16} class="ml-1" />
+						</Button>
+					</div>
+				</Card.Content>
+			</Card.Root>
 		</div>
 
 		<!-- Main grid -->
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 			<!-- Left column - Tables section -->
-			<div class="lg:col-span-2 space-y-6">
+			<div class="lg:col-span-3 space-y-6">
 				<!-- Tab navigation -->
 				<div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
 					<div class="flex border-b border-gray-200">
@@ -308,158 +268,192 @@
 							class={`flex-1 py-4 px-4 text-center font-medium ${activeTab === 'timesheets' ? 'text-blue-600 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700'}`}
 							on:click={() => (activeTab = 'timesheets')}
 						>
-							Timesheets with Issues
+							Timesheet Discrepancies ({discrepanciesCount})
 						</button>
 						<button
 							class={`flex-1 py-4 px-4 text-center font-medium ${activeTab === 'tickets' ? 'text-blue-600 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700'}`}
 							on:click={() => (activeTab = 'tickets')}
 						>
-							Support Tickets
+							Support Tickets ({supportTicketsCount})
 						</button>
 						<button
-							class={`flex-1 py-4 px-4 text-center font-medium ${activeTab === 'messages' ? 'text-blue-600 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700'}`}
-							on:click={() => (activeTab = 'messages')}
+							class={`flex-1 py-4 px-4 text-center font-medium ${activeTab === 'invoices' ? 'text-blue-600 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700'}`}
+							on:click={() => (activeTab = 'invoices')}
 						>
-							Recent Messages
+							Overdue Invoices ({invoicesDueCount})
 						</button>
 					</div>
 
 					<div class="p-4">
 						{#if activeTab === 'timesheets'}
-							<Table.Root class="w-full">
-								<Table.Header>
-									<Table.Row>
-										<Table.Head>Requisition</Table.Head>
-										<Table.Head>Candidate</Table.Head>
-										<Table.Head>Date</Table.Head>
-										<Table.Head class="text-right">Issues</Table.Head>
-									</Table.Row>
-								</Table.Header>
-								<Table.Body>
-									{#each timesheetsWithDiscrepancies.slice(0, 5) as timesheet, i (timesheet.id)}
-										<Table.Row
-											class="cursor-pointer hover:bg-gray-50"
-											on:click={() => goto(`/timesheets/${timesheet.id}`)}
-										>
-											<Table.Cell>
-												<span class="font-medium text-gray-900">{timesheet.requisition.title}</span>
-											</Table.Cell>
-											<Table.Cell>
-												{timesheet.candidate?.firstName}
-												{timesheet.candidate?.lastName}
-											</Table.Cell>
-											<Table.Cell>
-												<div class="flex items-center text-gray-500">
-													<Clock size={14} class="mr-1" />
-													{format(
-														parse(timesheet.weekBeginDate, 'yyyy-MM-dd', new Date()),
-														'MMM d'
-													)}
-												</div>
-											</Table.Cell>
-											<Table.Cell class="text-right">
-												<Badge
-													class="bg-orange-100 text-orange-800 hover:bg-orange-200"
-													value={timesheet.discrepancyCount}
-												/>
-											</Table.Cell>
+							{#if discrepancies.length > 0}
+								<Table.Root class="w-full">
+									<Table.Header>
+										<Table.Row>
+											<Table.Head>Timesheet</Table.Head>
+											<Table.Head>Candidate</Table.Head>
+											<Table.Head>Type</Table.Head>
+											<Table.Head>Description</Table.Head>
+											<Table.Head class="text-right">Date</Table.Head>
 										</Table.Row>
-									{/each}
-								</Table.Body>
-							</Table.Root>
+									</Table.Header>
+									<Table.Body>
+										{#each discrepancies.slice(0, 5) as discrepancy, i (i)}
+											<Table.Row
+												class="cursor-pointer hover:bg-gray-50"
+												on:click={() => goto(`/timesheets/${discrepancy.timesheetId}`)}
+											>
+												<Table.Cell>
+													<span class="font-medium text-gray-900"
+														>#{discrepancy.timesheetId?.slice(-8) || 'N/A'}</span
+													>
+												</Table.Cell>
+												<Table.Cell>
+													{discrepancy.candidateName || 'Unknown'}
+												</Table.Cell>
+												<Table.Cell>
+													<Badge
+														class={getDiscrepancyTypeColor(discrepancy.type)}
+														value={formatDiscrepancyType(discrepancy.type)}
+													/>
+												</Table.Cell>
+												<Table.Cell class="max-w-xs truncate">
+													{discrepancy.description || 'No description'}
+												</Table.Cell>
+												<Table.Cell class="text-right">
+													<div class="flex items-center justify-end text-gray-500">
+														<Clock size={14} class="mr-1" />
+														{discrepancy.weekBeginDate
+															? format(new Date(discrepancy.weekBeginDate), 'MMM d')
+															: 'N/A'}
+													</div>
+												</Table.Cell>
+											</Table.Row>
+										{/each}
+									</Table.Body>
+								</Table.Root>
+							{:else}
+								<div class="text-center py-8">
+									<CheckCircle2 size={48} class="mx-auto text-green-500 mb-4" />
+									<p class="text-gray-500">No timesheet discrepancies found</p>
+								</div>
+							{/if}
 							<div class="mt-4 flex justify-end">
 								<Button variant="outline" class="text-sm" href="/timesheets/discrepancies">
-									View all issues
+									View all discrepancies
 									<ArrowRight size={14} class="ml-1" />
 								</Button>
 							</div>
 						{:else if activeTab === 'tickets'}
-							<Table.Root class="w-full">
-								<Table.Header>
-									<Table.Row>
-										<Table.Head>Title</Table.Head>
-										<Table.Head>Submitted By</Table.Head>
-										<Table.Head>Date</Table.Head>
-										<Table.Head class="text-right">Status</Table.Head>
-									</Table.Row>
-								</Table.Header>
-								<Table.Body>
-									{#each supportTickets.slice(0, 5) as ticket, i (ticket.id)}
-										<Table.Row
-											class="cursor-pointer hover:bg-gray-50"
-											on:click={() => goto(`/support/ticket/${ticket.id}`)}
-										>
-											<Table.Cell>
-												<span class="font-medium text-gray-900">{ticket.title}</span>
-											</Table.Cell>
-											<Table.Cell>
-												{ticket.user.firstName}
-												{ticket.user.lastName}
-											</Table.Cell>
-											<Table.Cell>
-												<div class="flex items-center text-gray-500">
-													<Clock size={14} class="mr-1" />
-													{formatTicketDate(ticket.createdAt)}
-												</div>
-											</Table.Cell>
-											<Table.Cell class="text-right">
-												<Badge value={ticket.status} class={getStatusColorClass(ticket.status)} />
-											</Table.Cell>
+							{#if supportTickets.length > 0}
+								<Table.Root class="w-full">
+									<Table.Header>
+										<Table.Row>
+											<Table.Head>Title</Table.Head>
+											<Table.Head>Submitted By</Table.Head>
+											<Table.Head>Date</Table.Head>
+											<Table.Head class="text-right">Status</Table.Head>
 										</Table.Row>
-									{/each}
-								</Table.Body>
-							</Table.Root>
+									</Table.Header>
+									<Table.Body>
+										{#each supportTickets.slice(0, 5) as ticket, i (ticket.supportTicket.id)}
+											<Table.Row
+												class="cursor-pointer hover:bg-gray-50"
+												on:click={() => goto(`/support/ticket/${ticket.supportTicket.id}`)}
+											>
+												<Table.Cell>
+													<span class="font-medium text-gray-900">{ticket.supportTicket.title}</span
+													>
+												</Table.Cell>
+												<Table.Cell>
+													{ticket.reportedBy.firstName}
+													{ticket.reportedBy.lastName}
+												</Table.Cell>
+												<Table.Cell>
+													<div class="flex items-center text-gray-500">
+														<Clock size={14} class="mr-1" />
+														{formatTicketDate(ticket.supportTicket.createdAt)}
+													</div>
+												</Table.Cell>
+												<Table.Cell class="text-right">
+													<Badge
+														value={ticket.supportTicket.status}
+														class={getStatusColorClass(ticket.supportTicket.status)}
+													/>
+												</Table.Cell>
+											</Table.Row>
+										{/each}
+									</Table.Body>
+								</Table.Root>
+							{:else}
+								<div class="text-center py-8">
+									<CheckCircle2 size={48} class="mx-auto text-green-500 mb-4" />
+									<p class="text-gray-500">No support tickets found</p>
+								</div>
+							{/if}
 							<div class="mt-4 flex justify-end">
 								<Button variant="outline" class="text-sm" href="/support">
 									View all tickets
 									<ArrowRight size={14} class="ml-1" />
 								</Button>
 							</div>
-						{:else if activeTab === 'messages'}
-							<Table.Root class="w-full">
-								<Table.Header>
-									<Table.Row>
-										<Table.Head>From</Table.Head>
-										<Table.Head>Subject</Table.Head>
-										<Table.Head>Date</Table.Head>
-										<Table.Head class="text-right">Status</Table.Head>
-									</Table.Row>
-								</Table.Header>
-								<Table.Body>
-									{#each recentMessages.slice(0, 5) as message, i (message.id)}
-										<Table.Row
-											class="cursor-pointer hover:bg-gray-50"
-											on:click={() => goto(`/messages/${message.id}`)}
-										>
-											<Table.Cell>
-												<span class="font-medium text-gray-900"
-													>{message.sender.firstName} {message.sender.lastName}</span
-												>
-											</Table.Cell>
-											<Table.Cell>
-												{message.subject}
-											</Table.Cell>
-											<Table.Cell>
-												<div class="flex items-center text-gray-500">
-													<Clock size={14} class="mr-1" />
-													{formatDate(message.createdAt)}
-												</div>
-											</Table.Cell>
-											<Table.Cell class="text-right">
-												<Badge
-													class={message.read
-														? 'bg-gray-100 text-gray-800'
-														: 'bg-blue-100 text-blue-800'}
-													value={message.read ? 'Read' : 'Unread'}
-												/>
-											</Table.Cell>
+						{:else if activeTab === 'invoices'}
+							{#if invoicesDue.length > 0}
+								<Table.Root class="w-full">
+									<Table.Header>
+										<Table.Row>
+											<Table.Head>Invoice #</Table.Head>
+											<Table.Head>Client</Table.Head>
+											<Table.Head>Amount</Table.Head>
+											<Table.Head>Due Date</Table.Head>
+											<Table.Head class="text-right">Status</Table.Head>
 										</Table.Row>
-									{/each}
-								</Table.Body>
-							</Table.Root>
+									</Table.Header>
+									<Table.Body>
+										{#each invoicesDue.slice(0, 5) as invoiceData, i (invoiceData.invoice.id)}
+											<Table.Row
+												class="cursor-pointer hover:bg-gray-50"
+												on:click={() => goto(`/invoices/${invoiceData.invoice.id}`)}
+											>
+												<Table.Cell>
+													<span class="font-medium text-gray-900"
+														>#{invoiceData.invoice.invoiceNumber ||
+															invoiceData.invoice.id.slice(-8)}</span
+													>
+												</Table.Cell>
+												<Table.Cell>
+													{invoiceData.company?.companyName || 'Unknown Client'}
+												</Table.Cell>
+												<Table.Cell>
+													{formatCurrency(invoiceData.invoice.amountDue)}
+												</Table.Cell>
+												<Table.Cell>
+													<div class="flex items-center text-gray-500">
+														<Clock size={14} class="mr-1" />
+														{formatDate(invoiceData.invoice.dueDate)}
+													</div>
+												</Table.Cell>
+												<Table.Cell class="text-right">
+													<Badge
+														value={invoiceData.invoice.status}
+														class={invoiceData.invoice.status === 'overdue'
+															? 'bg-red-100 text-red-800'
+															: getStatusColorClass(invoiceData.invoice.status)}
+													/>
+												</Table.Cell>
+											</Table.Row>
+										{/each}
+									</Table.Body>
+								</Table.Root>
+							{:else}
+								<div class="text-center py-8">
+									<CheckCircle2 size={48} class="mx-auto text-green-500 mb-4" />
+									<p class="text-gray-500">No overdue invoices found</p>
+								</div>
+							{/if}
 							<div class="mt-4 flex justify-end">
-								<Button variant="outline" class="text-sm" href="/messages">
-									View all messages
+								<Button variant="outline" class="text-sm" href="/invoices?filter=overdue">
+									View all overdue invoices
 									<ArrowRight size={14} class="ml-1" />
 								</Button>
 							</div>
@@ -480,30 +474,39 @@
 							</div>
 						</Card.Header>
 						<Card.Content class="pt-4">
-							<ul class="space-y-3">
-								{#each newCandidateProfiles.slice(0, 4) as profile, i (profile.id)}
-									<li
-										class="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer"
-										on:click={() => goto(`/candidates/${profile.id}`)}
-									>
-										<div
-											class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium mr-3"
+							{#if newCandidateProfiles.length > 0}
+								<ul class="space-y-3">
+									{#each newCandidateProfiles.slice(0, 4) as profileData, i (profileData.profile.id)}
+										<li
+											class="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer"
+											on:click={() => goto(`/candidates/${profileData.profile.id}`)}
 										>
-											{profile.firstName[0]}{profile.lastName[0]}
-										</div>
-										<div class="flex-1 min-w-0">
-											<p class="text-sm font-medium text-gray-900 truncate">
-												{profile.firstName}
-												{profile.lastName}
-											</p>
-											<p class="text-xs text-gray-500 truncate">
-												{profile.desiredPosition}
-											</p>
-										</div>
-										<Badge class="bg-yellow-100 text-yellow-800" value="Review"></Badge>
-									</li>
-								{/each}
-							</ul>
+											<div
+												class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium mr-3"
+											>
+												{profileData.user.firstName[0]}{profileData.user.lastName[0]}
+											</div>
+											<div class="flex-1 min-w-0">
+												<p class="text-sm font-medium text-gray-900 truncate">
+													{profileData.user.firstName}
+													{profileData.user.lastName}
+												</p>
+												<p class="text-xs text-gray-500 truncate">
+													{profileData.profile.desiredPosition || 'Position not specified'}
+												</p>
+											</div>
+											<Badge
+												class="bg-yellow-100 text-yellow-800"
+												value={profileData.profile.status || 'PENDING'}
+											></Badge>
+										</li>
+									{/each}
+								</ul>
+							{:else}
+								<div class="text-center py-4">
+									<p class="text-gray-500">No new candidate profiles</p>
+								</div>
+							{/if}
 							<div class="mt-4 text-center">
 								<Button variant="outline" size="sm" class="w-full" href="/candidates/pending">
 									View all candidates
@@ -523,37 +526,43 @@
 							</div>
 						</Card.Header>
 						<Card.Content class="pt-4">
-							<ul class="space-y-3">
-								{#each newClientSignups.slice(0, 4) as client, i (client.id)}
-									<li
-										class="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer"
-										on:click={() => goto(`/clients/${client.id}`)}
-									>
-										<div
-											class="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium mr-3"
+							{#if newClientSignups.length > 0}
+								<ul class="space-y-3">
+									{#each newClientSignups.slice(0, 4) as clientData, i (clientData.clientProfile.id)}
+										<li
+											class="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer"
+											on:click={() => goto(`/clients/${clientData.clientProfile.id}`)}
 										>
-											{client.companyName[0]}
-										</div>
-										<div class="flex-1 min-w-0">
-											<p class="text-sm font-medium text-gray-900 truncate">
-												{client.companyName}
-											</p>
-											<p class="text-xs text-gray-500 truncate">
-												{client.contactFirstName}
-												{client.contactLastName}
-											</p>
-										</div>
-										<Badge
-											class={client.status === 'PENDING'
-												? 'bg-yellow-100 text-yellow-800'
-												: client.status === 'ACTIVE'
-													? 'bg-green-100 text-green-800'
-													: 'bg-gray-100 text-gray-800'}
-											value={client.status}
-										/>
-									</li>
-								{/each}
-							</ul>
+											<div
+												class="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium mr-3"
+											>
+												{clientData.company.companyName[0]}
+											</div>
+											<div class="flex-1 min-w-0">
+												<p class="text-sm font-medium text-gray-900 truncate">
+													{clientData.company.companyName}
+												</p>
+												<p class="text-xs text-gray-500 truncate">
+													{clientData.user.firstName}
+													{clientData.user.lastName}
+												</p>
+											</div>
+											<Badge
+												class={clientData.clientProfile.status === 'PENDING'
+													? 'bg-yellow-100 text-yellow-800'
+													: clientData.clientProfile.status === 'ACTIVE'
+														? 'bg-green-100 text-green-800'
+														: 'bg-gray-100 text-gray-800'}
+												value={clientData.clientProfile.status || 'PENDING'}
+											/>
+										</li>
+									{/each}
+								</ul>
+							{:else}
+								<div class="text-center py-4">
+									<p class="text-gray-500">No new client signups</p>
+								</div>
+							{/if}
 							<div class="mt-4 text-center">
 								<Button variant="outline" size="sm" class="w-full" href="/clients">
 									View all clients
@@ -562,52 +571,6 @@
 						</Card.Content>
 					</Card.Root>
 				</div>
-			</div>
-
-			<!-- Right column - Activity and charts -->
-			<div class="space-y-6">
-				<!-- Activity timeline -->
-				<Card.Root>
-					<Card.Header class="pb-2">
-						<Card.Title class="flex items-center text-lg font-semibold">
-							<Clock size={20} class="mr-2 text-blue-600" />
-							Recent Activity
-						</Card.Title>
-					</Card.Header>
-					<Card.Content>
-						<div class="relative">
-							<!-- Timeline line -->
-							<div class="absolute h-full w-0.5 bg-gray-200 left-2.5 top-0 rounded-full"></div>
-
-							<ul class="space-y-4 relative ml-6">
-								{#each activityTimeline as activity, i}
-									<li class="relative pb-4">
-										<!-- Timeline dot -->
-										<div
-											class={`absolute -left-6 mt-1.5 w-5 h-5 rounded-full ${activity.color} flex items-center justify-center`}
-										>
-											<svelte:component this={activity.icon} size={12} color="white" />
-										</div>
-
-										<div class="flex flex-col">
-											<div class="flex items-center text-sm">
-												<p class="font-medium text-gray-900">{activity.title}</p>
-												<span class="ml-auto text-xs text-gray-500">{activity.time}</span>
-											</div>
-											<p class="text-xs text-gray-500 mt-0.5">{activity.description}</p>
-											<p class="text-xs font-medium text-gray-400 mt-1">{activity.date}</p>
-										</div>
-									</li>
-								{/each}
-							</ul>
-						</div>
-						<div class="mt-2 text-center">
-							<Button variant="ghost" size="sm" class="text-blue-600 text-xs">
-								View all activity
-							</Button>
-						</div>
-					</Card.Content>
-				</Card.Root>
 			</div>
 		</div>
 	</div>

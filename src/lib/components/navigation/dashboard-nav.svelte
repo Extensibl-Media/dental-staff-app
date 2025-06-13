@@ -75,10 +75,13 @@
 			<DashboardNavLink bind:expanded link={{ name: 'Requisitions', path: '/requisitions' }}>
 				<Briefcase class="shrink-0" />
 			</DashboardNavLink>
-			<DashboardNavLink bind:expanded link={{ name: 'Clients', path: '/clients' }}>
+			<DashboardNavLink bind:expanded link={{ name: 'Businesses Members', path: '/clients' }}>
 				<Building2 class="shrink-0" />
 			</DashboardNavLink>
-			<DashboardNavLink bind:expanded link={{ name: 'Candidates', path: '/candidates' }}>
+			<DashboardNavLink
+				bind:expanded
+				link={{ name: 'Professional Members', path: '/professionals' }}
+			>
 				<SquareUser class="shrink-0" />
 			</DashboardNavLink>
 			<DashboardNavLink bind:expanded link={{ name: 'Timesheets', path: '/timesheets ' }}>
@@ -92,12 +95,6 @@
 				link={{
 					name: 'Admin Menu',
 					path: '/admin/menu'
-					// children: [
-					// 	{ name: 'Admin Menu', path: '/admin/menu' },
-					// 	{ name: 'Reports', path: '/admin/reports' },
-					// 	{ name: 'Action History', path: '/admin/history' },
-					// 	{ name: 'Support Tickets', path: '/admin/support-tickets' }
-					// ]
 				}}
 			>
 				<Shield class="shrink-0" />

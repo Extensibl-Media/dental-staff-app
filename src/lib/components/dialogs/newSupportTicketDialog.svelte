@@ -19,7 +19,7 @@
 
 <Dialog.Root {open}>
 	<Dialog.Trigger
-		class={cn(buttonVariants({ variant: 'default' }), 'bg-blue-900 hover:bg-blue-800')}
+		class={cn(buttonVariants({ variant: 'default' }), 'bg-blue-800 hover:bg-blue-900')}
 		on:click={() => {
 			// form = data.form;
 			open = true;

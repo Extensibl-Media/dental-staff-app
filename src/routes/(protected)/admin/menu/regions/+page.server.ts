@@ -1,10 +1,14 @@
 import { fail, redirect } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import type { PageServerLoad, RequestEvent } from './$types';
 import { message, setError, superValidate } from 'sveltekit-superforms/server';
 import { newRegionSchema } from '$lib/config/zod-schemas';
 import { setFlash } from 'sveltekit-flash-message/server';
 import { USER_ROLES } from '$lib/config/constants';
-import { createNewRegion, getPaginatedRegions } from '$lib/server/database/queries/regions';
+import { createNewRegion, getAllRegions } from '$lib/server/database/queries/regions';
+import db from '$lib/server/database/drizzle';
+import { regionTable } from '$lib/server/database/schemas/region';
+import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 
 const regionSchema = newRegionSchema.pick({
 	name: true,
@@ -12,12 +16,9 @@ const regionSchema = newRegionSchema.pick({
 });
 
 export const load: PageServerLoad = async (event) => {
-	const skip = Number(event.url.searchParams.get('skip'));
-	const sortBy = event.url.searchParams.get('sortBy')?.toString();
-	const sortOn = event.url.searchParams.get('sortOn')?.toString();
-
-	const orderBy = sortBy && sortOn ? { column: sortOn, direction: sortBy } : undefined;
+	const searchTerm = event.url.searchParams.get('search') || '';
 	const user = event.locals.user;
+
 	if (!user) {
 		redirect(302, '/auth/sign-in');
 	}
@@ -27,18 +28,16 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const form = await superValidate(event, regionSchema);
-
-	const results = await getPaginatedRegions({ limit: 10, orderBy, offset: skip });
+	const regions = await getAllRegions(searchTerm);
 
 	return {
 		form,
-		regions: results?.regions || [],
-		count: results?.count || 0
+		regions: regions || []
 	};
 };
 
 export const actions = {
-	newRegion: async (event) => {
+	addRegion: async (event: RequestEvent) => {
 		const form = await superValidate(event, regionSchema);
 
 		if (!form.valid) {
@@ -70,9 +69,55 @@ export const actions = {
 		} catch (e) {
 			console.error(e);
 			setFlash({ type: 'error', message: 'Region was not able to be created.' }, event);
-			return setError(form, 'Error creating Region.');
+			return setError(form, 'Error creating region.');
 		}
+
 		console.log('Region added successfully');
 		return message(form, 'Region added successfully.');
+	},
+
+	deleteRegion: async (event: RequestEvent) => {
+		const user = event.locals.user;
+
+		if (!user) {
+			redirect(302, '/auth/sign-in');
+		}
+
+		if (user.role !== 'SUPERADMIN') {
+			return fail(403, { message: 'You do not have permission to delete regions.' });
+		}
+
+		const form = await superValidate(event, z.object({ id: z.string().min(1) }));
+
+		if (!form.valid) {
+			return fail(400, {
+				form
+			});
+		}
+
+		const regionId = form.data.id;
+
+		if (!regionId) {
+			return fail(400, { message: 'Region ID is required.' });
+		}
+
+		try {
+			await db.delete(regionTable).where(eq(regionTable.id, regionId));
+
+			setFlash(
+				{
+					type: 'success',
+					message: 'Region deleted successfully.'
+				},
+				event
+			);
+		} catch (e) {
+			console.error(e);
+			setFlash({ type: 'error', message: 'Region was not able to be deleted.' }, event);
+			return setError(form, 'Error deleting region.');
+		}
+
+		console.log('Region deleted successfully');
+		return message(form, 'Region deleted successfully.');
 	}
 };

@@ -1,7 +1,16 @@
 <script lang="ts">
+	import {
+		getCoreRowModel,
+		type ColumnDef,
+		getSortedRowModel,
+		getPaginationRowModel,
+		getFilteredRowModel,
+		type TableOptions,
+		createSvelteTable,
+		flexRender
+	} from '@tanstack/svelte-table';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import * as Table from '$lib/components/ui/table';
-	import * as Sheet from '$lib/components/ui/sheet';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Input } from '$lib/components/ui/input';
@@ -13,12 +22,10 @@
 		Search,
 		Filter,
 		Eye,
-		MoreHorizontal,
 		ChevronLeft,
 		ChevronRight
 	} from 'lucide-svelte';
 	import { goto } from '$app/navigation';
-	import { page } from '$app/stores';
 	import { cn } from '$lib/utils';
 	import type { PageData } from './$types';
 	import type { SuperValidated } from 'sveltekit-superforms';
@@ -27,182 +34,181 @@
 		type AdminRequisitionSchema,
 		type ClientRequisitionSchema
 	} from '$lib/config/zod-schemas';
-	import type {
-		RequisitionDetailsRaw,
-		RequisitionResults
-	} from '$lib/server/database/queries/requisitions';
+	import { writable } from 'svelte/store';
+	import { onMount } from 'svelte';
 	import AddRequisitionDrawer from '$lib/components/drawers/addRequisitionDrawer.svelte';
 
 	export let data: PageData;
 	export let adminForm: SuperValidated<AdminRequisitionSchema> | null = null;
 
-	const ITEMS_PER_PAGE = 10;
+	type RequisitionData = {
+		id: string;
+		title: string;
+		status: string;
+		createdAt: Date;
+		updatedAt: Date;
+		hourlyRate: number;
+		permanentPosition: boolean;
+		locationName: string;
+		companyName: string;
+		firstName: string;
+		lastName: string;
+		email: string;
+		disciplineName: string;
+		regionName: string;
+		regionAbbreviation: string;
+		subregionName: string;
+	};
 
 	let drawerExpanded = false;
-	let searchTerm = '';
+	$: searchTerm = '';
 	let activeTab = 'open';
 
 	$: user = data.user;
-	$: requisitions = data.requisitions as RequisitionResults;
+	$: requisitions = (data.requisitions as RequisitionData[]) || [];
 	$: clientForm = data.clientForm as SuperValidated<ClientRequisitionSchema>;
-	$: count = data.count;
-	$: sortOn = $page.url.searchParams.get('sortOn');
-	$: sortBy = $page.url.searchParams.get('sortBy');
-	$: currentPage = Number($page.url.searchParams.get('skip')) || 0;
-	$: totalPages = count ? Math.ceil(count / ITEMS_PER_PAGE) : 0;
+	$: isAdmin = user?.role === USER_ROLES.SUPERADMIN;
 
-	// Group requisitions by status
-	$: groupedRequisitions = {
-		open: (requisitions || []).filter((req) => req.status === 'OPEN'),
-		filled: (requisitions || []).filter((req) => req.status === 'FILLED'),
-		unfulfilled: (requisitions || []).filter((req) => req.status === 'UNFULFILLED'),
-		canceled: (requisitions || []).filter((req) => req.status === 'CANCELED')
-	};
-
-	// Apply search filter
-	$: filteredRequisitions = Object.fromEntries(
-		Object.entries(groupedRequisitions || {}).map(([status, reqs]) => [
-			status,
-			(reqs || []).filter(
-				(req) =>
-					req.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-					req.location_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-					`${req.first_name} ${req.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
-			)
-		])
-	);
-
-	// Column definitions
-	const getColumns = (isAdmin: boolean) => {
-		const baseColumns = [
+	// Define columns for different user roles
+	const getColumns = (isAdmin: boolean): ColumnDef<RequisitionData>[] => {
+		const baseColumns: ColumnDef<RequisitionData>[] = [
 			{
-				id: 'id',
 				header: 'Req #',
 				accessorKey: 'id',
-				sortable: false
+				cell: ({ getValue }) => {
+					const id = getValue() as string;
+					return `#${id}`;
+				}
 			},
 			{
-				id: 'name',
 				header: 'Title',
-				accessorKey: 'name',
-				sortable: true
+				accessorKey: 'title',
+				cell: ({ getValue, row }) => {
+					return getValue() as string;
+				}
 			}
 		];
 
 		if (isAdmin) {
 			baseColumns.push({
-				id: 'client',
 				header: 'Client',
-				accessorKey: 'client',
-				sortable: true
+				accessorFn: (row) => `${row.lastName}, Dr. ${row.firstName}`,
+				id: 'client'
 			});
 		}
 
 		baseColumns.push(
 			{
-				id: 'location_name',
 				header: 'Office',
-				accessorKey: 'location_name',
-				sortable: true
+				accessorKey: 'locationName'
 			},
 			{
-				id: 'region_abbreviation',
 				header: 'Region',
-				accessorKey: 'region_abbreviation',
-				sortable: true
+				accessorKey: 'regionAbbreviation'
 			}
 		);
 
 		if (!isAdmin) {
 			baseColumns.push({
-				id: 'permanent_position',
 				header: 'Type',
-				accessorKey: 'permanent_position',
-				sortable: true
+				accessorKey: 'permanentPosition',
+				cell: ({ getValue }) => {
+					const isPermanent = getValue() as boolean;
+					return isPermanent ? 'Permanent' : 'Temporary';
+				}
 			});
 		}
 
 		return baseColumns;
 	};
 
-	$: columns = getColumns(user?.role === USER_ROLES.SUPERADMIN);
-	$: isAdmin = user?.role === USER_ROLES.SUPERADMIN;
+	$: columns = getColumns(isAdmin);
 
-	function handleSort(columnId: string) {
-		if (!columns.find((col) => col.id === columnId)?.sortable) return;
+	// Filter requisitions by status
+	const filterByStatus = (requisitions: RequisitionData[], status: string) => {
+		return requisitions.filter((req) => req.status === status.toUpperCase());
+	};
 
-		const query = new URLSearchParams($page.url.searchParams.toString());
-		const currentSortOn = query.get('sortOn');
-		const currentSortBy = query.get('sortBy');
-
-		if (currentSortOn === columnId) {
-			if (currentSortBy === 'asc') {
-				query.set('sortBy', 'desc');
-			} else if (currentSortBy === 'desc') {
-				query.delete('sortBy');
-				query.delete('sortOn');
-			} else {
-				query.set('sortBy', 'asc');
-				query.set('sortOn', columnId);
+	// Create separate table instances for each tab
+	const createTableOptions = (data: RequisitionData[]): TableOptions<RequisitionData> => ({
+		data,
+		columns,
+		getCoreRowModel: getCoreRowModel(),
+		getSortedRowModel: getSortedRowModel(),
+		getPaginationRowModel: getPaginationRowModel(),
+		initialState: {
+			pagination: {
+				pageSize: 10
 			}
+		}
+	});
+
+	// Table options for each status
+	const openOptions = writable<TableOptions<RequisitionData>>(createTableOptions([]));
+	const filledOptions = writable<TableOptions<RequisitionData>>(createTableOptions([]));
+	const unfulfilledOptions = writable<TableOptions<RequisitionData>>(createTableOptions([]));
+	const canceledOptions = writable<TableOptions<RequisitionData>>(createTableOptions([]));
+
+	// Create table instances
+	const openTable = createSvelteTable(openOptions);
+	const filledTable = createSvelteTable(filledOptions);
+	const unfulfilledTable = createSvelteTable(unfulfilledOptions);
+	const canceledTable = createSvelteTable(canceledOptions);
+
+	// Get current active table
+	$: currentTable =
+		activeTab === 'open'
+			? openTable
+			: activeTab === 'filled'
+				? filledTable
+				: activeTab === 'unfulfilled'
+					? unfulfilledTable
+					: canceledTable;
+
+	// Update table data when requisitions change
+	$: {
+		const openData = filterByStatus(requisitions, 'open');
+		const filledData = filterByStatus(requisitions, 'filled');
+		const unfulfilledData = filterByStatus(requisitions, 'unfulfilled');
+		const canceledData = filterByStatus(requisitions, 'canceled');
+
+		openOptions.update((opts) => ({ ...opts, data: openData, columns }));
+		filledOptions.update((opts) => ({ ...opts, data: filledData, columns }));
+		unfulfilledOptions.update((opts) => ({ ...opts, data: unfulfilledData, columns }));
+		canceledOptions.update((opts) => ({ ...opts, data: canceledData, columns }));
+	}
+
+	onMount(() => {
+		const openData = filterByStatus(requisitions, 'open');
+		const filledData = filterByStatus(requisitions, 'filled');
+		const unfulfilledData = filterByStatus(requisitions, 'unfulfilled');
+		const canceledData = filterByStatus(requisitions, 'canceled');
+
+		openOptions.update((opts) => ({ ...opts, data: openData, columns }));
+		filledOptions.update((opts) => ({ ...opts, data: filledData, columns }));
+		unfulfilledOptions.update((opts) => ({ ...opts, data: unfulfilledData, columns }));
+		canceledOptions.update((opts) => ({ ...opts, data: canceledData, columns }));
+	});
+
+	// Get tab counts
+	$: tabCounts = {
+		open: filterByStatus(requisitions, 'open').length,
+		filled: filterByStatus(requisitions, 'filled').length,
+		unfulfilled: filterByStatus(requisitions, 'unfulfilled').length,
+		canceled: filterByStatus(requisitions, 'canceled').length
+	};
+
+	function handleRowClick(requisitionId: string) {
+		goto(`/requisitions/${requisitionId}`);
+	}
+
+	function handleSearch(searchTerm: string) {
+		if (!searchTerm || searchTerm.trim() === '') {
+			goto('/requisitions');
 		} else {
-			query.set('sortOn', columnId);
-			query.set('sortBy', 'asc');
+			goto(`/requisitions?search=${encodeURIComponent(searchTerm.trim())}`);
 		}
-
-		goto(`?${query.toString()}`);
 	}
-
-	function handlePagination(direction: 'prev' | 'next') {
-		const query = new URLSearchParams($page.url.searchParams.toString());
-
-		if (direction === 'prev' && currentPage > 0) {
-			const newPage = currentPage - ITEMS_PER_PAGE;
-			query.set('skip', String(newPage));
-		} else if (direction === 'next' && currentPage < (totalPages - 1) * ITEMS_PER_PAGE) {
-			const newPage = currentPage + ITEMS_PER_PAGE;
-			query.set('skip', String(newPage));
-		}
-
-		goto(`?${query.toString()}`);
-	}
-
-	function resetQuery() {
-		const query = new URLSearchParams();
-		goto(`?${query.toString()}`);
-	}
-
-	function getSortIcon(columnId: string) {
-		if (sortOn !== columnId) return ArrowUpDown;
-		return sortBy === 'asc' ? ArrowUp : ArrowDown;
-	}
-
-	function formatClientName(req: RequisitionDetailsRaw) {
-		return `${req.last_name}, Dr. ${req.first_name}`;
-	}
-
-	function getTabCounts() {
-		if (!groupedRequisitions) {
-			return {
-				open: 0,
-				filled: 0,
-				unfulfilled: 0,
-				canceled: 0
-			};
-		}
-		return {
-			open: groupedRequisitions.open?.length || 0,
-			filled: groupedRequisitions.filled?.length || 0,
-			unfulfilled: groupedRequisitions.unfulfilled?.length || 0,
-			canceled: groupedRequisitions.canceled?.length || 0
-		};
-	}
-
-	$: tabCounts = getTabCounts();
-
-	// Get current tab data
-	$: currentTabData = (filteredRequisitions && filteredRequisitions[activeTab]) || [];
-	$: currentTabCount = currentTabData.length;
 </script>
 
 <section class="flex flex-col h-full p-6 space-y-6">
@@ -223,19 +229,15 @@
 		</div>
 	</div>
 
-	<!-- Search and Filters -->
-	<div class="flex flex-col sm:flex-row gap-4">
-		<div class="relative flex-1 max-w-sm">
-			<Search
-				class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
-			/>
-			<Input bind:value={searchTerm} placeholder="Search requisitions..." class="pl-9" />
-		</div>
-
-		<div class="flex items-center gap-2">
-			<Button variant="outline" size="sm" on:click={resetQuery}>Reset Filters</Button>
-		</div>
-	</div>
+	<!-- Search -->
+	<form on:submit|preventDefault={() => handleSearch(searchTerm)} class="flex items-center gap-2">
+		<Input bind:value={searchTerm} placeholder="Search requisitions..." class="bg-white max-w-xs" />
+		<Button
+			size="sm"
+			class="bg-blue-800 hover:bg-blue-900"
+			on:click={() => handleSearch(searchTerm)}>Search</Button
+		>
+	</form>
 
 	<!-- Tabs with Tables -->
 	<Tabs.Root bind:value={activeTab} class="flex-1 flex flex-col">
@@ -243,135 +245,156 @@
 			<Tabs.Trigger value="open" class="relative">
 				Open
 				{#if tabCounts.open > 0}
-					<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.open} />
+					<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.open}
+					></Badge>
 				{/if}
 			</Tabs.Trigger>
 			<Tabs.Trigger value="filled" class="relative">
 				Filled
 				{#if tabCounts.filled > 0}
-					<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.filled} />
+					<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.filled}
+					></Badge>
 				{/if}
 			</Tabs.Trigger>
 			<Tabs.Trigger value="unfulfilled" class="relative">
 				Unfulfilled
 				{#if tabCounts.unfulfilled > 0}
-					<Badge
-						variant="secondary"
-						class="ml-2 h-5 min-w-5 text-xs"
-						value={tabCounts.unfulfilled}
-					/>
+					<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.unfulfilled}>
+						{tabCounts.unfulfilled}
+					</Badge>
 				{/if}
 			</Tabs.Trigger>
 			<Tabs.Trigger value="canceled" class="relative">
 				Canceled
 				{#if tabCounts.canceled > 0}
-					<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.canceled} />
+					<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.canceled}>
+						{tabCounts.canceled}
+					</Badge>
 				{/if}
 			</Tabs.Trigger>
 		</Tabs.List>
 
-		<!-- Single Tab Content that changes based on activeTab -->
-		<Tabs.Content value={activeTab} class="flex-1 flex flex-col">
-			<div class="rounded-md border flex flex-col bg-white shadow-sm">
-				<Table.Root>
-					<Table.Header>
-						<Table.Row>
-							{#each columns as column}
-								<Table.Head
-									class={cn(
-										'cursor-pointer hover:bg-muted/50 transition-colors',
-										!column.sortable && 'cursor-default'
-									)}
-									on:click={() => handleSort(column.id)}
-								>
-									<div class="flex items-center gap-2">
-										{column.header}
-										{#if column.sortable}
-											<svelte:component this={getSortIcon(column.id)} class="h-4 w-4" />
-										{/if}
-									</div>
-								</Table.Head>
-							{/each}
-						</Table.Row>
-					</Table.Header>
-					<Table.Body>
-						{#each currentTabData as req (req.id)}
-							<Table.Row
-								class="hover:bg-muted/50 cursor-pointer"
-								on:click={() => goto(`/requisitions/${req.id}`)}
-							>
-								<Table.Cell class="font-medium">
-									<a href="/requisitions/{req.id}" class="text-primary hover:underline font-mono">
-										#{req.id}
-									</a>
-								</Table.Cell>
-								<Table.Cell class="max-w-xs truncate" title={req.name}>
-									{req.name}
-								</Table.Cell>
-								{#if isAdmin}
-									<Table.Cell>
-										{formatClientName(req)}
-									</Table.Cell>
-								{/if}
-								<Table.Cell>{req.location_name || '-'}</Table.Cell>
-								<Table.Cell>{req.region_abbreviation || '-'}</Table.Cell>
-								{#if !isAdmin}
-									<Table.Cell>
-										<Badge
-											variant={req.permanent_position ? 'default' : 'secondary'}
-											value={req.permanent_position ? 'Permanent' : 'Temporary'}
-										/>
-									</Table.Cell>
-								{/if}
-							</Table.Row>
-						{:else}
-							<Table.Row>
-								<Table.Cell colspan={columns.length} class="text-center py-8">
-									<div class="flex flex-col items-center gap-2 text-muted-foreground">
-										<Filter class="h-8 w-8" />
-										<p>No {activeTab} requisitions found</p>
-										{#if searchTerm}
-											<p class="text-sm">Try adjusting your search terms</p>
-										{/if}
-									</div>
-								</Table.Cell>
-							</Table.Row>
-						{/each}
-					</Table.Body>
-				</Table.Root>
-			</div>
+		<!-- Tab Contents -->
+		{#each ['open', 'filled', 'unfulfilled', 'canceled'] as tabValue}
+			<Tabs.Content value={tabValue} class="flex-1 flex flex-col">
+				{#if activeTab === tabValue}
+					<div class="bg-white rounded-lg shadow-sm">
+						{#if $currentTable.getFilteredRowModel().rows.length > 0}
+							<div class="rounded-md border">
+								<Table.Root>
+									<Table.Header>
+										{#each $currentTable.getHeaderGroups() as headerGroup}
+											<Table.Row>
+												{#each headerGroup.headers as header}
+													<Table.Head
+														class={cn(
+															'cursor-pointer hover:bg-muted/50 transition-colors',
+															header.column.getCanSort() && 'select-none'
+														)}
+														on:click={header.column.getToggleSortingHandler()}
+													>
+														<div class="flex items-center gap-2">
+															<svelte:component
+																this={flexRender(
+																	header.column.columnDef.header,
+																	header.getContext()
+																)}
+															/>
+															{#if header.column.getCanSort()}
+																{#if header.column.getIsSorted() === 'asc'}
+																	<ArrowUp class="h-4 w-4" />
+																{:else if header.column.getIsSorted() === 'desc'}
+																	<ArrowDown class="h-4 w-4" />
+																{:else}
+																	<ArrowUpDown class="h-4 w-4" />
+																{/if}
+															{/if}
+														</div>
+													</Table.Head>
+												{/each}
+											</Table.Row>
+										{/each}
+									</Table.Header>
+									<Table.Body>
+										{#each $currentTable.getRowModel().rows as row}
+											<Table.Row
+												class="hover:bg-muted/50 cursor-pointer"
+												on:click={() => handleRowClick(row.original.id)}
+											>
+												{#each row.getVisibleCells() as cell}
+													<Table.Cell>
+														<svelte:component
+															this={flexRender(cell.column.columnDef.cell, cell.getContext())}
+														/>
+													</Table.Cell>
+												{/each}
+											</Table.Row>
+										{/each}
+									</Table.Body>
+								</Table.Root>
+							</div>
 
-			<!-- Pagination -->
-			{#if currentTabCount > 0 && totalPages > 1}
-				<div class="flex items-center justify-between px-2 py-4">
-					<div class="text-sm text-muted-foreground">
-						Showing {currentPage + 1} to {Math.min(currentPage + ITEMS_PER_PAGE, currentTabCount)} of
-						{currentTabCount}
-						results
+							<!-- Pagination -->
+							<div class="flex items-center justify-between space-x-2 p-4 border-t">
+								<div class="flex-1 text-sm text-muted-foreground">
+									Showing {$currentTable.getState().pagination.pageIndex *
+										$currentTable.getState().pagination.pageSize +
+										1} to {Math.min(
+										($currentTable.getState().pagination.pageIndex + 1) *
+											$currentTable.getState().pagination.pageSize,
+										$currentTable.getFilteredRowModel().rows.length
+									)} of {$currentTable.getFilteredRowModel().rows.length} results
+								</div>
+								<div class="flex items-center space-x-2">
+									<Button
+										variant="outline"
+										size="sm"
+										on:click={() => $currentTable.previousPage()}
+										disabled={!$currentTable.getCanPreviousPage()}
+									>
+										<ChevronLeft class="h-4 w-4" />
+										Previous
+									</Button>
+									<div class="flex items-center space-x-1">
+										<span class="text-sm text-muted-foreground">
+											Page {$currentTable.getState().pagination.pageIndex + 1} of {$currentTable.getPageCount()}
+										</span>
+									</div>
+									<Button
+										variant="outline"
+										size="sm"
+										on:click={() => $currentTable.nextPage()}
+										disabled={!$currentTable.getCanNextPage()}
+									>
+										Next
+										<ChevronRight class="h-4 w-4" />
+									</Button>
+								</div>
+							</div>
+						{:else}
+							<!-- Empty state -->
+							<div class="flex flex-col items-center justify-center py-12 text-center">
+								<div
+									class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4"
+								>
+									<Filter class="w-8 h-8 text-gray-400" />
+								</div>
+								<h3 class="text-lg font-medium text-gray-900 mb-2">
+									No {activeTab} requisitions found
+								</h3>
+								<p class="text-sm text-gray-500">
+									{#if searchTerm}
+										Try adjusting your search terms
+									{:else}
+										No {activeTab} requisitions available
+									{/if}
+								</p>
+							</div>
+						{/if}
 					</div>
-					<div class="flex items-center gap-2">
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={currentPage === 0}
-							on:click={() => handlePagination('prev')}
-						>
-							<ChevronLeft class="h-4 w-4 mr-1" />
-							Previous
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							disabled={currentPage >= (totalPages - 1) * ITEMS_PER_PAGE}
-							on:click={() => handlePagination('next')}
-						>
-							Next
-							<ChevronRight class="h-4 w-4 ml-1" />
-						</Button>
-					</div>
-				</div>
-			{/if}
-		</Tabs.Content>
+				{/if}
+			</Tabs.Content>
+		{/each}
 	</Tabs.Root>
 </section>
 

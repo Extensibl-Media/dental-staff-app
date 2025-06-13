@@ -1,13 +1,14 @@
 import { fail, redirect } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
-import {
-	getPaginatedDisciplines,
-	createNewDiscipline
-} from '$lib/server/database/queries/disciplines';
+import type { PageServerLoad, RequestEvent } from './$types';
+import { getAllDisciplines, createNewDiscipline } from '$lib/server/database/queries/disciplines';
 import { message, setError, superValidate } from 'sveltekit-superforms/server';
 import { newDisciplineSchema } from '$lib/config/zod-schemas';
 import { setFlash } from 'sveltekit-flash-message/server';
 import { USER_ROLES } from '$lib/config/constants';
+import db from '$lib/server/database/drizzle';
+import { disciplineTable } from '$lib/server/database/schemas/skill';
+import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 
 const disciplineSchema = newDisciplineSchema.pick({
 	name: true,
@@ -15,12 +16,9 @@ const disciplineSchema = newDisciplineSchema.pick({
 });
 
 export const load: PageServerLoad = async (event) => {
-	const skip = Number(event.url.searchParams.get('skip'));
-	const sortBy = event.url.searchParams.get('sortBy')?.toString();
-	const sortOn = event.url.searchParams.get('sortOn')?.toString();
-
-	const orderBy = sortBy && sortOn ? { column: sortOn, direction: sortBy } : undefined;
+	const searchTerm = event.url.searchParams.get('search') || '';
 	const user = event.locals.user;
+
 	if (!user) {
 		redirect(302, '/auth/sign-in');
 	}
@@ -30,18 +28,16 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const form = await superValidate(event, disciplineSchema);
-
-	const results = await getPaginatedDisciplines({ limit: 10, orderBy, offset: skip });
+	const disciplines = await getAllDisciplines(searchTerm);
 
 	return {
 		form,
-		disciplines: results?.disciplines || [],
-		count: results?.count || 0
+		disciplines: disciplines || []
 	};
 };
 
 export const actions = {
-	newDiscipline: async (event) => {
+	addDiscipline: async (event: RequestEvent) => {
 		const form = await superValidate(event, disciplineSchema);
 
 		if (!form.valid) {
@@ -73,9 +69,55 @@ export const actions = {
 		} catch (e) {
 			console.error(e);
 			setFlash({ type: 'error', message: 'Discipline was not able to be created.' }, event);
-			return setError(form, 'Error creating Discipline.');
+			return setError(form, 'Error creating discipline.');
 		}
+
 		console.log('Discipline added successfully');
-		return message(form, 'Skill added successfully.');
+		return message(form, 'Discipline added successfully.');
+	},
+
+	deleteDiscipline: async (event: RequestEvent) => {
+		const user = event.locals.user;
+
+		if (!user) {
+			redirect(302, '/auth/sign-in');
+		}
+
+		if (user.role !== 'SUPERADMIN') {
+			return fail(403, { message: 'You do not have permission to delete disciplines.' });
+		}
+
+		const form = await superValidate(event, z.object({ id: z.string().min(1) }));
+
+		if (!form.valid) {
+			return fail(400, {
+				form
+			});
+		}
+
+		const disciplineId = form.data.id;
+
+		if (!disciplineId) {
+			return fail(400, { message: 'Discipline ID is required.' });
+		}
+
+		try {
+			await db.delete(disciplineTable).where(eq(disciplineTable.id, disciplineId));
+
+			setFlash(
+				{
+					type: 'success',
+					message: 'Discipline deleted successfully.'
+				},
+				event
+			);
+		} catch (e) {
+			console.error(e);
+			setFlash({ type: 'error', message: 'Discipline was not able to be deleted.' }, event);
+			return setError(form, 'Error deleting discipline.');
+		}
+
+		console.log('Discipline deleted successfully');
+		return message(form, 'Discipline deleted successfully.');
 	}
 };

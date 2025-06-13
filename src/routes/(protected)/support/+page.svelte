@@ -3,6 +3,7 @@
 		getCoreRowModel,
 		type ColumnDef,
 		getSortedRowModel,
+		getPaginationRowModel,
 		type TableOptions,
 		createSvelteTable,
 		flexRender
@@ -16,26 +17,44 @@
 	import { onMount } from 'svelte';
 	import ViewLink from '$lib/components/tables/ViewLink.svelte';
 	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
 	import * as Table from '$lib/components/ui/table';
 	import { format } from 'date-fns';
+	import { ChevronLeft, ChevronRight } from 'lucide-svelte';
 	import NewSupportTicketDialog from '$lib/components/dialogs/newSupportTicketDialog.svelte';
+	import { goto } from '$app/navigation';
+	import { Input } from '$lib/components/ui/input';
+	import { Search } from 'flowbite-svelte';
 
 	export let data: PageData;
 	export let form: SuperValidated<NewSupportTicketSchema>;
 	let open = false;
 
+	// Reactive declarations
 	$: tickets = data.tickets as SupportTicketResult[];
 	$: user = data.user;
-	$: {
-		tableData = (tickets as SupportTicketResult[]) || [];
-		options.update((o) => ({ ...o, data: tableData }));
-	}
+	$: isAdmin = user?.role === USER_ROLES.SUPERADMIN;
+	$: isClient = user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF;
+	$: searchTerm = '';
+
+	const handleSearch = (term: string) => {
+		if (!term || term.trim() === '') {
+			// If the search term is empty, redirect to the support page without search
+			goto('/support', { replaceState: true });
+			return;
+		}
+		goto(`/support?search=${encodeURIComponent(term)}`, {
+			replaceState: true
+		});
+	};
 
 	form = data.form;
 
 	let tableData: SupportTicketResult[] = [];
-	const clientColumns: ColumnDef<SupportTicketResult>[] = [
+
+	// Common columns
+	const baseColumns: ColumnDef<SupportTicketResult>[] = [
 		{
 			header: '',
 			id: 'id',
@@ -49,17 +68,22 @@
 			header: 'Title',
 			id: 'title',
 			accessorFn: (original) => original.supportTicket.title
-		},
-		{
-			header: 'Date Created',
-			id: 'updatedAt',
-			accessorFn: (original) => original.supportTicket.updatedAt,
-			cell: (original) => format(original.getValue() as Date, 'PPp')
-		},
+		}
+	];
+
+	// Client-specific columns
+	const clientColumns: ColumnDef<SupportTicketResult>[] = [
+		...baseColumns,
 		{
 			header: 'Date Created',
 			id: 'createdAt',
 			accessorFn: (original) => original.supportTicket.createdAt,
+			cell: (original) => format(original.getValue() as Date, 'PPp')
+		},
+		{
+			header: 'Last Updated',
+			id: 'updatedAt',
+			accessorFn: (original) => original.supportTicket.updatedAt,
 			cell: (original) => format(original.getValue() as Date, 'PPp')
 		},
 		{
@@ -70,32 +94,25 @@
 				flexRender(Badge, {
 					value: original.getValue(),
 					class: cn(
-						original.getValue() === 'PENDING' && 'bg-yellow-300 hover:bg-yellow-400',
-						original.getValue() === 'NEW' && 'bg-green-400 hover:bg-bg-green-500',
+						'text-white',
+						original.getValue() === 'PENDING' && 'bg-yellow-500 hover:bg-yellow-600',
+						original.getValue() === 'NEW' && 'bg-green-500 hover:bg-green-600',
 						original.getValue() === 'CLOSED' && 'bg-red-500 hover:bg-red-600'
 					)
 				})
 		}
 	];
+
+	// Admin-specific columns
 	const adminColumns: ColumnDef<SupportTicketResult>[] = [
-		{
-			header: '',
-			id: 'id',
-			accessorFn: (original) => original.supportTicket.id,
-			cell: (original) =>
-				flexRender(ViewLink, {
-					href: `/support/ticket/${original.getValue()}`
-				})
-		},
-		{
-			header: 'Title',
-			id: 'title',
-			accessorFn: (original) => original.supportTicket.title
-		},
+		...baseColumns,
 		{
 			header: 'Opened By',
 			id: 'reportedBy',
-			accessorFn: (original) => `${original.reportedBy?.lastName}`
+			accessorFn: (original) =>
+				original.reportedBy
+					? `${original.reportedBy.firstName || ''} ${original.reportedBy.lastName || ''}`.trim()
+					: 'Unknown'
 		},
 		{
 			header: 'Date Created',
@@ -111,39 +128,70 @@
 				flexRender(Badge, {
 					value: original.getValue(),
 					class: cn(
-						original.getValue() === 'PENDING' && 'bg-yellow-300 hover:bg-yellow-400',
-						original.getValue() === 'NEW' && 'bg-green-400 hover:bg-bg-green-500',
+						'text-white',
+						original.getValue() === 'PENDING' && 'bg-yellow-500 hover:bg-yellow-600',
+						original.getValue() === 'NEW' && 'bg-green-500 hover:bg-green-600',
 						original.getValue() === 'CLOSED' && 'bg-red-500 hover:bg-red-600'
 					)
 				})
 		}
 	];
 
+	// Table options
 	const options = writable<TableOptions<SupportTicketResult>>({
 		data: tableData,
-		columns: user?.role === USER_ROLES.SUPERADMIN ? adminColumns : clientColumns,
+		columns: isAdmin ? adminColumns : clientColumns,
 		getCoreRowModel: getCoreRowModel(),
-		getSortedRowModel: getSortedRowModel()
+		getSortedRowModel: getSortedRowModel(),
+		getPaginationRowModel: getPaginationRowModel(),
+		initialState: {
+			pagination: {
+				pageSize: 10
+			}
+		}
 	});
 
+	// Update table data and columns when user role or tickets change
+	$: {
+		tableData = tickets || [];
+		options.update((o) => ({
+			...o,
+			data: tableData,
+			columns: isAdmin ? adminColumns : clientColumns
+		}));
+	}
+
 	onMount(() => {
-		tableData = (tickets as SupportTicketResult[]) ?? [];
-		options.update((o) => ({ ...o, data: tableData }));
+		tableData = tickets || [];
+		options.update((o) => ({
+			...o,
+			data: tableData,
+			columns: isAdmin ? adminColumns : clientColumns
+		}));
 	});
 
 	const table = createSvelteTable(options);
 </script>
 
 <section class="grow h-screen overflow-y-auto p-6 flex flex-col gap-6">
-	<div class=" flex items-center justify-between flex-wrap">
+	<div class="flex items-center justify-between flex-wrap">
 		<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">Support</h1>
 		<NewSupportTicketDialog bind:open {user} bind:form />
 	</div>
-	<!-- {#if user.role === USER_ROLES.SUPERADMIN}{/if} -->
-	{#if user.role === USER_ROLES.CLIENT || user.role === USER_ROLES.CLIENT_STAFF}
-		<div class="p-4">
-			<div class="column">
-				<Table.Root class="table">
+	<!-- Search -->
+	<form on:submit|preventDefault={() => handleSearch(searchTerm)} class="flex items-center gap-2">
+		<Input bind:value={searchTerm} placeholder="Search tickets..." class="bg-white max-w-xs" />
+		<Button
+			size="sm"
+			class="bg-blue-800 hover:bg-blue-900"
+			on:click={() => handleSearch(searchTerm)}>Search</Button
+		>
+	</form>
+
+	<div class="bg-white rounded-lg shadow-sm">
+		{#if tableData && tableData.length > 0}
+			<div class="rounded-md border">
+				<Table.Root>
 					<Table.TableHeader>
 						{#each $table.getHeaderGroups() as headerGroup}
 							<Table.TableRow class="bg-white">
@@ -155,13 +203,6 @@
 										<svelte:component
 											this={flexRender(header.column.columnDef.header, header.getContext())}
 										/>
-										<!-- {#if sortBy && sortOn && header.getContext().header.id === sortOn}
-										{#if sortBy === 'asc'}
-											<ArrowUpNarrowWide class="absolute right-0 top-[25%]" size={18} />
-										{:else}
-											<ArrowDownWideNarrow class="absolute right-0 top-[25%]" size={18} />
-										{/if}
-									{/if} -->
 									</Table.TableHead>
 								{/each}
 							</Table.TableRow>
@@ -169,7 +210,7 @@
 					</Table.TableHeader>
 					<Table.TableBody>
 						{#each $table.getRowModel().rows as row}
-							<Table.TableRow class="bg-gray-50">
+							<Table.TableRow class="bg-gray-50 hover:bg-gray-100">
 								{#each row.getVisibleCells() as cell}
 									<Table.TableCell>
 										<svelte:component
@@ -182,6 +223,80 @@
 					</Table.TableBody>
 				</Table.Root>
 			</div>
-		</div>
-	{/if}
+
+			<!-- Pagination Controls -->
+			<div class="flex items-center justify-between space-x-2 p-4 border-t">
+				<div class="flex-1 text-sm text-muted-foreground">
+					Showing {$table.getState().pagination.pageIndex * $table.getState().pagination.pageSize +
+						1} to {Math.min(
+						($table.getState().pagination.pageIndex + 1) * $table.getState().pagination.pageSize,
+						$table.getFilteredRowModel().rows.length
+					)} of {$table.getFilteredRowModel().rows.length} tickets
+				</div>
+				<div class="flex items-center space-x-2">
+					<Button
+						variant="outline"
+						size="sm"
+						on:click={() => $table.previousPage()}
+						disabled={!$table.getCanPreviousPage()}
+					>
+						<ChevronLeft class="h-4 w-4" />
+						Previous
+					</Button>
+					<div class="flex items-center space-x-1">
+						<span class="text-sm text-muted-foreground">
+							Page {$table.getState().pagination.pageIndex + 1} of {$table.getPageCount()}
+						</span>
+					</div>
+					<Button
+						variant="outline"
+						size="sm"
+						on:click={() => $table.nextPage()}
+						disabled={!$table.getCanNextPage()}
+					>
+						Next
+						<ChevronRight class="h-4 w-4" />
+					</Button>
+				</div>
+			</div>
+		{:else}
+			<!-- Empty state -->
+			<div class="flex flex-col items-center justify-center py-12 text-center">
+				<div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+					<svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+						/>
+					</svg>
+				</div>
+				<h3 class="text-lg font-medium text-gray-900 mb-2">No Support Tickets</h3>
+				<p class="text-sm text-gray-500 mb-6 max-w-sm">
+					{#if isAdmin}
+						No support tickets have been created yet.
+					{:else}
+						You haven't created any support tickets yet. Click the button above to create your first
+						ticket.
+					{/if}
+				</p>
+				{#if isClient}
+					<NewSupportTicketDialog bind:open {user} bind:form>
+						<Button variant="outline" class="gap-2">
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+								/>
+							</svg>
+							Create First Ticket
+						</Button>
+					</NewSupportTicketDialog>
+				{/if}
+			</div>
+		{/if}
+	</div>
 </section>

@@ -1,57 +1,43 @@
-<script lang="ts"></script>
+<script lang="ts">
+	const adminMenu = {
+		'User Management': [
+			{ name: 'Admins', link: '/admin/menu/admins' },
+			{ name: 'Professional Members', link: '/professionals' },
+			{ name: 'Business Members', link: '/clients' }
+		],
+		'Requisition Management': [
+			{ name: 'Requisitions', link: '/requisitions' },
+			{ name: 'Timesheets', link: '/timesheets' },
+			// { name: 'Ratings', link: '/admin/menu/ratings' },
+			{ name: 'Experience Levels', link: '/admin/menu/experience-levels' },
+			{ name: 'Skill Categories', link: '/admin/menu/skill-categories' },
+			{ name: 'Skills', link: '/admin/menu/skills' },
+			{ name: 'Disciplines', link: '/admin/menu/disciplines' }
+		],
+		'Record Management': [
+			{ name: 'Support Tickets', link: '/admin/menu/support-tickets' },
+			{ name: 'Record History', link: '/admin/menu/record-history' },
+			{ name: 'Regions', link: '/admin/menu/regions' },
+			{ name: 'Documents', link: '/admin/menu/documents' },
+			{ name: 'Application Settings', link: '/admin/menu/application-settings' }
+		]
+	};
+</script>
 
 <section class="grow h-screen overflow-y-auto">
 	<div class="p-6 flex flex-col gap-6">
 		<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">Admin Menu</h1>
 	</div>
 	<div class="px-6 pb-6 grid grid-cols-6 gap-12">
-		<div class="col-span-6 md:col-span-3 lg:col-span-2">
-			<p class="text-lg font-semibold">User Management</p>
-			<ul class="pt-4 flex flex-col gap-1">
-				<li class="text-blue-500"><a href="/admin/menu/admins">Admins</a></li>
-				<li class="text-blue-500"><a href="/candidates">Candidates</a></li>
-				<li class="text-blue-500"><a href="/clients">Clients</a></li>
-				<!-- <li class="text-blue-500"><a href="/admin/client-staff">Client Staff</a></li> -->
-				<li class="text-blue-500"><a href="/#">Client Locations</a></li>
-			</ul>
-		</div>
-		<div class="col-span-6 md:col-span-3 lg:col-span-2">
-			<p class="text-lg font-semibold">Requisition Management</p>
-			<ul class="pt-4 flex flex-col gap-1">
-				<li class="text-blue-500"><a href="/requisitions">Requisitions</a></li>
-				<!-- <li class="text-blue-500"><a href="/admin/menu/requisition-types">Requisition Types</a></li> -->
-				<li class="text-blue-500"><a href="/timesheets">Timesheets</a></li>
-				<li class="text-blue-500"><a href="/admin/menu/ratings">Ratings</a></li>
-				<li class="text-blue-500"><a href="/admin/menu/experience-levels">Experience Levels</a></li>
-				<li class="text-blue-500"><a href="/admin/menu/skill-categories">Skill Categories</a></li>
-				<li class="text-blue-500"><a href="/admin/menu/skills">Skills</a></li>
-				<li class="text-blue-500"><a href="/admin/menu/disciplines">Disciplines</a></li>
-			</ul>
-		</div>
-		<div class="col-span-6 md:col-span-3 lg:col-span-2">
-			<p class="text-lg font-semibold">Record Management</p>
-			<ul class="pt-4 flex flex-col gap-1">
-				<!-- <li class="text-blue-500"><a href="/#">Company Documents/Forms</a></li> -->
-				<li class="text-blue-500"><a href="/admin/menu/support-tickets">Support Tickets</a></li>
-				<li class="text-blue-500"><a href="/admin/menu/record-history">Record History</a></li>
-				<li class="text-blue-500"><a href="/admin/menu/regions">Regions</a></li>
-				<li class="text-blue-500"><a href="/admin/menu/sub-regions">Sub Regions</a></li>
-				<li class="text-blue-500"><a href="/admin/menu/documents">Documents</a></li>
-				<!-- <li class="text-blue-500">
-					<a href="/admin/menu/notification-templates">Notification Templates</a>
-				</li> -->
-				<!-- <li class="text-blue-500"><a href="/admin/menu/emails">Emails Sent</a></li>
-				<li class="text-blue-500"><a href="/admin/menu/sms">SMS Sent</a></li> -->
-				<!-- <li class="text-blue-500"><a href="/admin/menu/transactions">Transactions</a></li> -->
-				<!-- <li class="text-blue-500"><a href="/admin/menu/reports">Reports</a></li> -->
-				<li class="text-blue-500">
-					<a href="/admin/menu/application-settings">Application Settings</a>
-				</li>
-				<!-- <li class="text-blue-500">
-					<a href="/admin/menu/mass-notifications">Mass Notifications</a>
-				</li> -->
-				<!-- <li class="text-blue-500"><a href="/admin/menu/message-history">Message History</a></li> -->
-			</ul>
-		</div>
+		{#each Object.entries(adminMenu) as [section, items]}
+			<div class="col-span-6 md:col-span-3 lg:col-span-2">
+				<p class="text-lg font-semibold">{section}</p>
+				<ul class="pt-4 flex flex-col gap-1">
+					{#each items as { name, link }}
+						<li class="text-blue-500"><a href={link}>{name}</a></li>
+					{/each}
+				</ul>
+			</div>
+		{/each}
 	</div>
 </section>

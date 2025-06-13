@@ -1,7 +1,9 @@
-import { count, desc, eq, sql } from 'drizzle-orm';
+import { count, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import db from '../drizzle';
 import { disciplineTable, type Discipline, type UpdateDiscipline } from '../schemas/skill';
 import type { PaginateOptions } from '$lib/types';
+import { DEFAULT_MAX_RECORD_LIMIT } from '$lib/config/constants';
+import { error } from '@sveltejs/kit';
 
 export type DisciplinesRaw = {
 	id: string;
@@ -11,8 +13,27 @@ export type DisciplinesRaw = {
 
 export type DisciplineResults = DisciplinesRaw[];
 
-export async function getAllDisciplines() {
-	return await db.select().from(disciplineTable).orderBy(desc(disciplineTable.createdAt));
+export async function getAllDisciplines(searchTerm?: string) {
+	try {
+		const results = await db
+			.select()
+			.from(disciplineTable)
+			.where(
+				searchTerm
+					? or(
+							ilike(disciplineTable.name, `%${searchTerm}%`),
+							ilike(disciplineTable.abbreviation, `%${searchTerm}%`)
+						)
+					: undefined
+			)
+			.orderBy(desc(disciplineTable.createdAt))
+			.limit(DEFAULT_MAX_RECORD_LIMIT);
+
+		return results;
+	} catch (err) {
+		console.error('Error fetching disciplines:', err);
+		throw error(500, 'Failed to fetch disciplines');
+	}
 }
 
 export async function getPaginatedDisciplines({
@@ -32,10 +53,11 @@ export async function getPaginatedDisciplines({
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-    ORDER BY ${orderBy.direction === 'asc'
-					? sql`${sql.raw(orderSelector)} ASC`
-					: sql`${sql.raw(orderSelector)} DESC`
-				}
+    ORDER BY ${
+			orderBy.direction === 'asc'
+				? sql`${sql.raw(orderSelector)} ASC`
+				: sql`${sql.raw(orderSelector)} DESC`
+		}
   `);
 		} else {
 			query.append(sql`

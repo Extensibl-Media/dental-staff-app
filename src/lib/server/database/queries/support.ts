@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, ilike, or } from 'drizzle-orm';
 import db from '../drizzle';
 import {
 	supportTicketCommentTable,
@@ -11,6 +11,7 @@ import { userTable } from '../schemas/auth';
 import { error } from '@sveltejs/kit';
 import { getClientProfileById } from './clients';
 import { getUserById } from './users';
+import { DEFAULT_MAX_RECORD_LIMIT } from '$lib/config/constants';
 
 export interface SupportTicketResult {
 	supportTicket: SupportTicket;
@@ -37,7 +38,7 @@ export async function createSupportTicket(data: SupportTicket) {
 	}
 }
 
-export async function getAllSupportTickets() {
+export async function getAllSupportTickets(searchTerm?: string) {
 	return await db
 		.select({
 			supportTicket: { ...supportTicketTable },
@@ -50,8 +51,16 @@ export async function getAllSupportTickets() {
 			}
 		})
 		.from(supportTicketTable)
+		.where(
+			or(
+				searchTerm ? ilike(supportTicketTable.title, `%${searchTerm}%`) : undefined,
+				searchTerm ? ilike(userTable.firstName, `%${searchTerm}%`) : undefined,
+				searchTerm ? ilike(userTable.lastName, `%${searchTerm}%`) : undefined
+			)
+		)
 		.innerJoin(userTable, eq(supportTicketTable.reportedById, userTable.id))
-		.orderBy(desc(supportTicketTable.createdAt));
+		.orderBy(desc(supportTicketTable.createdAt))
+		.limit(DEFAULT_MAX_RECORD_LIMIT);
 }
 
 export async function getSupportTicketsForClient(clientId: string | undefined) {
@@ -67,7 +76,8 @@ export async function getSupportTicketsForClient(clientId: string | undefined) {
 		const tickets = await db
 			.select()
 			.from(supportTicketTable)
-			.where(eq(supportTicketTable.reportedById, clientUser.user.id));
+			.where(eq(supportTicketTable.reportedById, clientUser.user.id))
+			.limit(DEFAULT_MAX_RECORD_LIMIT);
 
 		return tickets;
 	} catch (err) {
@@ -76,7 +86,7 @@ export async function getSupportTicketsForClient(clientId: string | undefined) {
 	}
 }
 
-export async function getSupportTicketsForUser(userID?: string) {
+export async function getSupportTicketsForUser(userID?: string, searchTerm?: string) {
 	if (!userID) return error(400, 'User ID required');
 	return await db
 		.select({
@@ -91,9 +101,20 @@ export async function getSupportTicketsForUser(userID?: string) {
 		})
 		.from(supportTicketTable)
 		.innerJoin(userTable, eq(supportTicketTable.reportedById, userTable.id))
-		.where(eq(supportTicketTable.reportedById, userID))
-		.orderBy(desc(supportTicketTable.updatedAt));
+		.where(
+			and(
+				eq(supportTicketTable.reportedById, userID),
+				or(
+					searchTerm ? ilike(supportTicketTable.title, `%${searchTerm}%`) : undefined,
+					searchTerm ? ilike(userTable.firstName, `%${searchTerm}%`) : undefined,
+					searchTerm ? ilike(userTable.lastName, `%${searchTerm}%`) : undefined
+				)
+			)
+		)
+		.orderBy(desc(supportTicketTable.updatedAt))
+		.limit(DEFAULT_MAX_RECORD_LIMIT);
 }
+
 export async function getSupportTicketsForUserWithLimit(userID: string, count: number) {
 	if (!userID) return error(400, 'User ID required');
 	return await db
@@ -120,10 +141,6 @@ export async function closeSupportTicket(ticketId: string, closedById: string) {
 		.set({ closedById: closedById })
 		.where(eq(supportTicketTable.id, ticketId))
 		.returning();
-}
-
-export async function updateSuportTicket(ticketId: string, data: UpdateSuportTicket) {
-	return await db.update(supportTicketTable).set(data).where(eq(supportTicketTable.id, ticketId));
 }
 
 export async function deleteSupportTicket(ticketId: string) {
@@ -209,6 +226,10 @@ export const createSupportTicketComment = async (data: SupportTicketComment) => 
 			.values(data)
 			.onConflictDoNothing()
 			.returning();
+
+		await updateSupportTicket(data.supportTicketId, {
+			updatedAt: new Date()
+		});
 		return result;
 	} catch (err) {
 		console.log(err);
@@ -216,11 +237,11 @@ export const createSupportTicketComment = async (data: SupportTicketComment) => 
 	}
 };
 
-export const updateSupportTicket = async (ticketId: string, data: UpdateSuportTicket) => {
+export async function updateSupportTicket(ticketId: string, data: UpdateSuportTicket) {
 	try {
 		const [result] = await db
 			.update(supportTicketTable)
-			.set(data)
+			.set({ ...data, updatedAt: new Date() })
 			.where(eq(supportTicketTable.id, ticketId))
 			.returning();
 		return result;
@@ -228,4 +249,4 @@ export const updateSupportTicket = async (ticketId: string, data: UpdateSuportTi
 		console.log(err);
 		return error(500, `${err}`);
 	}
-};
+}

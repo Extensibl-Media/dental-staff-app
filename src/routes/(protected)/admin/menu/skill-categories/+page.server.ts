@@ -1,43 +1,41 @@
 import { fail, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import {
-	createNewSkillCategory,
-	getPaginatedSkillGategories
-} from '$lib/server/database/queries/skills';
+import { createNewSkillCategory, getAllSkillGategories } from '$lib/server/database/queries/skills';
 import { message, setError, superValidate } from 'sveltekit-superforms/server';
-import { newSkillSchema } from '$lib/config/zod-schemas';
+import { newCategorySchema, deleteCategorySchema } from '$lib/config/zod-schemas';
 import { setFlash } from 'sveltekit-flash-message/server';
-
-const skillSchema = newSkillSchema.pick({
-	name: true,
-	categoryId: true
-});
+import db from '$lib/server/database/drizzle';
+import { skillCategoryTable } from '$lib/server/database/schemas/skill';
+import { eq } from 'drizzle-orm';
 
 export const load: PageServerLoad = async (event) => {
-	const skip = Number(event.url.searchParams.get('skip'));
-	const sortBy = event.url.searchParams.get('sortBy')?.toString();
-	const sortOn = event.url.searchParams.get('sortOn')?.toString();
-
-	const orderBy = sortBy && sortOn ? { column: sortOn, direction: sortBy } : undefined;
+	const searchTerm = event.url.searchParams.get('search') || '';
 	const user = event.locals.user;
 	if (!user) {
 		redirect(302, '/auth/sign-in');
 	}
 
-	const form = await superValidate(event, skillSchema);
-
-	const results = await getPaginatedSkillGategories({ limit: 10, orderBy, offset: skip });
+	const form = await superValidate(event, newCategorySchema);
+	const categories = await getAllSkillGategories(searchTerm);
 
 	return {
 		form,
-		categories: results?.categories || [],
-		count: results?.count || 0
+		categories: categories || []
 	};
 };
 
 export const actions = {
-	default: async (event) => {
-		const form = await superValidate(event, skillSchema);
+	addCategory: async (event) => {
+		const user = event.locals.user;
+
+		if (!user) {
+			redirect(302, '/auth/sign-in');
+		}
+		if (user.role !== 'SUPERADMIN') {
+			fail(403, { message: 'You do not have permission to delete categories.' });
+		}
+
+		const form = await superValidate(event, newCategorySchema);
 
 		if (!form.valid) {
 			return fail(400, {
@@ -48,22 +46,20 @@ export const actions = {
 		try {
 			const categoryId = crypto.randomUUID();
 
-			const newCategory = await createNewSkillCategory({
+			await createNewSkillCategory({
 				id: categoryId,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 				name: form.data.name
 			});
 
-			if (newCategory) {
-				setFlash(
-					{
-						type: 'success',
-						message: 'Category created!'
-					},
-					event
-				);
-			}
+			setFlash(
+				{
+					type: 'success',
+					message: 'Category created successfully.'
+				},
+				event
+			);
 		} catch (e) {
 			console.error(e);
 			setFlash({ type: 'error', message: 'Category was not able to be created.' }, event);
@@ -71,5 +67,42 @@ export const actions = {
 		}
 		console.log('Category added successfully');
 		return message(form, 'Category added successfully.');
+	},
+	deleteCategory: async (event) => {
+		const user = event.locals.user;
+
+		if (!user) {
+			redirect(302, '/auth/sign-in');
+		}
+		if (user.role !== 'SUPERADMIN') {
+			fail(403, { message: 'You do not have permission to delete categories.' });
+		}
+
+		const form = await superValidate(event, deleteCategorySchema);
+
+		if (!form.valid) {
+			return fail(400, {
+				form
+			});
+		}
+
+		try {
+			const categoryId = form.data.id;
+
+			await db.delete(skillCategoryTable).where(eq(skillCategoryTable.id, categoryId));
+			setFlash(
+				{
+					type: 'success',
+					message: 'Category deleted successfully.'
+				},
+				event
+			);
+		} catch (e) {
+			console.error(e);
+			setFlash({ type: 'error', message: 'Category was not able to be deleted.' }, event);
+			return setError(form, 'Error deleting Category.');
+		}
+		console.log('Category deleted successfully');
+		return message(form, 'Category deleted successfully.');
 	}
 };

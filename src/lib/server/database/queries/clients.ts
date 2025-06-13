@@ -1,4 +1,4 @@
-import { desc, eq, count, sql, and, ne, notExists } from 'drizzle-orm';
+import { desc, eq, count, sql, and, ne, notExists, or, ilike } from 'drizzle-orm';
 import db from '$lib/server/database/drizzle';
 import {
 	clientCompanyTable,
@@ -35,6 +35,7 @@ import {
 } from './requisitions';
 import type { PaginateOptions } from '$lib/types';
 import { EmailService } from '$lib/server/email/emailService';
+import { DEFAULT_MAX_RECORD_LIMIT } from '$lib/config/constants';
 
 export type ClientWithCompanyRaw = {
 	birthday: string | null;
@@ -132,72 +133,19 @@ export async function updateClientProfile(clientId: string, values: UpdateClient
 	}
 }
 
+// Keep this for backward compatibility if needed elsewhere
 export async function getClientProfilesCount() {
-	const countResult = await db.select({ value: count() }).from(clientProfileTable);
-
-	return countResult[0].value;
-}
-
-export async function getPaginatedClientProfiles({
-	limit = 25,
-	offset = 0,
-	orderBy = undefined
-}: PaginateOptions) {
-	const userCols = ['email', 'first_name', 'last_name'];
-	const companyCols = ['company_name'];
-	const orderSelector = orderBy
-		? userCols.includes(orderBy.column)
-			? `u.${orderBy.column}`
-			: companyCols.includes(orderBy.column)
-				? `${orderBy.column}`
-				: `c.${orderBy.column}`
-		: null;
-
 	try {
-		const query = sql.empty();
+		const result = await db.select({ count: count() }).from(clientProfileTable);
 
-		query.append(sql`
-		SELECT
-			c.*,
-			u.first_name,
-			u.last_name,
-			u.email,
-			co.company_name
-		FROM ${clientProfileTable} AS c
-		INNER JOIN ${userTable} u ON c.user_id = u.id
-		INNER JOIN ${clientCompanyTable} co ON c.id = co.client_id
-     `);
-
-		if (orderSelector && orderBy) {
-			query.append(sql`
-		   ORDER BY ${
-					orderBy.direction === 'asc'
-						? sql`${sql.raw(orderSelector)} ASC`
-						: sql`${sql.raw(orderSelector)} DESC`
-				}
-		 `);
-		} else {
-			query.append(sql`
-		   ORDER BY c.created_at DESC
-		 `);
-		}
-
-		query.append(sql`
-       LIMIT ${limit}
-       OFFSET ${offset}
-     `);
-
-		const results = await db.execute(query);
-
-		const count = await getClientProfilesCount();
-
-		return { clients: results.rows, count };
-	} catch (err) {
-		console.error(err);
+		return result[0]?.count || 0;
+	} catch (error) {
+		console.error('Error getting client profiles count:', error);
+		return 0;
 	}
 }
 
-export async function getAllClientProfiles() {
+export async function getAllClientProfiles(searchTerm?: string) {
 	const results = await db
 		.select({
 			user: {
@@ -213,7 +161,16 @@ export async function getAllClientProfiles() {
 		.from(clientProfileTable)
 		.innerJoin(clientCompanyTable, eq(clientProfileTable.id, clientCompanyTable.clientId))
 		.innerJoin(userTable, eq(clientProfileTable.userId, userTable.id))
-		.orderBy(desc(clientProfileTable.createdAt));
+		.where(
+			or(
+				searchTerm ? ilike(userTable.email, `%${searchTerm}%`) : undefined,
+				searchTerm ? ilike(userTable.firstName, `%${searchTerm}%`) : undefined,
+				searchTerm ? ilike(userTable.lastName, `%${searchTerm}%`) : undefined,
+				searchTerm ? ilike(clientCompanyTable.companyName, `%${searchTerm}%`) : undefined
+			)
+		)
+		.orderBy(desc(clientProfileTable.createdAt))
+		.limit(DEFAULT_MAX_RECORD_LIMIT);
 
 	return results;
 }

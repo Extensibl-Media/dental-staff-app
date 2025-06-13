@@ -1,4 +1,4 @@
-import { asc, count, desc, eq, sql } from 'drizzle-orm';
+import { asc, count, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import db from '../drizzle';
 import {
 	skillTable,
@@ -11,6 +11,8 @@ import {
 	type UpdateExperienceLevel
 } from '../schemas/skill';
 import type { PaginateOptions } from '$lib/types';
+import { DEFAULT_MAX_RECORD_LIMIT } from '$lib/config/constants';
+import { error } from '@sveltejs/kit';
 
 export type SkillsWithCategoryRaw = {
 	id: string;
@@ -79,12 +81,38 @@ export async function getPaginatedSkills({
 	}
 }
 
-export async function getAllSkills() {
-	return await db
-		.select()
-		.from(skillTable)
-		.innerJoin(skillCategoryTable, eq(skillCategoryTable.id, skillTable.categoryId))
-		.orderBy(desc(skillTable.createdAt));
+export async function getAllSkills(searchTerm?: string) {
+	try {
+		const results = await db
+			.select({
+				// Skill fields
+				id: skillTable.id,
+				name: skillTable.name,
+				categoryId: skillTable.categoryId,
+				createdAt: skillTable.createdAt,
+				updatedAt: skillTable.updatedAt,
+
+				// Category fields
+				categoryName: skillCategoryTable.name
+			})
+			.from(skillTable)
+			.innerJoin(skillCategoryTable, eq(skillCategoryTable.id, skillTable.categoryId))
+			.where(
+				searchTerm
+					? or(
+							ilike(skillTable.name, `%${searchTerm}%`),
+							ilike(skillCategoryTable.name, `%${searchTerm}%`)
+						)
+					: undefined
+			)
+			.orderBy(desc(skillTable.createdAt))
+			.limit(DEFAULT_MAX_RECORD_LIMIT);
+
+		return results;
+	} catch (error) {
+		console.error('Error fetching skills:', error);
+		throw error;
+	}
 }
 
 export async function createNewSkill(values: Skill) {
@@ -146,8 +174,20 @@ export async function getPaginatedSkillGategories({
 	}
 }
 
-export async function getAllSkillGategories(): Promise<SkillCategory[]> {
-	return await db.select().from(skillCategoryTable).orderBy(desc(skillCategoryTable.createdAt));
+export async function getAllSkillGategories(searchTerm?: string): Promise<SkillCategory[]> {
+	try {
+		const results = await db
+			.select()
+			.from(skillCategoryTable)
+			.orderBy(desc(skillCategoryTable.createdAt))
+			.where(searchTerm ? ilike(skillCategoryTable.name, `%${searchTerm}%`) : undefined)
+			.limit(DEFAULT_MAX_RECORD_LIMIT);
+
+		return results;
+	} catch (err) {
+		console.error('Error fetching skill categories:', error);
+		throw error(500, 'Failed to fetch skill categories');
+	}
 }
 
 export async function createNewSkillCategory(values: SkillCategory) {
@@ -168,8 +208,20 @@ export async function getAllDisciplines() {
 	return await db.select().from(disciplineTable).orderBy(asc(disciplineTable.name));
 }
 
-export async function getAllExperienceLevels() {
-	return await db.select().from(experienceLevelTable).orderBy(asc(experienceLevelTable.value));
+export async function getAllExperienceLevels(searchTerm?: string) {
+	try {
+		const results = await db
+			.select()
+			.from(experienceLevelTable)
+			.where(searchTerm ? ilike(experienceLevelTable.value, `%${searchTerm}%`) : undefined)
+			.orderBy(asc(experienceLevelTable.value))
+			.limit(DEFAULT_MAX_RECORD_LIMIT);
+
+		return results;
+	} catch (err) {
+		console.error('Error fetching experience levels:', error);
+		throw error(500, 'Failed to fetch experience levels');
+	}
 }
 
 export async function getPaginatedExperienceLevels({

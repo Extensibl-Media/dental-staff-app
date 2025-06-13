@@ -129,6 +129,11 @@ export const newCategorySchema = z.object({
 
 export type NewCategorySchema = typeof newSkillSchema;
 
+export const deleteCategorySchema = z.object({
+	id: z.string()
+});
+export type DeleteCategorySchema = typeof deleteCategorySchema;
+
 export const newExperienceLevelSchema = z.object({
 	value: z.string()
 });
@@ -307,3 +312,4 @@ export const ClientLocationDetailsSchema = NewAddressSchema.merge(ContactSchema)
 		timezone: z.string().min(1, 'Timezone is required')
 	})
 );
+export const CandidateStatusSchema = z.object({ status: z.string().min(1), id: z.string().min(1) });

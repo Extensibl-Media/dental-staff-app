@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { and, asc, count, eq, or, sql, desc, isNotNull, gte, lte, SQL } from 'drizzle-orm';
+import { and, asc, count, eq, or, sql, desc, isNotNull, gte, lte, SQL, ilike } from 'drizzle-orm';
 import db from '../drizzle';
 import {
 	recurrenceDayTable,
@@ -51,6 +51,7 @@ import type { PaginateOptions } from '$lib/types';
 import { normalizeDate } from '$lib/_helpers';
 import type Stripe from 'stripe';
 import { calculateMaxHours, toUTCDateString } from '$lib/_helpers/UTCTimezoneUtils';
+import { DEFAULT_MAX_RECORD_LIMIT } from '$lib/config/constants';
 
 // Types and Interfaces
 export interface TimesheetDiscrepancy {
@@ -144,146 +145,307 @@ export async function getAllRequisitions() {
 	return await db.select().from(requisitionTable).where(eq(requisitionTable.archived, false));
 }
 
-export async function getPaginatedRequisitionsAdmin({
-	limit = 10,
-	offset = 0,
-	orderBy = undefined
-}: PaginateOptions) {
+export async function getRequisitionsForClient(companyId: string, searchTerm?: string) {
 	try {
-		const regionFields = ['region_abbreviation'];
-		const companyFields = ['company_name'];
-		const userCols = ['email', 'first_name', 'last_name'];
-		const locationFields = ['location_name', 'region_name'];
-		const disciplineFields = ['discipline_name'];
+		const results = await db
+			.select({
+				// Requisition fields
+				id: requisitionTable.id,
+				title: requisitionTable.title,
+				status: requisitionTable.status,
+				createdAt: requisitionTable.createdAt,
+				updatedAt: requisitionTable.updatedAt,
+				hourlyRate: requisitionTable.hourlyRate,
+				permanentPosition: requisitionTable.permanentPosition,
+				jobDescription: requisitionTable.jobDescription,
+				specialInstructions: requisitionTable.specialInstructions,
+				referenceTimezone: requisitionTable.referenceTimezone,
 
-		const orderSelector = orderBy
-			? companyFields.includes(orderBy.column)
-				? `co.${orderBy.column}`
-				: userCols.includes(orderBy.column)
-					? `u.${orderBy.column}`
-					: locationFields.includes(orderBy.column)
-						? `lo.${orderBy.column}`
-						: disciplineFields.includes(orderBy.column)
-							? `d.${orderBy.column}`
-							: regionFields.includes(orderBy.column)
-								? `re.${orderBy.column}`
-								: `r.${orderBy.column}`
-			: null;
+				// Location fields
+				locationId: companyOfficeLocationTable.id,
+				locationName: companyOfficeLocationTable.name,
+				companyId: companyOfficeLocationTable.companyId,
 
-		const query = sql.empty();
+				// Company fields
+				companyName: clientCompanyTable.companyName,
 
-		query.append(sql`
-			SELECT r.*, lo.company_id AS company_id, lo.location_name, co.company_name, u.first_name, u.last_name, u.email, d.name AS discipline_name, re.name AS region_name, re.abbreviation AS region_abbreviation, sr.name AS subregion
-			FROM ${requisitionTable} as r
-			INNER JOIN ${companyOfficeLocationTable} lo ON r.location_id = lo.id
-			INNER JOIN ${clientCompanyTable} co ON co.id = company_id
-			INNER JOIN ${clientProfileTable} cl ON co.client_id = cl.id
-			INNER JOIN ${userTable} u ON u.id = cl.user_id
-			INNER JOIN ${disciplineTable} d ON d.id = r.discipline_id
-			INNER JOIN ${regionTable} re ON re.id = lo.region_id
-			LEFT JOIN ${subRegionTable} sr ON sr.region_id = re.id
-			WHERE r.archived = false
-		`);
+				// User fields (client owner)
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				email: userTable.email,
 
-		// sorting segment
-		if (orderSelector && orderBy) {
-			query.append(sql`
-				ORDER BY ${
-					orderBy.direction === 'asc'
-						? sql`${sql.raw(orderSelector)} ASC`
-						: sql`${sql.raw(orderSelector)} DESC`
-				}
-			`);
-		} else {
-			query.append(sql`
-				ORDER BY r.created_at DESC
-			`);
-		}
+				// Discipline fields
+				disciplineName: disciplineTable.name,
 
-		// pagination segment
-		query.append(sql`
-			LIMIT ${limit}
-			OFFSET ${offset}
-		`);
+				// Region fields
+				regionName: regionTable.name,
+				regionAbbreviation: regionTable.abbreviation,
 
-		const results = await db.execute(query);
-		const countResult = await db.select({ value: count() }).from(requisitionTable);
+				// Subregion fields
+				subregionName: subRegionTable.name
+			})
+			.from(requisitionTable)
+			.innerJoin(
+				companyOfficeLocationTable,
+				eq(requisitionTable.locationId, companyOfficeLocationTable.id)
+			)
+			.innerJoin(
+				clientCompanyTable,
+				eq(companyOfficeLocationTable.companyId, clientCompanyTable.id)
+			)
+			.innerJoin(clientProfileTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
+			.innerJoin(userTable, eq(clientProfileTable.userId, userTable.id))
+			.innerJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id))
+			.innerJoin(regionTable, eq(companyOfficeLocationTable.regionId, regionTable.id))
+			.leftJoin(subRegionTable, eq(subRegionTable.regionId, regionTable.id))
+			.where(
+				and(
+					eq(requisitionTable.companyId, companyId),
+					eq(requisitionTable.archived, false),
+					or(
+						searchTerm ? ilike(requisitionTable.title, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(userTable.firstName, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(userTable.lastName, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(disciplineTable.name, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(regionTable.name, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(subRegionTable.name, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(companyOfficeLocationTable.name, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(clientCompanyTable.companyName, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(companyOfficeLocationTable.city, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(companyOfficeLocationTable.state, `%${searchTerm}%`) : undefined
+					)
+				)
+			)
+			.orderBy(desc(requisitionTable.createdAt))
+			.limit(DEFAULT_MAX_RECORD_LIMIT);
 
-		return { requisitions: results.rows, count: countResult[0].value };
+		return results;
 	} catch (error) {
-		console.log(error);
+		console.error('Error fetching requisitions for client:', error);
+		throw error;
 	}
 }
 
-export async function getPaginatedRequisitionsforClient(
-	companyId: string,
-	{ limit = 10, offset = 0, orderBy = undefined }: PaginateOptions
-) {
+export async function getRequisitionsAdmin(searchTerm?: string) {
 	try {
-		const regionFields = ['region_abbreviation'];
-		const companyFields = ['company_name'];
-		const userCols = ['email', 'first_name', 'last_name'];
-		const locationFields = ['location_name', 'region_name'];
-		const disciplineFields = ['discipline_name'];
+		const results = await db
+			.select({
+				// Requisition fields
+				id: requisitionTable.id,
+				title: requisitionTable.title,
+				status: requisitionTable.status,
+				createdAt: requisitionTable.createdAt,
+				updatedAt: requisitionTable.updatedAt,
+				hourlyRate: requisitionTable.hourlyRate,
+				permanentPosition: requisitionTable.permanentPosition,
+				jobDescription: requisitionTable.jobDescription,
+				specialInstructions: requisitionTable.specialInstructions,
+				referenceTimezone: requisitionTable.referenceTimezone,
 
-		const orderSelector = orderBy
-			? companyFields.includes(orderBy.column)
-				? `co.${orderBy.column}`
-				: userCols.includes(orderBy.column)
-					? `u.${orderBy.column}`
-					: locationFields.includes(orderBy.column)
-						? `lo.${orderBy.column}`
-						: disciplineFields.includes(orderBy.column)
-							? `d.${orderBy.column}`
-							: regionFields.includes(orderBy.column)
-								? `re.${orderBy.column}`
-								: `r.${orderBy.column}`
-			: null;
+				// Location fields
+				locationId: companyOfficeLocationTable.id,
+				locationName: companyOfficeLocationTable.name,
+				companyId: companyOfficeLocationTable.companyId,
 
-		const query = sql.empty();
+				// Company fields
+				companyName: clientCompanyTable.companyName,
 
-		query.append(sql`
-			SELECT r.*, lo.company_id AS company_id, lo.location_name, co.company_name, u.first_name, u.last_name, u.email, d.name AS discipline_name, re.name AS region_name, re.abbreviation AS region_abbreviation, sr.name AS subregion
-			FROM ${requisitionTable} as r
-			INNER JOIN ${companyOfficeLocationTable} lo ON r.location_id = lo.id
-			INNER JOIN ${clientCompanyTable} co ON co.id = company_id
-			INNER JOIN ${clientProfileTable} cl ON co.client_id = cl.id
-			INNER JOIN ${userTable} u ON u.id = cl.user_id
-			INNER JOIN ${disciplineTable} d ON d.id = r.discipline_id
-			INNER JOIN ${regionTable} re ON re.id = lo.region_id
-			LEFT JOIN ${subRegionTable} sr ON sr.region_id = re.id
-			WHERE r.client_id = ${companyId} AND r.archived = false
-		`);
+				// User fields (client owner)
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				email: userTable.email,
 
-		// sorting segment
-		if (orderSelector && orderBy) {
-			query.append(sql`
-				ORDER BY ${
-					orderBy.direction === 'asc'
-						? sql`${sql.raw(orderSelector)} ASC`
-						: sql`${sql.raw(orderSelector)} DESC`
-				}
-			`);
-		} else {
-			query.append(sql`
-				ORDER BY r.created_at DESC
-			`);
-		}
+				// Discipline fields
+				disciplineName: disciplineTable.name,
 
-		// pagination segment
-		query.append(sql`
-			LIMIT ${limit}
-			OFFSET ${offset}
-		`);
+				// Region fields
+				regionName: regionTable.name,
+				regionAbbreviation: regionTable.abbreviation,
 
-		const results = await db.execute(query);
-		const countResult = await db.select({ value: count() }).from(requisitionTable);
+				// Subregion fields
+				subregionName: subRegionTable.name
+			})
+			.from(requisitionTable)
+			.innerJoin(
+				companyOfficeLocationTable,
+				eq(requisitionTable.locationId, companyOfficeLocationTable.id)
+			)
+			.innerJoin(
+				clientCompanyTable,
+				eq(companyOfficeLocationTable.companyId, clientCompanyTable.id)
+			)
+			.innerJoin(clientProfileTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
+			.innerJoin(userTable, eq(clientProfileTable.userId, userTable.id))
+			.innerJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id))
+			.innerJoin(regionTable, eq(companyOfficeLocationTable.regionId, regionTable.id))
+			.leftJoin(subRegionTable, eq(subRegionTable.regionId, regionTable.id))
+			.where(
+				and(
+					eq(requisitionTable.archived, false),
+					or(
+						searchTerm ? ilike(requisitionTable.title, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(userTable.firstName, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(userTable.lastName, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(disciplineTable.name, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(regionTable.name, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(subRegionTable.name, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(companyOfficeLocationTable.name, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(clientCompanyTable.companyName, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(companyOfficeLocationTable.city, `%${searchTerm}%`) : undefined,
+						searchTerm ? ilike(companyOfficeLocationTable.state, `%${searchTerm}%`) : undefined
+					)
+				)
+			)
+			.orderBy(desc(requisitionTable.createdAt))
+			.limit(DEFAULT_MAX_RECORD_LIMIT);
 
-		return { requisitions: results.rows, count: countResult[0].value };
+		return results;
 	} catch (error) {
-		console.log(error);
+		console.error('Error fetching requisitions for admin:', error);
+		throw error;
 	}
 }
+
+// export async function getPaginatedRequisitionsAdmin({
+// 	limit = 10,
+// 	offset = 0,
+// 	orderBy = undefined
+// }: PaginateOptions) {
+// 	try {
+// 		const regionFields = ['region_abbreviation'];
+// 		const companyFields = ['company_name'];
+// 		const userCols = ['email', 'first_name', 'last_name'];
+// 		const locationFields = ['location_name', 'region_name'];
+// 		const disciplineFields = ['discipline_name'];
+
+// 		const orderSelector = orderBy
+// 			? companyFields.includes(orderBy.column)
+// 				? `co.${orderBy.column}`
+// 				: userCols.includes(orderBy.column)
+// 					? `u.${orderBy.column}`
+// 					: locationFields.includes(orderBy.column)
+// 						? `lo.${orderBy.column}`
+// 						: disciplineFields.includes(orderBy.column)
+// 							? `d.${orderBy.column}`
+// 							: regionFields.includes(orderBy.column)
+// 								? `re.${orderBy.column}`
+// 								: `r.${orderBy.column}`
+// 			: null;
+
+// 		const query = sql.empty();
+
+// 		query.append(sql`
+// 			SELECT r.*, lo.company_id AS company_id, lo.location_name, co.company_name, u.first_name, u.last_name, u.email, d.name AS discipline_name, re.name AS region_name, re.abbreviation AS region_abbreviation, sr.name AS subregion
+// 			FROM ${requisitionTable} as r
+// 			INNER JOIN ${companyOfficeLocationTable} lo ON r.location_id = lo.id
+// 			INNER JOIN ${clientCompanyTable} co ON co.id = company_id
+// 			INNER JOIN ${clientProfileTable} cl ON co.client_id = cl.id
+// 			INNER JOIN ${userTable} u ON u.id = cl.user_id
+// 			INNER JOIN ${disciplineTable} d ON d.id = r.discipline_id
+// 			INNER JOIN ${regionTable} re ON re.id = lo.region_id
+// 			LEFT JOIN ${subRegionTable} sr ON sr.region_id = re.id
+// 			WHERE r.archived = false
+// 		`);
+
+// 		// sorting segment
+// 		if (orderSelector && orderBy) {
+// 			query.append(sql`
+// 				ORDER BY ${
+// 					orderBy.direction === 'asc'
+// 						? sql`${sql.raw(orderSelector)} ASC`
+// 						: sql`${sql.raw(orderSelector)} DESC`
+// 				}
+// 			`);
+// 		} else {
+// 			query.append(sql`
+// 				ORDER BY r.created_at DESC
+// 			`);
+// 		}
+
+// 		// pagination segment
+// 		query.append(sql`
+// 			LIMIT ${limit}
+// 			OFFSET ${offset}
+// 		`);
+
+// 		const results = await db.execute(query);
+// 		const countResult = await db.select({ value: count() }).from(requisitionTable);
+
+// 		return { requisitions: results.rows, count: countResult[0].value };
+// 	} catch (error) {
+// 		console.log(error);
+// 	}
+// }
+
+// export async function getPaginatedRequisitionsforClient(
+// 	companyId: string,
+// 	{ limit = 10, offset = 0, orderBy = undefined }: PaginateOptions
+// ) {
+// 	try {
+// 		const regionFields = ['region_abbreviation'];
+// 		const companyFields = ['company_name'];
+// 		const userCols = ['email', 'first_name', 'last_name'];
+// 		const locationFields = ['location_name', 'region_name'];
+// 		const disciplineFields = ['discipline_name'];
+
+// 		const orderSelector = orderBy
+// 			? companyFields.includes(orderBy.column)
+// 				? `co.${orderBy.column}`
+// 				: userCols.includes(orderBy.column)
+// 					? `u.${orderBy.column}`
+// 					: locationFields.includes(orderBy.column)
+// 						? `lo.${orderBy.column}`
+// 						: disciplineFields.includes(orderBy.column)
+// 							? `d.${orderBy.column}`
+// 							: regionFields.includes(orderBy.column)
+// 								? `re.${orderBy.column}`
+// 								: `r.${orderBy.column}`
+// 			: null;
+
+// 		const query = sql.empty();
+
+// 		query.append(sql`
+// 			SELECT r.*, lo.company_id AS company_id, lo.location_name, co.company_name, u.first_name, u.last_name, u.email, d.name AS discipline_name, re.name AS region_name, re.abbreviation AS region_abbreviation, sr.name AS subregion
+// 			FROM ${requisitionTable} as r
+// 			INNER JOIN ${companyOfficeLocationTable} lo ON r.location_id = lo.id
+// 			INNER JOIN ${clientCompanyTable} co ON co.id = company_id
+// 			INNER JOIN ${clientProfileTable} cl ON co.client_id = cl.id
+// 			INNER JOIN ${userTable} u ON u.id = cl.user_id
+// 			INNER JOIN ${disciplineTable} d ON d.id = r.discipline_id
+// 			INNER JOIN ${regionTable} re ON re.id = lo.region_id
+// 			LEFT JOIN ${subRegionTable} sr ON sr.region_id = re.id
+// 			WHERE r.client_id = ${companyId} AND r.archived = false
+// 		`);
+
+// 		// sorting segment
+// 		if (orderSelector && orderBy) {
+// 			query.append(sql`
+// 				ORDER BY ${
+// 					orderBy.direction === 'asc'
+// 						? sql`${sql.raw(orderSelector)} ASC`
+// 						: sql`${sql.raw(orderSelector)} DESC`
+// 				}
+// 			`);
+// 		} else {
+// 			query.append(sql`
+// 				ORDER BY r.created_at DESC
+// 			`);
+// 		}
+
+// 		// pagination segment
+// 		query.append(sql`
+// 			LIMIT ${limit}
+// 			OFFSET ${offset}
+// 		`);
+
+// 		const results = await db.execute(query);
+// 		const countResult = await db.select({ value: count() }).from(requisitionTable);
+
+// 		return { requisitions: results.rows, count: countResult[0].value };
+// 	} catch (error) {
+// 		console.log(error);
+// 	}
+// }
 
 export async function getRequisitionDetailsByIdAdmin(requisitionId: number): Promise<any | null> {
 	const [result] = await db
@@ -1052,7 +1214,7 @@ export async function getTimesheetsDueCount(clientId: string) {
 				and(eq(timeSheetTable.associatedClientId, clientId), eq(timeSheetTable.status, 'PENDING'))
 			);
 
-		return result.count;
+		return result.count || 0;
 	} catch (err) {
 		console.log('error getting timesheet count');
 		console.log(err);

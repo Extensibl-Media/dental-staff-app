@@ -1,4 +1,4 @@
-import { count, eq, sql } from 'drizzle-orm';
+import { count, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import db from '../drizzle';
 import {
 	regionTable,
@@ -11,6 +11,7 @@ import {
 } from '../schemas/region';
 import type { PaginateOptions } from '$lib/types';
 import { error } from '@sveltejs/kit';
+import { DEFAULT_MAX_RECORD_LIMIT } from '$lib/config/constants';
 
 export type RegionRaw = {
 	id: string;
@@ -66,8 +67,27 @@ export async function getPaginatedRegions({
 	}
 }
 
-export async function getAllRegions() {
-	return await db.select().from(regionTable);
+export async function getAllRegions(searchTerm?: string) {
+	try {
+		const results = await db
+			.select()
+			.from(regionTable)
+			.where(
+				searchTerm
+					? or(
+							ilike(regionTable.name, `%${searchTerm}%`),
+							ilike(regionTable.abbreviation, `%${searchTerm}%`)
+						)
+					: undefined
+			)
+			.orderBy(desc(regionTable.createdAt))
+			.limit(DEFAULT_MAX_RECORD_LIMIT);
+
+		return results;
+	} catch (err) {
+		console.error('Error fetching regions:', err);
+		throw error(500, 'Failed to fetch regions');
+	}
 }
 
 export async function getRegionById(regionId: string | null | undefined) {

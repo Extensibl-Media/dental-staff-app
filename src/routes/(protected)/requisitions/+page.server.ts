@@ -8,36 +8,28 @@ import {
 } from '$lib/server/database/queries/clients.js';
 import {
 	createRequisition,
-	getPaginatedRequisitionsAdmin,
-	getPaginatedRequisitionsforClient
+	getRequisitionsAdmin,
+	getRequisitionsForClient
 } from '$lib/server/database/queries/requisitions';
 import { error, fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import { setFlash } from 'sveltekit-flash-message/server';
 import { superValidate } from 'sveltekit-superforms/server';
 
-export const load = async (event) => {
-	const skip = Number(event.url.searchParams.get('skip'));
-	const sortBy = event.url.searchParams.get('sortBy')?.toString();
-	const sortOn = event.url.searchParams.get('sortOn')?.toString();
-	const orderBy = sortBy && sortOn ? { column: sortOn, direction: sortBy } : undefined;
-
+export const load = async (event: RequestEvent) => {
 	const user = event.locals.user;
+	const searchTerm = event.url.searchParams.get('search') || '';
 
 	if (!user) {
 		redirect(301, '/auth/sign-in');
 	}
 
 	if (user?.role === USER_ROLES.SUPERADMIN) {
-		const results = await getPaginatedRequisitionsAdmin({
-			limit: 10,
-			offset: skip || 0,
-			orderBy
-		});
+		const requisitions = await getRequisitionsAdmin(searchTerm);
 		const form = superValidate(event, adminRequisitionSchema);
+
 		return {
 			user: event.locals.user,
-			requisitions: results?.requisitions || [],
-			count: results?.count || 0,
+			requisitions: requisitions || [],
 			adminForm: form,
 			clientForm: null
 		};
@@ -45,22 +37,15 @@ export const load = async (event) => {
 
 	if (user?.role === USER_ROLES.CLIENT) {
 		const client = await getClientProfilebyUserId(user.id);
-
 		await redirectIfNotValidCustomer(client.id, user.role);
 
 		const clientCompany = await getClientCompanyByClientId(client.id);
 		const form = await superValidate(event, clientRequisitionSchema);
-
-		const results = await getPaginatedRequisitionsforClient(clientCompany.id, {
-			limit: 10,
-			offset: skip,
-			orderBy
-		});
+		const requisitions = await getRequisitionsForClient(clientCompany.id, searchTerm);
 
 		return {
 			user,
-			requisitions: results?.requisitions || [],
-			count: results?.count || 0,
+			requisitions: requisitions || [],
 			clientForm: form,
 			adminForm: null
 		};
@@ -68,24 +53,15 @@ export const load = async (event) => {
 
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
 		const client = await getClientProfileByStaffUserId(user.id);
-
 		await redirectIfNotValidCustomer(client?.id, user.role);
 
 		const company = await getClientCompanyByClientId(client?.id);
-
 		const form = await superValidate(event, clientRequisitionSchema);
+		const requisitions = await getRequisitionsForClient(company.id, searchTerm);
 
-		const results = await getPaginatedRequisitionsforClient(company.id, {
-			limit: 10,
-			offset: skip,
-			orderBy
-		});
-
-		console.log({ client, company, results });
 		return {
 			user,
-			requisitions: results?.requisitions || [],
-			count: results?.count || 0,
+			requisitions: requisitions || [],
 			clientForm: form,
 			adminForm: null
 		};
@@ -93,8 +69,7 @@ export const load = async (event) => {
 
 	return {
 		user: event.locals.user,
-		requisitions: null,
-		count: 0,
+		requisitions: [],
 		adminForm: null,
 		clientForm: null
 	};
@@ -122,6 +97,7 @@ export const actions = {
 		const timezone = formData.get('timezone') as string;
 		const permanentPosition = formData.get('permanentPosition');
 		const hourlyRate = Number(formData.get('hourlyRate'));
+
 		const newRequisition = await createRequisition(
 			{
 				createdAt: new Date(),
@@ -152,6 +128,7 @@ export const actions = {
 		if (!user) {
 			return fail(403);
 		}
+
 		const client =
 			user && user?.role === USER_ROLES.CLIENT_STAFF
 				? await getClientProfileByStaffUserId(user.id)
@@ -163,8 +140,6 @@ export const actions = {
 		if (!companyId) error(500, 'Invalid or missing CompanyId');
 
 		const formData = await event.request.formData();
-
-		console.log({ formData });
 
 		const title = formData.get('title') as string;
 		const locationId = formData.get('locationId') as string;

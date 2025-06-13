@@ -1,5 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import type { PageServerLoad, RequestEvent } from './$types';
 import { USER_ROLES } from '$lib/config/constants';
 import {
 	createSupportTicket,
@@ -12,6 +12,7 @@ import { setFlash } from 'sveltekit-flash-message/server';
 
 export const load: PageServerLoad = async (event) => {
 	const user = event.locals.user;
+	const search = event.url.searchParams.get('search') || '';
 
 	if (!user) {
 		return redirect(302, '/sign-in');
@@ -19,7 +20,7 @@ export const load: PageServerLoad = async (event) => {
 	const form = await superValidate(event, newSupportTicketSchema);
 
 	if (user.role === USER_ROLES.SUPERADMIN) {
-		const supportTickets = await getAllSupportTickets();
+		const supportTickets = await getAllSupportTickets(search);
 
 		return {
 			form,
@@ -38,9 +39,9 @@ export const load: PageServerLoad = async (event) => {
 };
 
 export const actions = {
-	default: async (request) => {
+	default: async (request: RequestEvent) => {
 		const form = await superValidate(request, newSupportTicketSchema);
-		let newId
+		let newId;
 
 		if (!form.valid) {
 			fail(400, { form });
@@ -63,13 +64,13 @@ export const actions = {
 			});
 			if (newTicket) {
 				setFlash({ type: 'success', message: 'New support ticket created.' }, request);
-				newId = newTicket.id
+				newId = newTicket.id;
 			}
 		} catch (error) {
-			console.log({ error })
+			console.log({ error });
 			setFlash({ type: 'error', message: 'Something went wrong.' }, request);
 			return setError(form, 'Error submitting new ticket.');
 		}
-		return redirect(302, `/support/ticket/${newId}`)
+		return redirect(302, `/support/ticket/${newId}`);
 	}
 };

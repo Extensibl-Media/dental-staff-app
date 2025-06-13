@@ -11,6 +11,7 @@ import { superValidate } from 'sveltekit-superforms/server';
 import db from '$lib/server/database/drizzle';
 import { invoiceTable } from '$lib/server/database/schemas/requisition';
 import { count, and, eq, lt, ne, sum } from 'drizzle-orm';
+import { getAdminDashboardData } from '$lib/server/database/queries/admin';
 
 export const load = async (event: RequestEvent) => {
 	//I only have this function here so it will check page again
@@ -249,7 +250,28 @@ export const load = async (event: RequestEvent) => {
 				}
 			]
 		};
-		return { user, ...adminDashboardData };
+
+		const {
+			timesheetsDueCount,
+			supportTickets,
+			openSupportTicketsCount,
+			discrepancies,
+			newCandidateProfiles,
+			newClientSignups,
+			invoicesDueCount,
+			invoicesDue
+		} = await getAdminDashboardData();
+		return {
+			user,
+			timesheetsDueCount,
+			supportTickets,
+			openSupportTicketsCount,
+			discrepancies,
+			newCandidateProfiles,
+			newClientSignups,
+			invoicesDueCount,
+			invoicesDue
+		};
 	}
 
 	if (user.role === USER_ROLES.CLIENT) {

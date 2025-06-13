@@ -70,13 +70,15 @@
 	<li>
 		<button
 			on:click={() => link?.path && handleLinkClick(link.path)}
-			class="w-full text-left flex gap-x-4 p-2 text-white hover:bg-blue-800 cursor-pointer rounded-sm items-center transition-all duration-100"
+			class="w-full text-left flex gap-x-4 p-2 text-white hover:bg-blue-800 cursor-pointer rounded-sm items-center transition-all duration-300"
 		>
 			<slot />
 			<span
 				class={cn(
 					'grow origin-left text-white text-sm leading-none',
-					!expanded ? 'hidden' : 'block'
+					!expanded
+						? 'opacity-0'
+						: 'opacity-100 whitespace-nowrap text-nowrap transition-all duration-300'
 				)}>{link.name}</span
 			>
 		</button>
