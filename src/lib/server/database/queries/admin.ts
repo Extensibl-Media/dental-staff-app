@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { sql, count, eq, desc, lt, and, ne } from 'drizzle-orm';
+import { sql, count, eq, desc, lt, and, ne, ilike, or } from 'drizzle-orm';
 import db from '../drizzle';
 import { userTable, type UpdateUser, type User } from '$lib/server/database/schemas/auth';
-import { USER_ROLES } from '$lib/config/constants';
+import { DEFAULT_MAX_RECORD_LIMIT, USER_ROLES } from '$lib/config/constants';
 import {
 	invoiceTable,
 	recurrenceDayTable,
@@ -25,6 +25,7 @@ import {
 } from '$lib/server/database/queries/requisitions';
 import { get } from 'svelte/store';
 import type Stripe from 'stripe';
+import { error } from '@sveltejs/kit';
 
 export type ActionType = 'CREATE' | 'UPDATE' | 'DELETE';
 
@@ -38,6 +39,39 @@ export type AdminUserRaw = {
 };
 
 export type AdminUserResults = AdminUserRaw[];
+
+export async function getAdminUsers(searchTerm?: string) {
+	try {
+		const results = await db
+			.select({
+				id: userTable.id,
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				email: userTable.email,
+				avatarUrl: userTable.avatarUrl,
+				role: userTable.role
+			})
+			.from(userTable)
+			.where(
+				and(
+					eq(userTable.role, USER_ROLES.SUPERADMIN),
+					searchTerm
+						? or(
+								ilike(userTable.email, `%${searchTerm}%`),
+								ilike(userTable.firstName, `%${searchTerm}%`),
+								ilike(userTable.lastName, `%${searchTerm}%`)
+							)
+						: undefined
+				)
+			)
+			.orderBy(desc(userTable.createdAt))
+			.limit(DEFAULT_MAX_RECORD_LIMIT);
+
+		return results;
+	} catch (err) {
+		throw error(500, 'Failed to fetch admin users');
+	}
+}
 
 export async function getPaginatedAdminUsers({
 	limit = 25,

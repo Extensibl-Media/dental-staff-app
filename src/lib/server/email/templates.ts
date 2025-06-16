@@ -305,5 +305,15 @@ export const EMAIL_TEMPLATES: Record<
         `.trim(),
 			subject: `Workday Shift Cancelled | ${APP_NAME}`
 		};
+	},
+	newSupportTicketEmail: (ticketDetails: { reportedBy: string; createdAt: string; id: string }) => {
+		return { textEmail: '', htmlEmail: '', subject: '' };
+	},
+	supportTicketCommentAddedEmail: (ticketDetails: {
+		id: string;
+		title: string;
+		createdAt: string;
+	}) => {
+		return { textEmail: '', htmlEmail: '', subject: '' };
 	}
 };
