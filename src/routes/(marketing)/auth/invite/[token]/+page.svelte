@@ -27,7 +27,7 @@
 				<p><strong>Role:</strong> {role}</p>
 			</div>
 
-			<form method="POST" class="mt-6">
+			<form method="POST" class="mt-6" action="?/handleClientInvite">
 				<button
 					type="submit"
 					class="w-full bg-blue-800 text-white py-2 px-4 rounded-md hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
