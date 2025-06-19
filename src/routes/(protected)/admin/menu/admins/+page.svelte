@@ -34,6 +34,7 @@
 	import { goto } from '$app/navigation';
 	import DialogHeader from '$lib/components/ui/dialog/dialog-header.svelte';
 	import { Label } from '$lib/components/ui/label';
+	import { superForm } from 'sveltekit-superforms/client';
 
 	export let data: PageData;
 
@@ -133,6 +134,14 @@
 	function handleRowClick(adminId: string) {
 		goto(`/admin/menu/admins/${adminId}`);
 	}
+
+	const { submitting, errors, enhance } = superForm(data.form, {
+		onResult: ({ result }) => {
+			if (result.type === 'success') {
+				dialogOpen = false;
+			}
+		}
+	});
 </script>
 
 <section class="flex flex-col h-full p-6 space-y-6">
@@ -151,19 +160,26 @@
 			</DialogTrigger>
 			<DialogContent>
 				<DialogHeader><DialogTitle>Invite Admin User</DialogTitle></DialogHeader>
-				<form>
+				<form use:enhance method="POST" class="space-y-4">
 					<div class="space-y-2">
 						<Label for="email">User Email</Label>
 						<Input name="email" placeholder="Enter user email" />
 					</div>
+					<DialogFooter>
+						<DialogClose asChild
+							><Button type="button" on:click={() => (dialogOpen = false)} variant="outline"
+								>Cancel</Button
+							></DialogClose
+						>
+						<Button class="bg-green-500 hover:bg-green-600" type="submit"
+							>{#if $submitting}
+								Sending...
+							{:else}
+								Send Invite
+							{/if}
+						</Button>
+					</DialogFooter>
 				</form>
-				<DialogFooter>
-					<DialogClose asChild
-						><Button on:click={() => (dialogOpen = false)} variant="outline">Cancel</Button
-						></DialogClose
-					>
-					<Button></Button>
-				</DialogFooter>
 			</DialogContent>
 		</Dialog>
 	</div>

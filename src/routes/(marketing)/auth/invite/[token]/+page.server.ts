@@ -8,8 +8,10 @@ import {
 	userTable
 } from '$lib/server/database/schemas/auth';
 import { getClientCompanyById } from '$lib/server/database/queries/clients';
+import type { RequestEvent } from './$types';
+import { USER_ROLES } from '$lib/config/constants';
 
-export async function load(event) {
+export async function load(event: RequestEvent) {
 	const token = event.params.token;
 
 	try {
@@ -96,7 +98,40 @@ export async function load(event) {
 }
 
 export const actions = {
-	handleClientInvite: async (event) => {
+	handleAdminInvite: async (event: RequestEvent) => {
+		const token = event.params.token;
+		const [invite] = await db
+			.select()
+			.from(userInviteTable)
+			.where(eq(userInviteTable.token, token));
+		try {
+			if (!invite || new Date() > new Date(invite.expiresAt)) {
+				return fail(400, {
+					message: 'Invalid or expired invitation'
+				});
+			}
+			const inviteData = {
+				token,
+				email: invite.email,
+				invitedRole: 'SUPERADMIN'
+			};
+			event.cookies.set('admin_invite', JSON.stringify(inviteData), {
+				path: '/',
+				maxAge: 60 * 15, // 15 minutes
+				httpOnly: true,
+				secure: process.env.NODE_ENV === 'production',
+				sameSite: 'lax'
+			});
+		} catch (error) {
+			console.error('Error accepting invite:', error);
+			return fail(500, {
+				message: 'Error processing invitation. Please try again.'
+			});
+		}
+		// Redirect to registration page
+		return redirect(302, `/auth/sign-up?email=${encodeURIComponent(invite.email)}&invite=true`);
+	},
+	handleClientInvite: async (event: RequestEvent) => {
 		const token = event.params.token;
 		const [invite] = await db
 			.select()
@@ -134,14 +169,13 @@ export const actions = {
 				secure: process.env.NODE_ENV === 'production',
 				sameSite: 'lax'
 			});
-
-			// Redirect to registration page
 		} catch (error) {
 			console.error('Error accepting invite:', error);
 			return fail(500, {
 				message: 'Error processing invitation. Please try again.'
 			});
 		}
+		// Redirect to registration page
 		return redirect(302, `/auth/sign-up?email=${encodeURIComponent(invite.email)}&invite=true`);
 	}
 };

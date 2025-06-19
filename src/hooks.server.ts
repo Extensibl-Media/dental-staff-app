@@ -45,6 +45,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const { session, user } = await lucia.validateSession(sessionId);
 
+	console.log(session);
+
 	// Check if the user is a CANDIDATE before setting cookies or locals
 	if (user && user.role === USER_ROLES.CANDIDATE) {
 		// Invalidate the session for CANDIDATE users

@@ -74,24 +74,17 @@ export const actions = {
 
 			// Check for staff invite
 			const staffInviteCookie = event.cookies.get('staff_invite');
+			const adminInviteCookie = event.cookies.get('admin_invite');
+			// If there's an admin invite, we should not proceed with staff invite logic
+			if (adminInviteCookie) {
+				inviteData = await JSON.parse(adminInviteCookie);
+			} else if (staffInviteCookie) {
+				inviteData = await JSON.parse(staffInviteCookie);
+			}
 
-			// console.log({ staffInviteCookie });
-			if (staffInviteCookie) {
-				try {
-					inviteData = await JSON.parse(staffInviteCookie);
-
-					// Verify the invite email matches the registration email
-					if (inviteData.email.toLowerCase() !== form.data.email.toLowerCase()) {
-						return setError(form, 'email', 'Please use the email address from your invitation.');
-					}
-				} catch (error) {
-					console.error('Error processing invite data:', error);
-					return setError(
-						form,
-						'email',
-						'Invalid or expired invitation. Please request a new invitation.'
-					);
-				}
+			// Verify the invite email matches the registration email
+			if (inviteData.email.toLowerCase() !== form.data.email.toLowerCase()) {
+				return setError(form, 'email', 'Please use the email address from your invitation.');
 			}
 
 			const user = {
@@ -109,8 +102,8 @@ export const actions = {
 				provider: 'email',
 				providerId: '',
 				avatarUrl: null,
-				// all staff invites for now don't need onboarding since their profile is bare info relationships to client/company details
-				completedOnboarding: inviteData.invitedRole === 'CLIENT_STAFF' ? true : false,
+				// all invites for now don't need onboarding
+				completedOnboarding: inviteData ? true : false,
 				blacklisted: null,
 				onboardingStep: 1,
 				stripeCustomerId: null,
@@ -127,45 +120,47 @@ export const actions = {
 
 				// If this was an invite-based registration, handle the additional setup
 				if (inviteData) {
-					const clientId = await getClientIdByCompanyId(inviteData.companyId);
+					if (inviteData.invitedRole === 'CLIENT_STAFF') {
+						//This is a client staff invite
+						const clientId = await getClientIdByCompanyId(inviteData.companyId);
 
-					if (!clientId) {
-						throw new Error(`No client found for company ID: ${inviteData.companyId}`);
+						if (!clientId) {
+							throw new Error(`No client found for company ID: ${inviteData.companyId}`);
+						}
+
+						// Now create the staff profile
+						const [staffProfile] = await tx
+							.insert(clientStaffProfileTable)
+							.values({
+								id: crypto.randomUUID(),
+								userId: createdUser.id, // Make sure we're using the created user's ID
+								companyId: inviteData.companyId,
+								clientId: clientId,
+								staffRole: inviteData.staffRole
+							})
+							.returning();
+
+						// Add location associations
+						await tx.insert(clientStaffLocationTable).values(
+							inviteData.locations.map((locationId: string) => ({
+								id: crypto.randomUUID(),
+								companyId: inviteData.companyId,
+								staffId: staffProfile.id,
+								locationId,
+								isPrimary: true
+							}))
+						);
+
+						await tx
+							.update(companyStaffInviteLocations)
+							.set({ token: null })
+							.where(eq(companyStaffInviteLocations.token, inviteData.token));
 					}
-
-					// Now create the staff profile
-					const [staffProfile] = await tx
-						.insert(clientStaffProfileTable)
-						.values({
-							id: crypto.randomUUID(),
-							userId: createdUser.id, // Make sure we're using the created user's ID
-							companyId: inviteData.companyId,
-							clientId: clientId,
-							staffRole: inviteData.staffRole
-						})
-						.returning();
-
-					// Add location associations
-					await tx.insert(clientStaffLocationTable).values(
-						inviteData.locations.map((locationId: string) => ({
-							id: crypto.randomUUID(),
-							companyId: inviteData.companyId,
-							staffId: staffProfile.id,
-							locationId,
-							isPrimary: true
-						}))
-					);
-
 					// Mark the invites as used
 					await tx
 						.update(userInviteTable)
 						.set({ token: null })
 						.where(eq(userInviteTable.token, inviteData.token));
-
-					await tx
-						.update(companyStaffInviteLocations)
-						.set({ token: null })
-						.where(eq(companyStaffInviteLocations.token, inviteData.token));
 				}
 
 				return createdUser;
@@ -183,6 +178,9 @@ export const actions = {
 				// Clear the invite cookie if it exists
 				if (staffInviteCookie) {
 					event.cookies.delete('staff_invite', { path: '/' });
+				}
+				if (adminInviteCookie) {
+					event.cookies.delete('admin_invite', { path: '/' });
 				}
 
 				// Set appropriate flash message
