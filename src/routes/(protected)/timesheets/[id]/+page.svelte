@@ -49,6 +49,7 @@
 	import { USER_ROLES } from '$lib/config/constants';
 	import { Label } from '$lib/components/ui/label';
 	import { Input } from '$lib/components/ui/input';
+	import { goto } from '$app/navigation';
 
 	export let data: PageData;
 	$: user = data.user;
@@ -56,7 +57,6 @@
 	// State variables
 	let approvalDialogOpen = false;
 	let rejectionDialogOpen = false;
-	let rejectionReason = '';
 	let activeTab = 'hours';
 	let editingDiscrepancy = null;
 	let editingHour = null;
@@ -67,7 +67,6 @@
 	let correctionHistory: any[] = [];
 	let showHistory = false;
 	let overrideDialogOpen = false;
-	let overrideReason = '';
 	let recalculatingHours = false;
 
 	// Format dates for display
@@ -137,18 +136,6 @@
 		return data?.discrepancies && data.discrepancies.length > 0;
 	}
 
-	// Dummy action functions
-	function handleApproveTimesheet() {
-		alert('Timesheet approved!');
-		// dummyData.timesheet.awaitingClientSignature = false;
-	}
-
-	function handleRejectTimesheet() {
-		alert(`Timesheet rejected with reason: ${rejectionReason}`);
-		rejectionDialogOpen = false;
-		rejectionReason = '';
-	}
-
 	const timesheetSeverityMap = {
 		HOURS_MISMATCH: 'warning',
 		MISSING_RATE: 'info',
@@ -176,7 +163,7 @@
 			</div>
 
 			<div class="flex gap-2">
-				<Button variant="outline" class="gap-1">
+				<Button on:click={() => goto('/timesheets')} variant="outline" class="gap-1">
 					<ArrowLeft class="h-4 w-4" />
 					Back to List
 				</Button>
@@ -557,6 +544,7 @@
 
 							{#if hasDiscrepancies()}
 								<Button
+								disabled={data?.timesheet?.status === 'APPROVED'}
 									variant="outline"
 									class="w-full border-amber-200 text-amber-700 hover:bg-amber-50 gap-2"
 									on:click={() => (overrideDialogOpen = true)}
@@ -570,13 +558,14 @@
 								variant="outline"
 								class="w-full border-red-200 text-red-700 hover:bg-red-50 gap-2"
 								on:click={() => (rejectionDialogOpen = true)}
+								disabled={data?.timesheet?.status === 'REJECTED' || data?.timesheet?.status === 'APPROVED'}
 							>
 								<X class="h-4 w-4" />
 								<span>Reject Timesheet</span>
 							</Button>
 						</div>
 
-						{#if hasDiscrepancies()}
+						{#if hasDiscrepancies() && data?.timesheet?.status !== 'APPROVED'}
 							<Alert variant="destructive" class="mt-3">
 								<AlertCircle class="h-4 w-4" />
 								<AlertDescription>
@@ -620,10 +609,17 @@
 					</DialogDescription>
 				</DialogHeader>
 				<DialogFooter class="mt-4">
-					<Button variant="outline">Cancel</Button>
-					<Button variant="default" class="bg-amber-600 hover:bg-amber-700">
-						Override & Approve
-					</Button>
+					<form method="POST" use:enhance action="?/adminOverrideTimesheet">
+
+						<Button type="button" variant="outline">Cancel</Button>
+						<Button 
+						on:click={() => overrideDialogOpen = false} 
+						type="submit" 
+						variant="default" 
+						class="bg-amber-600 hover:bg-amber-700">
+							Override & Approve
+						</Button>
+					</form>
 				</DialogFooter>
 			</DialogContent>
 		</Dialog>

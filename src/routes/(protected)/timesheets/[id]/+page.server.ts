@@ -21,7 +21,7 @@ import {
 	validateTimesheet,
 	voidTimesheet
 } from '$lib/server/database/queries/requisitions';
-import { error, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { RequestEvent } from './$types';
 import { setFlash } from 'sveltekit-flash-message/server';
 import { createStripeInvoice, stripe } from '$lib/server/stripe';
@@ -57,10 +57,7 @@ export const load = async (event: RequestEvent) => {
 		const auditHistory = await Promise.allSettled(
 			auditHistoryRaw.map(async (history) => {
 				const user = await getUserById(history.userId);
-				return {
-					...history,
-					user: user?.user || null
-				};
+				return { ...history, user: user?.user || null };
 			})
 		);
 
@@ -119,13 +116,7 @@ export const load = async (event: RequestEvent) => {
 		};
 	}
 
-	return {
-		user,
-		timesheet: null,
-		workdays: [],
-		recurrenceDays: [],
-		discrepancies: []
-	};
+	return { user, timesheet: null, workdays: [], recurrenceDays: [], discrepancies: [] };
 };
 
 export const actions = {
@@ -135,12 +126,14 @@ export const actions = {
 			redirect(302, '/auth/sign-in');
 		}
 		const userId = user.id;
+		const { id } = event.params;
 		try {
 			const { id } = event.params;
 			await rejectTimesheet(id, userId);
 			setFlash({ type: 'success', message: 'Timesheet rejected' }, event);
 			return { succes: true };
 		} catch (error) {
+			await revertTimesheetToPending(id);
 			console.error('Error rejecting timesheet:', error);
 			setFlash({ type: 'error', message: 'Error rejecting timesheet' }, event);
 		}
@@ -191,12 +184,7 @@ export const actions = {
 			});
 
 			setFlash({ type: 'success', message: 'Timesheet approved' }, event);
-			return {
-				success: true,
-				message: 'Timesheet approved',
-				timesheet,
-				stripeInvoice
-			};
+			return { success: true, message: 'Timesheet approved', timesheet, stripeInvoice };
 		} catch (err) {
 			await revertTimesheetToPending(id);
 			console.error('Error approving timesheet:', err);
@@ -228,8 +216,57 @@ export const actions = {
 		}
 	},
 	adminOverrideTimesheet: async (event: RequestEvent) => {
+		if (event.locals.user === null) {
+			redirect(302, '/auth/sign-in');
+		}
 		if (event.locals.user?.role !== USER_ROLES.SUPERADMIN) {
 			throw error(403, 'Forbidden');
 		}
+		const { user } = event.locals;
+		const { id } = event.params;
+		try {
+			const timesheet = await approveTimesheet(id, user.id);
+			const [adminConfig] = await db.select().from(adminConfigTable).limit(1);
+			const amountInCents = convertToStripeAmount(
+				timesheet.totalHoursWorked || 0,
+				timesheet.candidateRateBase,
+				timesheet.candidateRateOT
+			);
+
+			const adminFee = adminConfig.adminPaymentFee;
+			const adminFeeType = adminConfig.adminPaymentFeeType;
+			let finalAmt = amountInCents;
+
+			if (adminFeeType === 'PERCENTAGE') {
+				finalAmt += Math.round((amountInCents * adminFee) / 100);
+			} else if (adminFeeType === 'FIXED') {
+				finalAmt += Math.round(adminFee * 100);
+			}
+
+			finalAmt = Math.round(finalAmt);
+
+			const stripeCustomerId = await getClientSubscription(timesheet.associatedClientId);
+
+			if (!stripeCustomerId) {
+				return fail(404, { error: 'No Stripe customer found for this client' });
+			}
+
+			const stripeInvoice = await createStripeInvoice(
+				stripeCustomerId,
+				[{ amountInCents: finalAmt, description: `Invoice for timesheet ${id}` }],
+				{ userId: user.id, timesheetId: timesheet.id },
+				`DentalStaff.US invoice: Hours worked for ${user.firstName} ${user.lastName} for timesheet ${id}`
+			);
+
+			await createInvoiceRecord({
+				clientId: timesheet.associatedClientId,
+				timesheet,
+				stripeInvoice: stripeInvoice,
+				amountInDollars: (stripeInvoice.amount_due / 100).toFixed(2)
+			});
+
+			setFlash({ type: 'success', message: 'Timesheet approved' }, event);
+			return { success: true, message: 'Timesheet approved', timesheet, stripeInvoice };
+		} catch (error) {}
 	}
 };

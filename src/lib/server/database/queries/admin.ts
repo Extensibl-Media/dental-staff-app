@@ -294,6 +294,8 @@ export async function getDiscrepanciesForAdminDashboard() {
 		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
 		allDiscrepancies.push(...discrepancies);
 	}
+
+	console.log('Discrepancies found:', allDiscrepancies);
 	return allDiscrepancies;
 }
 

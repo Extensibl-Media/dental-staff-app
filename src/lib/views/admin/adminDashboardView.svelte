@@ -44,6 +44,7 @@
 	$: newClientSignups = data.newClientSignups || [];
 	$: invoicesDue = data.invoicesDue || [];
 
+	$: console.log(discrepancies)
 	// Calculate the % change in timesheets due from previous period (placeholder - you'll need to implement actual trend calculation)
 	const timesheetsTrendPercent = 12; // This should be calculated based on historical data
 	const supportTicketsTrendPercent = -5;
@@ -179,7 +180,7 @@
 						<Button
 							variant="link"
 							class="text-orange-600 p-0 h-auto"
-							href="/timesheets/discrepancies"
+							href="/timesheets"
 						>
 							Review discrepancies
 							<ArrowRight size={16} class="ml-1" />
@@ -301,24 +302,24 @@
 										{#each discrepancies.slice(0, 5) as discrepancy, i (i)}
 											<Table.Row
 												class="cursor-pointer hover:bg-gray-50"
-												on:click={() => goto(`/timesheets/${discrepancy.timesheetId}`)}
+												on:click={() => goto(`/timesheets/${discrepancy.timeSheetId}`)}
 											>
 												<Table.Cell>
 													<span class="font-medium text-gray-900"
-														>#{discrepancy.timesheetId?.slice(-8) || 'N/A'}</span
+														>#{discrepancy.timeSheetId?.slice(-8) || 'N/A'}</span
 													>
 												</Table.Cell>
 												<Table.Cell>
-													{discrepancy.candidateName || 'Unknown'}
+													{discrepancy.candidate}
 												</Table.Cell>
 												<Table.Cell>
 													<Badge
-														class={getDiscrepancyTypeColor(discrepancy.type)}
-														value={formatDiscrepancyType(discrepancy.type)}
+														class={getDiscrepancyTypeColor(discrepancy.discrepancyType)}
+														value={formatDiscrepancyType(discrepancy.discrepancyType)}
 													/>
 												</Table.Cell>
 												<Table.Cell class="max-w-xs truncate">
-													{discrepancy.description || 'No description'}
+													{discrepancy.details || 'No details'}
 												</Table.Cell>
 												<Table.Cell class="text-right">
 													<div class="flex items-center justify-end text-gray-500">

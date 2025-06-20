@@ -1,5 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { and, asc, count, eq, or, sql, desc, isNotNull, gte, lte, SQL, ilike } from 'drizzle-orm';
+import {
+	and,
+	asc,
+	count,
+	eq,
+	or,
+	sql,
+	desc,
+	isNotNull,
+	gte,
+	lte,
+	SQL,
+	ilike,
+	inArray
+} from 'drizzle-orm';
 import db from '../drizzle';
 import {
 	recurrenceDayTable,
@@ -64,6 +78,8 @@ export interface TimesheetDiscrepancy {
 	details: string;
 	hoursDiscrepancy?: number;
 	hoursRaw?: Record<string, number>[];
+	candidate?: string | null;
+	status?: string;
 }
 
 export enum TimesheetDiscrepancyType {
@@ -584,18 +600,8 @@ export async function getRequisitionDetailsForAdmin(id: number) {
 			.where(and(eq(recurrenceDayTable.requisitionId, id), eq(recurrenceDayTable.archived, false)))
 			.orderBy(asc(recurrenceDayTable.date));
 
-		console.log({
-			requisition,
-			applications,
-			timesheets,
-			recurrenceDays
-		});
-		return {
-			requisition,
-			applications,
-			timesheets,
-			recurrenceDays
-		};
+		console.log({ requisition, applications, timesheets, recurrenceDays });
+		return { requisition, applications, timesheets, recurrenceDays };
 	} catch (err) {
 		console.error(err);
 		throw error(500, 'Error fetching requisition details');
@@ -721,9 +727,7 @@ export async function changeRequisitionStatus(
 			entityId: id.toString(),
 			beforeState: original,
 			afterState: update,
-			metadata: {
-				updatedField: 'STATUS'
-			}
+			metadata: { updatedField: 'STATUS' }
 		});
 
 		return update;
@@ -1147,7 +1151,7 @@ export async function getRecentTimesheetsDueForClient(clientId: string) {
 	}
 }
 
-export async function getAllTimesheetsAdmin() {
+export async function getAllTimesheetsAdmin(searchTerm?: string) {
 	try {
 		const result = await db
 			.select({
@@ -1168,6 +1172,16 @@ export async function getAllTimesheetsAdmin() {
 				eq(candidateProfileTable.id, timeSheetTable.associatedCandidateId)
 			)
 			.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
+			.where(
+				searchTerm
+					? or(
+							ilike(requisitionTable.title, `%${searchTerm}%`),
+							ilike(clientCompanyTable.companyName, `%${searchTerm}%`),
+							ilike(userTable.firstName, `%${searchTerm}%`),
+							ilike(userTable.lastName, `%${searchTerm}%`)
+						)
+					: undefined
+			)
 			.orderBy(asc(timeSheetTable.createdAt));
 
 		return result || [];
@@ -1177,7 +1191,7 @@ export async function getAllTimesheetsAdmin() {
 	}
 }
 
-export async function getAllTimesheetsForClient(clientId: string | undefined) {
+export async function getAllTimesheetsForClient(clientId: string | undefined, searchTerm?: string) {
 	if (!clientId) throw new Error('Client ID required');
 	try {
 		const result = await db
@@ -1197,7 +1211,20 @@ export async function getAllTimesheetsForClient(clientId: string | undefined) {
 				eq(candidateProfileTable.id, timeSheetTable.associatedCandidateId)
 			)
 			.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
-			.where(and(eq(timeSheetTable.associatedClientId, clientId)));
+			.leftJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientId))
+			.where(
+				and(
+					eq(timeSheetTable.associatedClientId, clientId),
+					searchTerm
+						? or(
+								ilike(requisitionTable.title, `%${searchTerm}%`),
+								ilike(clientCompanyTable.companyName, `%${searchTerm}%`),
+								ilike(userTable.firstName, `%${searchTerm}%`),
+								ilike(userTable.lastName, `%${searchTerm}%`)
+							)
+						: undefined
+				)
+			);
 
 		return result;
 	} catch (err) {
@@ -1322,6 +1349,18 @@ export async function getClientCompanyTimesheetDiscrepancies(
 	}
 	// console.log({ allDiscrepancies });
 	return allDiscrepancies;
+}
+
+export async function getWorkdaysForRecurrenceDays(recurrenceDayIds: string[]) {
+	try {
+		return await db
+			.select()
+			.from(workdayTable)
+			.where(inArray(workdayTable.recurrenceDayId, recurrenceDayIds));
+	} catch (error) {
+		console.error('Error fetching workdays:', error);
+		return [];
+	}
 }
 
 export async function getRecurrenceDaysForTimesheet(timesheet: any): Promise<RecurrenceDay[]> {
@@ -1746,7 +1785,11 @@ function createBaseDiscrepancy(timesheet: Timesheet): Partial<TimesheetDiscrepan
 		clientCompanyName: timesheet.clientCompanyName,
 		candidateId: timesheet.candidate?.id,
 		requisitionId: timesheet.requisitionId,
-		weekBeginDate: timesheet.weekBeginDate
+		weekBeginDate: timesheet.weekBeginDate,
+		status: timesheet.status,
+		candidate: timesheet.candidate
+			? timesheet.candidate?.firstName + ' ' + timesheet.candidate?.lastName
+			: 'Unknown Candidate'
 	};
 }
 
@@ -1873,10 +1916,7 @@ export async function getClientInvoices(
 		invoice: row.invoice,
 		candidate:
 			row.candidateProfile && row.candidateUser
-				? {
-						profile: row.candidateProfile,
-						user: row.candidateUser
-					}
+				? { profile: row.candidateProfile, user: row.candidateUser }
 				: null,
 		timesheet: row.timesheet,
 		requisition: row.requisition,
@@ -1930,10 +1970,7 @@ export async function getAllInvoicesAdmin(): Promise<InvoiceWithRelations[]> {
 			invoice: row.invoice,
 			candidate:
 				row.candidateProfile && row.candidateUser
-					? {
-							profile: row.candidateProfile,
-							user: row.candidateUser
-						}
+					? { profile: row.candidateProfile, user: row.candidateUser }
 					: null,
 			timesheet: row.timesheet,
 			requisition: row.requisition,
@@ -1950,11 +1987,7 @@ export async function getAllInvoicesAdmin(): Promise<InvoiceWithRelations[]> {
 
 export async function getTimesheetInvoices(
 	clientId: string,
-	options?: {
-		candidateId?: string;
-		requisitionId?: number;
-		status?: InvoiceStatus;
-	}
+	options?: { candidateId?: string; requisitionId?: number; status?: InvoiceStatus }
 ): Promise<InvoiceWithRelations[]> {
 	const whereConditions = [
 		eq(invoiceTable.clientId, clientId),
@@ -2011,10 +2044,7 @@ export async function getTimesheetInvoices(
 
 	return results.map((row) => ({
 		invoice: row.invoice,
-		candidate: {
-			profile: row.candidateProfile,
-			user: row.candidateUser
-		},
+		candidate: { profile: row.candidateProfile, user: row.candidateUser },
 		timesheet: row.timesheet,
 		requisition: row.requisition,
 		lineItems: (row.invoice.lineItems as Stripe.InvoiceLineItem[]) || [],
@@ -2026,11 +2056,7 @@ export async function getTimesheetInvoices(
 
 export async function getManualInvoices(
 	clientId: string,
-	options?: {
-		status?: InvoiceStatus;
-		fromDate?: Date;
-		toDate?: Date;
-	}
+	options?: { status?: InvoiceStatus; fromDate?: Date; toDate?: Date }
 ): Promise<InvoiceWithRelations[]> {
 	const whereConditions = [
 		eq(invoiceTable.clientId, clientId),
@@ -2127,10 +2153,7 @@ export async function getInvoiceByIdAdmin(invoiceId: string): Promise<InvoiceWit
 		invoice: row.invoice,
 		candidate:
 			row.candidateProfile && row.candidateUser
-				? {
-						profile: row.candidateProfile,
-						user: row.candidateUser
-					}
+				? { profile: row.candidateProfile, user: row.candidateUser }
 				: null,
 		timesheet: row.timesheet,
 		requisition: row.requisition,
@@ -2190,10 +2213,7 @@ export async function getInvoiceById(
 		invoice: row.invoice,
 		candidate:
 			row.candidateProfile && row.candidateUser
-				? {
-						profile: row.candidateProfile,
-						user: row.candidateUser
-					}
+				? { profile: row.candidateProfile, user: row.candidateUser }
 				: null,
 		timesheet: row.timesheet,
 		requisition: row.requisition,
@@ -2206,10 +2226,7 @@ export async function getInvoiceById(
 
 export async function getInvoicesWithStripeData(
 	clientId: string,
-	options?: {
-		onlyWithStripeId?: boolean;
-		status?: InvoiceStatus;
-	}
+	options?: { onlyWithStripeId?: boolean; status?: InvoiceStatus }
 ): Promise<(InvoiceWithRelations & { stripeData: any })[]> {
 	const whereConditions = [eq(invoiceTable.clientId, clientId)];
 
@@ -2322,7 +2339,9 @@ export async function getRecurrenceDayByWorkdayId(
  * @param workdayId The ID of the workday
  * @returns Object containing the workday, requisition, and recurrence day
  */
-export async function getWorkdayWithRelations(workdayId: string): Promise<{
+export async function getWorkdayWithRelations(
+	workdayId: string
+): Promise<{
 	workday: WorkdaySelect | null;
 	requisition: RequisitionSelect | null;
 	recurrenceDay: RecurrenceDaySelect | null;
@@ -2435,9 +2454,7 @@ export async function voidTimesheet(timesheetId: string, userId: string) {
 			entityId: timesheetId,
 			beforeState: original,
 			afterState: result,
-			metadata: {
-				status: 'VOID'
-			}
+			metadata: { status: 'VOID' }
 		});
 
 		return result;
@@ -2465,9 +2482,7 @@ export async function rejectTimesheet(timesheetId: string, userId: string) {
 			entityId: timesheetId,
 			beforeState: original,
 			afterState: result,
-			metadata: {
-				status: 'DISCREPANCY'
-			}
+			metadata: { status: 'DISCREPANCY' }
 		});
 
 		return result;
@@ -2501,9 +2516,7 @@ export async function approveTimesheet(timesheetId: string, userId: string) {
 			entityId: timesheetId,
 			beforeState: original,
 			afterState: result,
-			metadata: {
-				status: 'APPROVED'
-			}
+			metadata: { status: 'APPROVED' }
 		});
 
 		return result;
