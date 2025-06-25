@@ -64,7 +64,7 @@
 	const filterByStatus = (candidates: CandidateData[], status: string) => {
 		return candidates.filter((candidate) =>
 			status === 'approved'
-				? candidate.profile.status === 'APPROVED'
+				? candidate.profile.status === 'ACTIVE'
 				: candidate.profile.status === 'PENDING'
 		);
 	};
@@ -78,7 +78,7 @@
 			enableSorting: false,
 			cell: ({ getValue }) =>
 				flexRender(ViewLink, {
-					href: `/candidates/${getValue()}`
+					href: `/professionals/${getValue()}`
 				})
 		},
 		{
@@ -216,7 +216,7 @@
 	}
 </script>
 
-<section class="flex flex-col h-full p-6 space-y-6">
+<section class="flex flex-col p-6 space-y-6">
 	<!-- Header -->
 	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 		<div>
@@ -240,7 +240,7 @@
 	</form>
 
 	<!-- Tabs with Tables -->
-	<Tabs.Root bind:value={activeTab} class="flex flex-col">
+	<Tabs.Root bind:value={activeTab} class="">
 		<Tabs.List class="grid w-full grid-cols-2">
 			<Tabs.Trigger value="approved" class="relative">
 				Approved
@@ -260,7 +260,7 @@
 
 		<!-- Tab Contents -->
 		{#each ['approved', 'pending'] as tabValue}
-			<Tabs.Content value={tabValue} class="flex-1 flex flex-col">
+			<Tabs.Content value={tabValue} class="">
 				{#if activeTab === tabValue}
 					<div class="bg-white rounded-lg shadow-sm">
 						{#if $currentTable.getRowModel().rows.length > 0}

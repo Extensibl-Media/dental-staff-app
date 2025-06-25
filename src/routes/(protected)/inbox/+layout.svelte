@@ -12,6 +12,7 @@
 	import type { LayoutData } from './$types';
 	import { PenBox, Search, ArrowLeft, MessageCircle, Users, X } from 'lucide-svelte';
 	import { onMount } from 'svelte';
+	import { superForm } from 'sveltekit-superforms/client';
 
 	export let data: LayoutData;
 
@@ -21,33 +22,9 @@
 	let selectedUsers: any[] = [];
 	let userSearchTerm = '';
 
-	// Mock users data - replace with actual data from your backend
-	let availableUsers = [
-		{
-			id: '1',
-			firstName: 'John',
-			lastName: 'Doe',
-			avatarUrl: '/avatars/john.jpg',
-			email: 'john@example.com'
-		},
-		{
-			id: '2',
-			firstName: 'Jane',
-			lastName: 'Smith',
-			avatarUrl: '/avatars/jane.jpg',
-			email: 'jane@example.com'
-		},
-		{
-			id: '3',
-			firstName: 'Bob',
-			lastName: 'Johnson',
-			avatarUrl: '/avatars/bob.jpg',
-			email: 'bob@example.com'
-		}
-	];
-
 	$: pageObj = $page;
 	$: user = data.user;
+	$: availableUsers = data.availableUsers || [];
 	$: isNestedRoute = pageObj.params.chatId !== undefined;
 	$: conversations = data.conversations.map((conv) => ({
 		...conv,
@@ -66,11 +43,13 @@
 	$: filteredUsers = availableUsers
 		.filter(
 			(u) =>
-				u.firstName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-				u.lastName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-				u.email.toLowerCase().includes(userSearchTerm.toLowerCase())
+				u.firstName?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+				u.lastName?.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+				u.email?.toLowerCase().includes(userSearchTerm.toLowerCase())
 		)
 		.filter((u) => u.id !== user.id);
+
+	$: stringifiedUserIds = JSON.stringify(selectedUsers.map((u) => u.id));
 
 	onMount(() => {
 		const checkMobile = () => {
@@ -102,20 +81,20 @@
 		selectedUsers = selectedUsers.filter((u) => u.id !== userId);
 	}
 
-	async function startNewConversation() {
-		if (selectedUsers.length === 0) return;
+	// async function startNewConversation() {
+	// 	if (selectedUsers.length === 0) return;
 
-		// TODO: Implement conversation creation logic
-		console.log('Starting conversation with:', selectedUsers);
+	// 	// TODO: Implement conversation creation logic
+	// 	console.log('Starting conversation with:', selectedUsers);
 
-		// Reset state
-		selectedUsers = [];
-		userSearchTerm = '';
-		showNewMessageDialog = false;
+	// 	// Reset state
+	// 	selectedUsers = [];
+	// 	userSearchTerm = '';
+	// 	showNewMessageDialog = false;
 
-		// Navigate to new conversation (you'll need to implement this)
-		// goto('/inbox/new-conversation-id');
-	}
+	// 	// Navigate to new conversation (you'll need to implement this)
+	// 	// goto('/inbox/new-conversation-id');
+	// }
 
 	function formatLastSeen(date: string | Date) {
 		// Simple date formatting - enhance as needed
@@ -130,6 +109,8 @@
 		if (diffDays < 7) return `${diffDays}d ago`;
 		return messageDate.toLocaleDateString();
 	}
+
+	const { form, enhance, submitting } = superForm(data.newConversationForm);
 </script>
 
 <div class="flex h-screen bg-background">
@@ -164,7 +145,7 @@
 		<!-- Conversations List -->
 		<div class="flex-1 overflow-y-auto">
 			{#each filteredConversations as conversation (conversation.id)}
-				{@const participant = conversation.participants[0]}
+				{@const participants = conversation.participants}
 				{@const isActive = pageObj.params.chatId === conversation.id}
 				<a
 					href="/inbox/{conversation.id}"
@@ -174,18 +155,26 @@
 					)}
 				>
 					<Avatar.Root class="h-12 w-12">
-						<Avatar.Image src={participant?.user?.avatarUrl} alt={participant?.user?.firstName} />
+						<Avatar.Image
+							src={participants[0]?.user?.avatarUrl}
+							alt={participants[0]?.user?.firstName}
+						/>
 						<Avatar.Fallback>
-							{participant?.user?.firstName?.[0]}{participant?.user?.lastName?.[0]}
+							{participants[0]?.user?.firstName?.[0]}{participants[0]?.user?.lastName?.[0]}
 						</Avatar.Fallback>
 					</Avatar.Root>
 
 					<div class="flex-1 min-w-0">
-						<div class="flex items-center justify-between">
-							<p class="font-medium truncate">
-								{participant?.user?.firstName}
-								{participant?.user?.lastName}
-							</p>
+						<div class="flex items-center">
+							{#each participants as participant, index}
+								<span class="font-semibold">
+									{participant.user?.firstName}
+									{participant.user?.lastName}
+								</span>
+								{#if index < participants.length - 1}
+									,
+								{/if}
+							{/each}
 						</div>
 						{#if conversation.lastMessage}
 							<p class="text-sm text-muted-foreground truncate max-w-[250px]">
@@ -260,88 +249,96 @@
 <!-- New Message Dialog -->
 <Dialog.Root bind:open={showNewMessageDialog}>
 	<Dialog.Content class="sm:max-w-[500px]">
-		<Dialog.Header>
-			<Dialog.Title>New Message</Dialog.Title>
-			<Dialog.Description>Select people to start a new conversation with.</Dialog.Description>
-		</Dialog.Header>
+		<form class="space-y-4" method="POST" action="?/startConversation" use:enhance>
+			<Dialog.Header>
+				<Dialog.Title>New Message</Dialog.Title>
+				<Dialog.Description>Select people to start a new conversation with.</Dialog.Description>
+			</Dialog.Header>
 
-		<div class="space-y-4">
-			<!-- Selected Users -->
-			{#if selectedUsers.length > 0}
-				<div class="flex flex-wrap gap-2">
-					{#each selectedUsers as selectedUser (selectedUser.id)}
-						<Badge
-							variant="secondary"
-							class="flex items-center gap-1"
-							value={`${selectedUser.firstName} ${selectedUser.lastName}`}
-						>
-							<Button
-								variant="ghost"
-								size="sm"
-								class="h-4 w-4 p-0 hover:bg-transparent"
-								on:click={() => removeSelectedUser(selectedUser.id)}
+			<div class="space-y-4">
+				<!-- Selected Users -->
+				{#if selectedUsers.length > 0}
+					<div class="flex flex-wrap gap-2">
+						{#each selectedUsers as selectedUser (selectedUser.id)}
+							<Badge
+								variant="secondary"
+								class="flex items-center gap-1"
+								value={`${selectedUser.firstName} ${selectedUser.lastName}`}
 							>
-								<X class="h-3 w-3" />
-							</Button>
-						</Badge>
-					{/each}
-				</div>
-			{/if}
-
-			<!-- User Search -->
-			<div class="relative">
-				<Users
-					class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
-				/>
-				<Input bind:value={userSearchTerm} placeholder="Search people..." class="pl-9" />
-			</div>
-
-			<!-- User List -->
-			<div class="max-h-60 overflow-y-auto border rounded-md">
-				{#each filteredUsers as availableUser (availableUser.id)}
-					{@const isSelected = selectedUsers.some((u) => u.id === availableUser.id)}
-					<button
-						type="button"
-						class={cn(
-							'w-full flex items-center gap-3 p-3 hover:bg-accent transition-colors text-left',
-							isSelected && 'bg-accent'
-						)}
-						on:click={() => toggleUserSelection(availableUser)}
-					>
-						<Avatar.Root class="h-10 w-10">
-							<Avatar.Image src={availableUser.avatarUrl} alt={availableUser.firstName} />
-							<Avatar.Fallback>
-								{availableUser.firstName[0]}{availableUser.lastName[0]}
-							</Avatar.Fallback>
-						</Avatar.Root>
-						<div class="flex-1">
-							<p class="font-medium">
-								{availableUser.firstName}
-								{availableUser.lastName}
-							</p>
-							<p class="text-sm text-muted-foreground">
-								{availableUser.email}
-							</p>
-						</div>
-						{#if isSelected}
-							<div class="h-4 w-4 rounded-full bg-primary flex items-center justify-center">
-								<div class="h-2 w-2 rounded-full bg-primary-foreground"></div>
-							</div>
-						{/if}
-					</button>
-				{/each}
-
-				{#if filteredUsers.length === 0}
-					<div class="p-4 text-center text-sm text-muted-foreground">No people found</div>
+								<Button
+									variant="ghost"
+									size="sm"
+									class="h-4 w-4 p-0 hover:bg-transparent"
+									on:click={() => removeSelectedUser(selectedUser.id)}
+								>
+									<X class="h-3 w-3" />
+								</Button>
+							</Badge>
+						{/each}
+					</div>
 				{/if}
-			</div>
-		</div>
 
-		<Dialog.Footer>
-			<Button variant="outline" on:click={() => (showNewMessageDialog = false)}>Cancel</Button>
-			<Button on:click={startNewConversation} disabled={selectedUsers.length === 0}>
-				Start Conversation
-			</Button>
-		</Dialog.Footer>
+				<!-- User Search -->
+				<div class="relative">
+					<Users
+						class="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
+					/>
+					<Input bind:value={userSearchTerm} placeholder="Search people..." class="pl-9" />
+				</div>
+
+				<!-- User List -->
+				<div class="max-h-60 overflow-y-auto border rounded-md">
+					{#each filteredUsers as availableUser (availableUser.id)}
+						{@const isSelected = selectedUsers.some((u) => u.id === availableUser.id)}
+						<button
+							type="button"
+							class={cn(
+								'w-full flex items-center gap-3 p-3 hover:bg-accent transition-colors text-left',
+								isSelected && 'bg-accent'
+							)}
+							on:click={() => toggleUserSelection(availableUser)}
+						>
+							<Avatar.Root class="h-10 w-10">
+								<Avatar.Image src={availableUser.avatarUrl} alt={availableUser.firstName} />
+								<Avatar.Fallback>
+									{availableUser.firstName?.[0]}{availableUser.lastName?.[0]}
+								</Avatar.Fallback>
+							</Avatar.Root>
+							<div class="flex-1">
+								<p class="font-medium">
+									{availableUser.firstName}
+									{availableUser.lastName}
+								</p>
+								<p class="text-sm text-muted-foreground">
+									{availableUser.email}
+								</p>
+							</div>
+							{#if isSelected}
+								<div class="h-4 w-4 rounded-full bg-primary flex items-center justify-center">
+									<div class="h-2 w-2 rounded-full bg-primary-foreground"></div>
+								</div>
+							{/if}
+						</button>
+					{/each}
+
+					{#if filteredUsers.length === 0}
+						<div class="p-4 text-center text-sm text-muted-foreground">No people found</div>
+					{/if}
+				</div>
+			</div>
+			<input type="hidden" name="userIDs" bind:value={stringifiedUserIds} />
+			<Dialog.Footer>
+				<Button type="button" variant="outline" on:click={() => (showNewMessageDialog = false)}
+					>Cancel</Button
+				>
+				<Button type="submit" disabled={selectedUsers.length === 0}>
+					{#if $submitting}
+						Please Wait...
+					{:else}
+						Start Conversation
+					{/if}
+				</Button>
+			</Dialog.Footer>
+		</form>
 	</Dialog.Content>
 </Dialog.Root>

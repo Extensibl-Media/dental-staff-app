@@ -25,12 +25,15 @@ export async function load({ locals, params }: RequestEvent) {
 	}
 
 	if (user.role === 'CLIENT') {
+		if (!user.completedOnboarding) {
+			redirect(302, '/onboarding/client/company');
+		}
 		const client = await getClientProfilebyUserId(user.id);
 		const company = await getClientCompanyByClientId(client.id);
 		const recurrenceDay = await getRecurrenceDayDetails(recurrenceDayId, company.id);
 		const workday = await getWorkdayDetails(recurrenceDayId, company.id);
 		const requisition = await getRequisitionDetailsById(requisitionId);
-
+		console.log({ workday, requisition, recurrenceDay });
 		return {
 			user,
 			recurrenceDay,

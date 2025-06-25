@@ -5,10 +5,10 @@
 	import type { UserSchema, UserUpdatePasswordSchema } from '$lib/config/zod-schemas';
 	import ClientStaffSettingsView from '$lib/views/client/clientStaffSettingsView.svelte';
 	import { page } from '$app/stores';
+	import type { PageData } from './$types';
+	import AdminSettingsView from '$lib/views/admin/adminSettingsView.svelte';
 
-	export let data: any;
-	export let userProfileForm: SuperValidated<UserSchema>;
-	export let passwordForm: SuperValidated<UserUpdatePasswordSchema>;
+	export let data: PageData;
 	export let subscriptionForm;
 	export let companyForm;
 
@@ -17,7 +17,8 @@
 	$: subscriptionForm = data.subscriptionForm;
 	$: companyForm = data.companyForm;
 	$: billingInfo = data.billingInfo;
-
+	$: hasAdminPrivileges = data.hasAdminRights;
+	$: staff = data.staff;
 	$: user = data.user;
 	$: URLTab = $page.url.searchParams.get('tab');
 	$: URLRole = $page.url.searchParams.get('role');
@@ -25,9 +26,9 @@
 	$: console.log('URLTab:', URLTab);
 
 	$: defaultTab =
-		user.role === USER_ROLES.CLIENT
+		user?.role === USER_ROLES.CLIENT
 			? SETTINGS_MENU_OPTIONS.CLIENT.PROFILE
-			: user.role === USER_ROLES.CLIENT_STAFF
+			: user?.role === USER_ROLES.CLIENT_STAFF
 				? SETTINGS_MENU_OPTIONS.CLIENT_STAFF.PROFILE
 				: SETTINGS_MENU_OPTIONS.ADMIN.PROFILE;
 
@@ -39,17 +40,26 @@
 		<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">
 			Account Settings
 		</h1>
-		{#if user.role === USER_ROLES.CLIENT}
+		{#if user?.role === USER_ROLES.CLIENT || hasAdminPrivileges}
 			<ClientSettingsView
 				bind:selectedTab
 				{companyForm}
 				{userProfileForm}
 				{passwordForm}
 				{billingInfo}
+				staffInviteForm={data.inviteForm}
+				{staff}
 			/>
-		{/if}
-		{#if user.role === USER_ROLES.CLIENT_STAFF}
-			<ClientStaffSettingsView bind:selectedTab {userProfileForm} {passwordForm} {companyForm} />
+		{:else if user?.role === USER_ROLES.CLIENT_STAFF}
+			<ClientStaffSettingsView
+				bind:selectedTab
+				{userProfileForm}
+				{passwordForm}
+				{companyForm}
+				{hasAdminPrivileges}
+			/>
+		{:else if user?.role === USER_ROLES.SUPERADMIN}
+			<AdminSettingsView bind:selectedTab {userProfileForm} {passwordForm} />
 		{/if}
 	</div>
 </section>

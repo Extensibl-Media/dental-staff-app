@@ -130,11 +130,14 @@ export const actions = {
 					form.data.description,
 					utcDate
 				);
-				await createInvoiceRecord({
-					clientId,
-					stripeInvoice: invoice,
-					amountInDollars: (invoice.amount_due / 100).toFixed(2)
-				});
+				await createInvoiceRecord(
+					{
+						clientId,
+						stripeInvoice: invoice,
+						amountInDollars: (invoice.amount_due / 100).toFixed(2)
+					},
+					user.id
+				);
 			} else throw new Error('Stripe customer ID not found for the client');
 			setFlash({ type: 'success', message: 'Invoice created successfully' }, request);
 			return message(form, 'Invoice created successfully');

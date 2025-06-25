@@ -28,6 +28,9 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	if (user.role === USER_ROLES.CLIENT) {
+		if (!user.completedOnboarding) {
+			redirect(302, '/onboarding/client/company');
+		}
 		const client = await getClientProfilebyUserId(user.id);
 		await redirectIfNotValidCustomer(client.id, user.role);
 		const clientCompany = await getClientCompanyByClientId(client.id);

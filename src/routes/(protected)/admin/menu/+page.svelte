@@ -15,7 +15,7 @@
 			{ name: 'Disciplines', link: '/admin/menu/disciplines' }
 		],
 		'Record Management': [
-			{ name: 'Support Tickets', link: '/admin/menu/support-tickets' },
+			{ name: 'Support Tickets', link: '/support' },
 			{ name: 'Record History', link: '/admin/menu/record-history' },
 			{ name: 'Regions', link: '/admin/menu/regions' },
 			{ name: 'Documents', link: '/admin/menu/documents' },

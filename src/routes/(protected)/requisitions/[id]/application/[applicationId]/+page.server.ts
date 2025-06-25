@@ -33,6 +33,9 @@ export const load: PageServerLoad = async (event) => {
 	const applicationDetails = await getRequisitionApplicationDetails(+id, applicationId);
 
 	if (user.role === USER_ROLES.CLIENT) {
+		if (!user.completedOnboarding) {
+			redirect(302, '/onboarding/client/company');
+		}
 		const client = await getClientProfilebyUserId(user.id);
 
 		await redirectIfNotValidCustomer(client.id, user.role);
@@ -80,7 +83,8 @@ export const actions = {
 		const inboxService = new InboxService();
 
 		const existingConversation = await inboxService.findExistingConversation({
-			applicationId: applicationId,
+			contextId: applicationId,
+			contextType: 'APPLICATION',
 			participantIds: [user!.id, applicationDetails.user.id]
 		});
 

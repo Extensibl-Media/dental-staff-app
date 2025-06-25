@@ -240,7 +240,7 @@
 	</form>
 
 	<!-- Tabs with Tables -->
-	<Tabs.Root bind:value={activeTab} class="flex-1 flex flex-col">
+	<Tabs.Root bind:value={activeTab} class="">
 		<Tabs.List class="grid w-full grid-cols-4">
 			<Tabs.Trigger value="open" class="relative">
 				Open
@@ -276,7 +276,7 @@
 
 		<!-- Tab Contents -->
 		{#each ['open', 'filled', 'unfulfilled', 'canceled'] as tabValue}
-			<Tabs.Content value={tabValue} class="flex-1 flex flex-col">
+			<Tabs.Content value={tabValue} class="">
 				{#if activeTab === tabValue}
 					<div class="bg-white rounded-lg shadow-sm">
 						{#if $currentTable.getFilteredRowModel().rows.length > 0}

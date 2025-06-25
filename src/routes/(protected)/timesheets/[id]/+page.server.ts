@@ -6,13 +6,16 @@ import {
 	getClientSubscription
 } from '$lib/server/database/queries/clients';
 import {
+	adminOverrideTimesheet,
 	approveTimesheet,
 	convertToStripeAmount,
 	createInvoiceRecord,
 	getInvoiceByTimesheetId,
 	getRecurrenceDaysForTimesheet,
+	getRequisitionById,
 	getRequisitionDetailsById,
 	getRequisitionDetailsByIdAdmin,
+	getTimesheetById,
 	getTimesheetDetails,
 	getTimesheetDetailsAdmin,
 	getWorkdaysForTimesheet,
@@ -74,6 +77,9 @@ export const load = async (event: RequestEvent) => {
 	}
 
 	if (user.role === USER_ROLES.CLIENT) {
+		if (!user.completedOnboarding) {
+			redirect(302, '/onboarding/client/company');
+		}
 		const client = await getClientProfilebyUserId(user.id);
 		await redirectIfNotValidCustomer(client.id, user.role);
 
@@ -133,25 +139,29 @@ export const actions = {
 			setFlash({ type: 'success', message: 'Timesheet rejected' }, event);
 			return { succes: true };
 		} catch (error) {
-			await revertTimesheetToPending(id);
+			await revertTimesheetToPending(id, user.id);
 			console.error('Error rejecting timesheet:', error);
 			setFlash({ type: 'error', message: 'Error rejecting timesheet' }, event);
 		}
 	},
 	approveTimesheet: async (event: RequestEvent) => {
 		const { id } = event.params;
+		const { user } = event.locals;
+		if (user === null) {
+			redirect(302, '/auth/sign-in');
+		}
 		try {
 			const [adminConfig] = await db.select().from(adminConfigTable).limit(1);
-			const { user } = event.locals;
 
-			if (user === null) {
-				redirect(302, '/auth/sign-in');
-			}
 			const timesheet = await approveTimesheet(id, user.id);
+			const requisition = timesheet.requisitionId
+				? await getRequisitionById(timesheet.requisitionId)
+				: null;
+
 			const amountInCents = convertToStripeAmount(
 				timesheet.totalHoursWorked || 0,
-				timesheet.candidateRateBase,
-				timesheet.candidateRateOT
+				requisition?.hourlyRate || timesheet.candidateRateBase,
+				requisition?.hourlyRate ? requisition.hourlyRate * 1.5 : timesheet.candidateRateOT
 			);
 
 			const adminFee = adminConfig.adminPaymentFee;
@@ -176,17 +186,20 @@ export const actions = {
 				`DentalStaff.US invoice: Hours worked for ${user.firstName} ${user.lastName} for timesheet ${id}`
 			);
 
-			await createInvoiceRecord({
-				clientId: timesheet.associatedClientId,
-				timesheet,
-				stripeInvoice: stripeInvoice,
-				amountInDollars: (stripeInvoice.amount_due / 100).toFixed(2)
-			});
+			await createInvoiceRecord(
+				{
+					clientId: timesheet.associatedClientId,
+					timesheet,
+					stripeInvoice: stripeInvoice,
+					amountInDollars: (stripeInvoice.amount_due / 100).toFixed(2)
+				},
+				user.id
+			);
 
 			setFlash({ type: 'success', message: 'Timesheet approved' }, event);
 			return { success: true, message: 'Timesheet approved', timesheet, stripeInvoice };
 		} catch (err) {
-			await revertTimesheetToPending(id);
+			await revertTimesheetToPending(id, user?.id);
 			console.error('Error approving timesheet:', err);
 			setFlash({ type: 'error', message: 'Error approving timesheet' }, event);
 			return { success: false };
@@ -225,12 +238,21 @@ export const actions = {
 		const { user } = event.locals;
 		const { id } = event.params;
 		try {
-			const timesheet = await approveTimesheet(id, user.id);
+			const timesheet = await getTimesheetById(id);
+
+			if (!timesheet) {
+				return fail(404, { error: 'Timesheet not found' });
+			}
+			const overridden = await adminOverrideTimesheet(id, user.id, timesheet);
+			const requisition = overridden.requisitionId
+				? await getRequisitionById(overridden.requisitionId)
+				: null;
 			const [adminConfig] = await db.select().from(adminConfigTable).limit(1);
+
 			const amountInCents = convertToStripeAmount(
-				timesheet.totalHoursWorked || 0,
-				timesheet.candidateRateBase,
-				timesheet.candidateRateOT
+				overridden.totalHoursWorked || 0,
+				requisition?.hourlyRate || overridden.candidateRateBase,
+				requisition?.hourlyRate ? requisition.hourlyRate * 1.5 : overridden.candidateRateOT
 			);
 
 			const adminFee = adminConfig.adminPaymentFee;
@@ -245,7 +267,7 @@ export const actions = {
 
 			finalAmt = Math.round(finalAmt);
 
-			const stripeCustomerId = await getClientSubscription(timesheet.associatedClientId);
+			const stripeCustomerId = await getClientSubscription(overridden.associatedClientId);
 
 			if (!stripeCustomerId) {
 				return fail(404, { error: 'No Stripe customer found for this client' });
@@ -254,19 +276,22 @@ export const actions = {
 			const stripeInvoice = await createStripeInvoice(
 				stripeCustomerId,
 				[{ amountInCents: finalAmt, description: `Invoice for timesheet ${id}` }],
-				{ userId: user.id, timesheetId: timesheet.id },
+				{ userId: user.id, timesheetId: overridden.id },
 				`DentalStaff.US invoice: Hours worked for ${user.firstName} ${user.lastName} for timesheet ${id}`
 			);
 
-			await createInvoiceRecord({
-				clientId: timesheet.associatedClientId,
-				timesheet,
-				stripeInvoice: stripeInvoice,
-				amountInDollars: (stripeInvoice.amount_due / 100).toFixed(2)
-			});
+			await createInvoiceRecord(
+				{
+					clientId: overridden.associatedClientId,
+					timesheet: overridden,
+					stripeInvoice: stripeInvoice,
+					amountInDollars: (stripeInvoice.amount_due / 100).toFixed(2)
+				},
+				user.id
+			);
 
 			setFlash({ type: 'success', message: 'Timesheet approved' }, event);
-			return { success: true, message: 'Timesheet approved', timesheet, stripeInvoice };
+			return { success: true, message: 'Timesheet approved', overridden, stripeInvoice };
 		} catch (error) {}
 	}
 };

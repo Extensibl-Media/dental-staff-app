@@ -294,22 +294,7 @@
 
 							<!-- Status Section (Desktop) -->
 							<div class="hidden md:block">
-								<div class="flex flex-wrap gap-2 items-center">
-									<div
-										class="py-2.5 px-3 text-sm font-medium border border-gray-300 rounded-md flex items-center gap-2 bg-white"
-									>
-										<span
-											class={cn(
-												'h-3 w-3 rounded-full',
-												status === 'OPEN' && 'bg-blue-500',
-												status === 'FILLED' && 'bg-green-400',
-												status === 'UNFULFILLED' && 'bg-orange-400',
-												status === 'CANCELED' && 'bg-red-500'
-											)}
-										></span>
-										{requisition.status}
-									</div>
-
+								<div class="flex flex-col flex-wrap gap-2">
 									{#if hasRequisitionRights}
 										<DropdownMenu>
 											<DropdownMenuTrigger>
@@ -370,6 +355,20 @@
 											</DropdownMenuContent>
 										</DropdownMenu>
 									{/if}
+									<div
+										class="py-2.5 px-3 text-sm font-medium border border-gray-300 rounded-md flex items-center gap-2 bg-white"
+									>
+										<span
+											class={cn(
+												'h-3 w-3 rounded-full',
+												status === 'OPEN' && 'bg-blue-500',
+												status === 'FILLED' && 'bg-green-400',
+												status === 'UNFULFILLED' && 'bg-orange-400',
+												status === 'CANCELED' && 'bg-red-500'
+											)}
+										></span>
+										{requisition.status}
+									</div>
 								</div>
 							</div>
 						</div>

@@ -3,7 +3,14 @@
 	import * as Avatar from '$lib/components/ui/avatar';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import {
+		Card,
+		CardContent,
+		CardDescription,
+		CardFooter,
+		CardHeader,
+		CardTitle
+	} from '$lib/components/ui/card';
 	import { Separator } from '$lib/components/ui/separator';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { Input } from '$lib/components/ui/input';
@@ -12,17 +19,19 @@
 	import type { PageData } from './$types';
 	import { Loader } from 'lucide-svelte';
 	import { superForm } from 'sveltekit-superforms/client';
+	import { enhance } from '$app/forms';
+	import { USER_ROLES } from '$lib/config/constants';
 
 	export let data: PageData;
 	$: user = data.user;
 	$: ticket = data.ticket;
 	$: comments = ticket.comments || [];
 
-	let newComment = "";
+	let newComment = '';
 
 	function getStatusColor(status: string) {
 		return cn(
-			"text-xs font-medium",
+			'text-xs font-medium',
 			status === 'NEW' && 'bg-green-400 text-white',
 			status === 'PENDING' && 'bg-yellow-400 text-white',
 			status === 'CLOSED' && 'bg-gray-600 text-white'
@@ -61,16 +70,18 @@
 		console.log('Closing ticket');
 	}
 
-	const {form: commentForm, enhance: commentFormEnhance, submitting: commentFormSubmitting} = superForm(data.commentForm, {
-    resetForm: true
-  });
+	const {
+		form: commentForm,
+		enhance: commentFormEnhance,
+		submitting: commentFormSubmitting
+	} = superForm(data.commentForm, {
+		resetForm: true
+	});
 </script>
 
 <section class="container mx-auto px-4 py-6 space-y-8">
 	<!-- Page Header -->
-	<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">
-		Support Ticket
-	</h1>
+	<h1 class="text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl">Support Ticket</h1>
 
 	<!-- Ticket Header with title and status -->
 	<div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -85,13 +96,23 @@
 				/>
 			</div>
 			<p class="text-sm text-muted-foreground">
-				Ticket #{ticket.details.ticket.id.slice(0, 8)} • Submitted on: {format(new Date(ticket.details.ticket.createdAt), 'PPp')}
+				Ticket #{ticket.details.ticket.id.slice(0, 8)} • Submitted on: {format(
+					new Date(ticket.details.ticket.createdAt),
+					'PPp'
+				)}
 			</p>
 		</div>
 
 		<div class="flex gap-2 items-center">
 			{#if ticket.details.ticket.status !== 'CLOSED'}
-				<Button variant="outline" on:click={handleCloseTicket}>Close Ticket</Button>
+				<form action="?/closeTicket" method="post" use:enhance>
+					<Button type="submit" variant="outline">Close Ticket</Button>
+				</form>
+			{/if}
+			{#if user.role === USER_ROLES.SUPERADMIN && ticket.details.ticket.status === 'CLOSED'}
+				<form action="?/reopenTicket" method="post" use:enhance>
+					<Button variant="outline" type="submit">Reopen Ticket</Button>
+				</form>
 			{/if}
 		</div>
 	</div>
@@ -153,13 +174,22 @@
 								<div class="flex gap-4">
 									<Avatar.Root class="h-10 w-10">
 										<Avatar.Image src={commentItem.user?.avatarUrl} />
-										<Avatar.Fallback>{commentItem.user?.firstName?.[0]}{commentItem.user?.lastName?.[0]}</Avatar.Fallback>
+										<Avatar.Fallback
+											>{commentItem.user?.firstName?.[0]}{commentItem.user
+												?.lastName?.[0]}</Avatar.Fallback
+										>
 									</Avatar.Root>
 									<div class="flex-1 space-y-1">
 										<div class="flex items-center justify-between">
 											<div class="flex items-center gap-2">
-												<span class="font-semibold">{commentItem.user?.firstName} {commentItem.user?.lastName}</span>
-												<Badge variant="outline" class="text-xs" value={commentItem.user?.role.replace('_', ' ')} />
+												<span class="font-semibold"
+													>{commentItem.user?.firstName} {commentItem.user?.lastName}</span
+												>
+												<Badge
+													variant="outline"
+													class="text-xs"
+													value={commentItem.user?.role.replace('_', ' ')}
+												/>
 											</div>
 											<span class="text-xs text-muted-foreground">
 												{getTimeAgo(commentItem.comment.createdAt)}
@@ -178,24 +208,24 @@
 				{#if ticket.details.ticket.status !== 'CLOSED'}
 					<CardFooter>
 						<form class="w-full" action="?/addComment" use:commentFormEnhance method="post">
-    						<div class="w-full space-y-2">
-    							<Textarea
-                                    name="body"
-                                    bind:value={$commentForm.body}
-    								placeholder="Add a comment..."
-    								class="min-h-24 w-full"
-    							/>
-    							<div class="flex justify-end">
-    								<Button type="submit" disabled={$commentFormSubmitting}>
-                                        {#if $commentFormSubmitting}
-                                            <Loader class="h-5 w-5 animate-spin" />
-                                            Adding Comment
-                                        {:else}
-                                            Post Comment
-                                        {/if}
-                                    </Button>
-    							</div>
-    						</div>
+							<div class="w-full space-y-2">
+								<Textarea
+									name="body"
+									bind:value={$commentForm.body}
+									placeholder="Add a comment..."
+									class="min-h-24 w-full"
+								/>
+								<div class="flex justify-end">
+									<Button type="submit" disabled={$commentFormSubmitting}>
+										{#if $commentFormSubmitting}
+											<Loader class="h-5 w-5 animate-spin" />
+											Adding Comment
+										{:else}
+											Post Comment
+										{/if}
+									</Button>
+								</div>
+							</div>
 						</form>
 					</CardFooter>
 				{/if}
@@ -213,14 +243,22 @@
 					<div class="flex items-center gap-4">
 						<Avatar.Root class="h-16 w-16">
 							<Avatar.Image src={ticket.details.reportedBy?.avatarUrl} />
-							<Avatar.Fallback>{ticket.details.reportedBy?.firstName?.[0]}{ticket.details.reportedBy?.lastName?.[0]}</Avatar.Fallback>
+							<Avatar.Fallback
+								>{ticket.details.reportedBy?.firstName?.[0]}{ticket.details.reportedBy
+									?.lastName?.[0]}</Avatar.Fallback
+							>
 						</Avatar.Root>
 						<div>
 							<p class="font-semibold">
-								{ticket.details.reportedBy?.firstName} {ticket.details.reportedBy?.lastName}
+								{ticket.details.reportedBy?.firstName}
+								{ticket.details.reportedBy?.lastName}
 							</p>
 							<p class="text-sm text-muted-foreground">{ticket.details.reportedBy?.email}</p>
-							<Badge class="mt-1" variant="outline" value={ticket.details.reportedBy?.role.replace('_', ' ')}/>
+							<Badge
+								class="mt-1"
+								variant="outline"
+								value={ticket.details.reportedBy?.role.replace('_', ' ')}
+							/>
 						</div>
 					</div>
 				</CardContent>
@@ -252,15 +290,22 @@
 								<div class="flex items-center gap-2 mt-1">
 									<Avatar.Root class="h-6 w-6">
 										<Avatar.Image src={ticket.details.closedBy?.avatarUrl} />
-										<Avatar.Fallback>{ticket.details.closedBy?.firstName?.[0]}{ticket.details.closedBy?.lastName?.[0]}</Avatar.Fallback>
+										<Avatar.Fallback
+											>{ticket.details.closedBy?.firstName?.[0]}{ticket.details.closedBy
+												?.lastName?.[0]}</Avatar.Fallback
+										>
 									</Avatar.Root>
-									<span>{ticket.details.closedBy?.firstName} {ticket.details.closedBy?.lastName}</span>
+									<span
+										>{ticket.details.closedBy?.firstName} {ticket.details.closedBy?.lastName}</span
+									>
 								</div>
 							</div>
 
 							<div>
 								<p class="text-sm text-muted-foreground">Closed on</p>
-								<p class="font-medium">{format(new Date(ticket.details.ticket.updatedAt), 'PPp')}</p>
+								<p class="font-medium">
+									{format(new Date(ticket.details.ticket.updatedAt), 'PPp')}
+								</p>
 							</div>
 						{/if}
 					</div>

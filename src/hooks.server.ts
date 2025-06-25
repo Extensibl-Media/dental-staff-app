@@ -45,19 +45,17 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const { session, user } = await lucia.validateSession(sessionId);
 
-	console.log(session);
-
 	// Check if the user is a CANDIDATE before setting cookies or locals
 	if (user && user.role === USER_ROLES.CANDIDATE) {
 		// Invalidate the session for CANDIDATE users
-		// await lucia.invalidateSession(session.id);
+		await lucia.invalidateSession(session.id);
 
-		// // Clear the session cookie
-		// const sessionCookie = lucia.createBlankSessionCookie();
-		// event.cookies.set(sessionCookie.name, sessionCookie.value, {
-		// 	path: '.',
-		// 	...sessionCookie.attributes
-		// });
+		// Clear the session cookie
+		const sessionCookie = lucia.createBlankSessionCookie();
+		event.cookies.set(sessionCookie.name, sessionCookie.value, {
+			path: '.',
+			...sessionCookie.attributes
+		});
 
 		// Redirect to the external candidate app
 		redirect(302, CANDIDATE_APP_DOMAIN);
@@ -96,4 +94,4 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 // Sheduled CRON Jobs
 processPastRecurrenceDaysJob();
-processOutdatedRequisitionsJob();
+// processOutdatedRequisitionsJob();

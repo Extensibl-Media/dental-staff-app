@@ -1,7 +1,8 @@
-import { eq } from 'drizzle-orm';
+import { asc, eq, or } from 'drizzle-orm';
 import db from '$lib/server/database/drizzle';
 import { userInviteTable, userTable } from '$lib/server/database/schemas/auth';
 import type { User, UpdateUser, NewUserInvite } from '$lib/server/database/schemas/auth';
+import { clientCompanyTable, clientProfileTable, clientStaffProfileTable } from '../schemas/client';
 
 export const getUserByEmail = async (email: string) => {
 	const user = await db.select().from(userTable).where(eq(userTable.email, email));
@@ -58,3 +59,26 @@ export const getUserById = async (userId: string) => {
 		console.log(err);
 	}
 };
+
+export async function getUsersInCompany(companyId: string) {
+	try {
+		const users = await db
+			.select({
+				id: userTable.id,
+				email: userTable.email,
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				avatarUrl: userTable.avatarUrl
+			})
+			.from(userTable)
+			.leftJoin(clientStaffProfileTable, eq(clientStaffProfileTable.userId, userTable.id))
+			.leftJoin(clientProfileTable, eq(clientProfileTable.id, clientStaffProfileTable.clientId))
+			.where(eq(clientStaffProfileTable.companyId, companyId))
+			.orderBy(asc(userTable.firstName));
+
+		return users;
+	} catch (err) {
+		console.log(err);
+		return [];
+	}
+}

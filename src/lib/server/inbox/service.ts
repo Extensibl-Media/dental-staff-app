@@ -1,4 +1,4 @@
-import { and, desc, asc, eq, gt, sql, inArray } from 'drizzle-orm';
+import { and, desc, asc, eq, gt, sql, inArray, count } from 'drizzle-orm';
 import db from '../database/drizzle';
 import {
 	conversationTable,
@@ -168,31 +168,40 @@ export class InboxService {
 	}
 
 	async findExistingConversation({
-		applicationId,
+		contextId,
+		contextType,
 		participantIds
 	}: {
-		applicationId: string;
+		contextId?: string;
+		contextType?: ConversationType;
 		participantIds: string[];
 	}): Promise<{ exists: boolean; conversationId?: string }> {
-		// First find all conversations for this application
-		const applicationConversations = await db
-			.select({
-				id: conversationTable.id
-			})
-			.from(conversationTable)
-			.where(
-				and(
-					eq(conversationTable.applicationId, applicationId),
-					eq(conversationTable.isActive, true)
-				)
-			);
+		// Create an array of conditions
+		const conditions = [eq(conversationTable.isActive, true)];
 
-		if (applicationConversations.length === 0) {
+		// Add conditional filters
+		if (contextId) {
+			conditions.push(eq(conversationTable.applicationId, contextId));
+		}
+
+		if (contextType) {
+			conditions.push(eq(conversationTable.type, contextType));
+		}
+
+		// Execute query with all conditions
+		const conversations = await db
+			.select({ id: conversationTable.id })
+			.from(conversationTable)
+			.where(and(...conditions));
+
+		if (conversations.length === 0) {
 			return { exists: false };
 		}
 
-		// Then check participants for these conversations
-		const conversationIds = applicationConversations.map((c) => c.id);
+		console.log({ conversations });
+
+		// Check participants for these conversations
+		const conversationIds = conversations.map((c) => c.id);
 		const participants = await db
 			.select({
 				conversationId: conversationParticipantsTable.conversationId,
@@ -219,8 +228,9 @@ export class InboxService {
 			{} as Record<string, Set<string>>
 		);
 
+		console.log({ conversationsMap });
+
 		// Find first conversation with all required participants
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
 		const matchingConversationId = Object.entries(conversationsMap).find(([_, users]) =>
 			participantIds.every((id) => users.has(id))
 		)?.[0];
@@ -480,6 +490,34 @@ export class InboxService {
 				)
 			);
 
+		return result[0]?.count ?? 0;
+	}
+
+	async getTotalUnreadCount(userId: string) {
+		const conversations = await db
+			.select({
+				conversationId: conversationParticipantsTable.conversationId,
+				latestMessageId: conversationParticipantsTable.latestMessageId
+			})
+			.from(conversationParticipantsTable)
+			.where(
+				and(
+					eq(conversationParticipantsTable.userId, userId),
+					eq(conversationParticipantsTable.isActive, true)
+				)
+			);
+		if (conversations.length === 0) return 0;
+		const conversationIds = conversations.map((c) => c.conversationId);
+		const latestMessageIds = conversations.map((c) => c.latestMessageId ?? 0);
+		const result = await db
+			.select({ count: count() })
+			.from(messageTable)
+			.where(
+				and(
+					inArray(messageTable.conversationId, conversationIds),
+					gt(messageTable.id, sql`ANY(ARRAY[${latestMessageIds.join(',')}]::int[])`)
+				)
+			);
 		return result[0]?.count ?? 0;
 	}
 

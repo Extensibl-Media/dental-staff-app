@@ -27,6 +27,9 @@ export const load = async (event) => {
 	if (user.role === USER_ROLES.SUPERADMIN) {
 		timesheets = await getAllTimesheetsAdmin(searchTerm);
 	} else if (user.role === USER_ROLES.CLIENT) {
+		if (!user.completedOnboarding) {
+			redirect(302, '/onboarding/client/company');
+		}
 		const client = await getClientProfilebyUserId(user.id);
 		await redirectIfNotValidCustomer(client.id, user.role);
 		timesheets = await getAllTimesheetsForClient(client?.id, searchTerm);

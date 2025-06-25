@@ -18,10 +18,10 @@ import type Stripe from 'stripe';
 import db from '$lib/server/database/drizzle';
 import { clientSubscriptionTable } from '$lib/server/database/schemas/client';
 import { eq } from 'drizzle-orm';
-import {
-	createInvoiceRecord,
-	getTimesheetDetails
-} from '$lib/server/database/queries/requisitions';
+// import {
+// 	createInvoiceRecord,
+// 	getTimesheetDetails
+// } from '$lib/server/database/queries/requisitions';
 
 export const POST: RequestHandler = async ({ request }) => {
 	console.log('Webhook received');

@@ -38,7 +38,7 @@
 	$: conversation = data.conversation;
 	$: ({ messages } = conversation);
 	$: ({ participants } = conversation);
-	$: [chatUser] = participants.filter((u) => u.userId !== user.id);
+	$: chatUsers = participants.filter((u) => u.userId !== user.id);
 
 	$: if (messages) {
 		shouldScroll = true;
@@ -106,27 +106,28 @@
 	<!-- Header -->
 	<div class="flex items-center justify-between p-4 border-b bg-card">
 		<div class="flex items-center gap-3">
-			<Avatar.Root class="h-10 w-10">
-				<Avatar.Image src={chatUser?.avatarUrl} alt={chatUser?.firstName} />
-				<Avatar.Fallback>
-					{chatUser?.firstName?.[0]}{chatUser?.lastName?.[0]}
-				</Avatar.Fallback>
-			</Avatar.Root>
-			<div>
-				<h2 class="font-semibold">
-					{chatUser?.firstName}
-					{chatUser?.lastName}
-				</h2>
+			{#if chatUsers.length === 1}
+				<Avatar.Root class="h-10 w-10">
+					<Avatar.Image src={chatUsers[0]?.avatarUrl} alt={chatUsers[0]?.firstName} />
+					<Avatar.Fallback class="text-lg">
+						{chatUsers[0]?.firstName?.[0]}{chatUsers[0]?.lastName?.[0]}
+					</Avatar.Fallback>
+				</Avatar.Root>
+			{/if}
+			<div class="flex flex-wrap truncate max-w-lg">
+				{#each chatUsers as user, index}
+					<span class="font-semibold">
+						{user.firstName}
+						{user.lastName}
+					</span>
+					{#if index < chatUsers.length - 1}
+						,
+					{/if}
+				{/each}
 			</div>
 		</div>
 
 		<div class="flex items-center gap-2">
-			<Button variant="ghost" size="sm" class="h-9 w-9 p-0">
-				<Phone class="h-4 w-4" />
-			</Button>
-			<Button variant="ghost" size="sm" class="h-9 w-9 p-0">
-				<Video class="h-4 w-4" />
-			</Button>
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger asChild let:builder>
 					<Button variant="ghost" size="sm" class="h-9 w-9 p-0" builders={[builder]}>
@@ -175,9 +176,13 @@
 				>
 					{#if message.senderId !== user?.id}
 						<Avatar.Root class="h-8 w-8 mt-auto">
-							<Avatar.Image src={chatUser?.avatarUrl} alt={chatUser?.firstName} />
+							<Avatar.Image
+								src={chatUsers.find((u) => u.userId === message.senderId)?.avatarUrl}
+								alt={chatUsers.find((u) => u.userId === message.senderId)?.firstName}
+							/>
 							<Avatar.Fallback class="text-xs">
-								{chatUser?.firstName?.[0]}
+								{chatUsers.find((u) => u.userId === message.senderId)?.firstName?.[0]}
+								{chatUsers.find((u) => u.userId === message.senderId)?.lastName?.[0]}
 							</Avatar.Fallback>
 						</Avatar.Root>
 					{/if}
@@ -208,20 +213,8 @@
 			{/each}
 		{:else}
 			<div class="flex flex-col items-center justify-center h-full text-center">
-				<div class="p-6 rounded-full bg-muted mb-4">
-					<Avatar.Root class="h-16 w-16">
-						<Avatar.Image src={chatUser?.avatarUrl} alt={chatUser?.firstName} />
-						<Avatar.Fallback class="text-2xl">
-							{chatUser?.firstName?.[0]}{chatUser?.lastName?.[0]}
-						</Avatar.Fallback>
-					</Avatar.Root>
-				</div>
-				<h3 class="font-semibold text-lg mb-2">
-					{chatUser?.firstName}
-					{chatUser?.lastName}
-				</h3>
 				<p class="text-muted-foreground mb-4">
-					Start your conversation with {chatUser?.firstName}
+					Start your conversation with {chatUsers?.map((u) => u.firstName).join(', ')}
 				</p>
 			</div>
 		{/if}
@@ -232,14 +225,14 @@
 		<form method="POST" action="?/sendNewMessage" use:enhance class="flex items-end gap-3">
 			<div class="flex-1">
 				<div class="flex items-center gap-2 p-3 border rounded-lg bg-background">
-					<Button
+					<!-- <Button
 						type="button"
 						variant="ghost"
 						size="sm"
 						class="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
 					>
 						<Paperclip class="h-4 w-4" />
-					</Button>
+					</Button> -->
 
 					<Input
 						name="body"
@@ -249,15 +242,6 @@
 						on:keypress={handleKeyPress}
 						disabled={$submitting}
 					/>
-
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						class="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-					>
-						<Smile class="h-4 w-4" />
-					</Button>
 				</div>
 			</div>
 

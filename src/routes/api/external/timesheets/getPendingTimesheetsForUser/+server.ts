@@ -9,7 +9,7 @@ import {
 } from '$lib/server/database/schemas/requisition';
 import { authenticateUser } from '$lib/server/serverUtils';
 import { error, json, type RequestHandler } from '@sveltejs/kit';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, ne } from 'drizzle-orm';
 
 export const GET: RequestHandler = async ({ request }) => {
 	// Authenticate the user
@@ -60,7 +60,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			.leftJoin(requisitionTable, eq(timeSheetTable.requisitionId, requisitionTable.id))
 			.leftJoin(workdayTable, eq(timeSheetTable.workdayId, workdayTable.id))
 			.innerJoin(clientCompanyTable, eq(requisitionTable.companyId, clientCompanyTable.id))
-			.where(eq(timeSheetTable.associatedCandidateId, candidateProfile.id))
+			.where(
+				and(
+					eq(timeSheetTable.associatedCandidateId, candidateProfile.id),
+					ne(timeSheetTable.status, 'APPROVED')
+				)
+			)
 			.orderBy(timeSheetTable.weekBeginDate);
 
 		return json({ success: true, data: timesheets });

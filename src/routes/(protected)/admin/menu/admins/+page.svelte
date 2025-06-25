@@ -205,9 +205,9 @@
 	</div>
 
 	<!-- Table -->
-	<div class="bg-white rounded-lg shadow-sm flex-1 flex flex-col">
+	<div class="bg-white rounded-lg shadow-sm flex flex-col">
 		{#if $table.getRowModel().rows.length > 0}
-			<div class="rounded-md border flex-1">
+			<div class="rounded-md border">
 				<Table.Root>
 					<Table.Header>
 						{#each $table.getHeaderGroups() as headerGroup}

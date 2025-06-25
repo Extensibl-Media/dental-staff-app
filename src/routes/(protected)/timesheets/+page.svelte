@@ -17,10 +17,10 @@
 	import type { PageData } from './$types';
 	import { writable } from 'svelte/store';
 	import { onMount } from 'svelte';
-	import { 
-		ArrowUpDown, 
-		ArrowUp, 
-		ArrowDown, 
+	import {
+		ArrowUpDown,
+		ArrowUp,
+		ArrowDown,
 		Search,
 		ChevronLeft,
 		ChevronRight,
@@ -49,21 +49,23 @@
 		if (timesheet.timesheet.status === 'DISCREPANCY') {
 			return true;
 		}
-		
+
 		// Check if validation has already been done in page.server.ts
 		if ('hasValidationIssues' in timesheet) {
 			return timesheet.hasValidationIssues;
 		}
-		
+
 		return false;
 	}
 
 	// Filter timesheets by discrepancy status
 	const filterByDiscrepancy = (timesheets: TimesheetWithRelations[], hasDiscrepancy: boolean) => {
 		if (hasDiscrepancy) {
-			return timesheets.filter(ts => hasDiscrepancies(ts)).filter(ts => ts.timesheet.status !== 'APPROVED');
+			return timesheets
+				.filter((ts) => hasDiscrepancies(ts))
+				.filter((ts) => ts.timesheet.status !== 'APPROVED');
 		} else {
-			return timesheets.filter(ts => ts.timesheet.status !== 'DISCREPANCY');
+			return timesheets.filter((ts) => ts.timesheet.status !== 'DISCREPANCY');
 		}
 	};
 
@@ -96,8 +98,10 @@
 			accessorFn: (row) => `${row.candidate?.firstName || ''} ${row.candidate?.lastName || ''}`,
 			enableSorting: true,
 			sortingFn: (rowA, rowB) => {
-				const nameA = `${rowA.original.candidate?.firstName || ''} ${rowA.original.candidate?.lastName || ''}`.toLowerCase();
-				const nameB = `${rowB.original.candidate?.firstName || ''} ${rowB.original.candidate?.lastName || ''}`.toLowerCase();
+				const nameA =
+					`${rowA.original.candidate?.firstName || ''} ${rowA.original.candidate?.lastName || ''}`.toLowerCase();
+				const nameB =
+					`${rowB.original.candidate?.firstName || ''} ${rowB.original.candidate?.lastName || ''}`.toLowerCase();
 				return nameA.localeCompare(nameB);
 			}
 		},
@@ -109,10 +113,10 @@
 			cell: ({ getValue, row }) => {
 				const status = getValue() as string;
 				const timesheet = row.original;
-				
+
 				// Show validation warning if there are discrepancies beyond just status
 				const displayStatus = status;
-				
+
 				return flexRender(Badge, {
 					value: displayStatus,
 					class: cn(
@@ -158,7 +162,9 @@
 	];
 
 	// Create separate table instances for each tab
-	const createTableOptions = (data: TimesheetWithRelations[]): TableOptions<TimesheetWithRelations> => ({
+	const createTableOptions = (
+		data: TimesheetWithRelations[]
+	): TableOptions<TimesheetWithRelations> => ({
 		data,
 		columns,
 		getCoreRowModel: getCoreRowModel(),
@@ -173,7 +179,9 @@
 
 	// Table options for each tab
 	const allOptions = writable<TableOptions<TimesheetWithRelations>>(createTableOptions([]));
-	const noDiscrepancyOptions = writable<TableOptions<TimesheetWithRelations>>(createTableOptions([]));
+	const noDiscrepancyOptions = writable<TableOptions<TimesheetWithRelations>>(
+		createTableOptions([])
+	);
 	const discrepancyOptions = writable<TableOptions<TimesheetWithRelations>>(createTableOptions([]));
 
 	// Create table instances
@@ -182,9 +190,12 @@
 	const discrepancyTable = createSvelteTable(discrepancyOptions);
 
 	// Get current active table
-	$: currentTable = activeTab === 'all' ? allTable 
-		: activeTab === 'no-discrepancy' ? noDiscrepancyTable
-		: discrepancyTable;
+	$: currentTable =
+		activeTab === 'all'
+			? allTable
+			: activeTab === 'no-discrepancy'
+				? noDiscrepancyTable
+				: discrepancyTable;
 
 	// Update table data when timesheets change
 	$: {
@@ -192,9 +203,9 @@
 		const noDiscrepancyData = filterByDiscrepancy(timesheets, false);
 		const discrepancyData = filterByDiscrepancy(timesheets, true);
 
-		allOptions.update(opts => ({ ...opts, data: allData, columns }));
-		noDiscrepancyOptions.update(opts => ({ ...opts, data: noDiscrepancyData, columns }));
-		discrepancyOptions.update(opts => ({ ...opts, data: discrepancyData, columns }));
+		allOptions.update((opts) => ({ ...opts, data: allData, columns }));
+		noDiscrepancyOptions.update((opts) => ({ ...opts, data: noDiscrepancyData, columns }));
+		discrepancyOptions.update((opts) => ({ ...opts, data: discrepancyData, columns }));
 	}
 
 	onMount(() => {
@@ -202,9 +213,9 @@
 		const noDiscrepancyData = filterByDiscrepancy(timesheets, false);
 		const discrepancyData = filterByDiscrepancy(timesheets, true);
 
-		allOptions.update(opts => ({ ...opts, data: allData, columns }));
-		noDiscrepancyOptions.update(opts => ({ ...opts, data: noDiscrepancyData, columns }));
-		discrepancyOptions.update(opts => ({ ...opts, data: discrepancyData, columns }));
+		allOptions.update((opts) => ({ ...opts, data: allData, columns }));
+		noDiscrepancyOptions.update((opts) => ({ ...opts, data: noDiscrepancyData, columns }));
+		discrepancyOptions.update((opts) => ({ ...opts, data: discrepancyData, columns }));
 	});
 
 	// Get tab counts
@@ -218,7 +229,7 @@
 
 	function getSortingIcon(header: any) {
 		if (!header.column.getCanSort()) return null;
-		
+
 		const sorted = header.column.getIsSorted();
 		if (sorted === 'asc') return ArrowUp;
 		if (sorted === 'desc') return ArrowDown;
@@ -281,45 +292,52 @@
 					{#if searchTerm}
 						No timesheets found matching your search terms. Try adjusting your search.
 					{:else}
-						You haven't received any timesheet submissions yet. When requisitions are submitted, timesheets will be submitted by candidates and will appear here.
+						You haven't received any timesheet submissions yet. When requisitions are submitted,
+						timesheets will be submitted by candidates and will appear here.
 					{/if}
 				</Card.Description>
 			</div>
 		</Card.Root>
 	{:else}
 		<!-- Tabs with Tables -->
-		<Tabs.Root bind:value={activeTab} class="flex-1 flex flex-col">
+		<Tabs.Root bind:value={activeTab} class="">
 			<Tabs.List class="grid w-full grid-cols-3">
 				<Tabs.Trigger value="all" class="relative">
 					All Timesheets
 					{#if tabCounts.all > 0}
-						<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.all}>
-							
-						</Badge>
+						<Badge
+							variant="secondary"
+							class="ml-2 h-5 min-w-5 text-xs"
+							value={tabCounts.all}
+						></Badge>
 					{/if}
 				</Tabs.Trigger>
 				<Tabs.Trigger value="no-discrepancy" class="relative">
 					No Issues
 					{#if tabCounts.noDiscrepancy > 0}
-						<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.noDiscrepancy}>
-							
-						</Badge>
+						<Badge
+							variant="secondary"
+							class="ml-2 h-5 min-w-5 text-xs"
+							value={tabCounts.noDiscrepancy}
+						></Badge>
 					{/if}
 				</Tabs.Trigger>
 				<Tabs.Trigger value="discrepancy" class="relative">
 					<AlertTriangle class="h-4 w-4 mr-1" />
 					Discrepancies
 					{#if tabCounts.discrepancy > 0}
-						<Badge variant="destructive" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.discrepancy}>
-							
-						</Badge>
+						<Badge
+							variant="destructive"
+							class="ml-2 h-5 min-w-5 text-xs"
+							value={tabCounts.discrepancy}
+						></Badge>
 					{/if}
 				</Tabs.Trigger>
 			</Tabs.List>
 
 			<!-- Tab Contents -->
 			{#each ['all', 'no-discrepancy', 'discrepancy'] as tabValue}
-				<Tabs.Content value={tabValue} class="mt-0 flex flex-col">
+				<Tabs.Content value={tabValue} class="">
 					{#if activeTab === tabValue}
 						<div class="bg-white rounded-lg shadow-sm">
 							{#if $currentTable.getRowModel().rows.length > 0}
@@ -334,13 +352,18 @@
 																<Button
 																	variant="ghost"
 																	on:click={() =>
-																		header.column.toggleSorting(header.column.getIsSorted() === 'asc')}
+																		header.column.toggleSorting(
+																			header.column.getIsSorted() === 'asc'
+																		)}
 																	class="hover:bg-gray-50"
 																>
 																	{header.column.columnDef.header}
 																	{#if header.column.getCanSort()}
 																		{#if getSortingIcon(header)}
-																			<svelte:component this={getSortingIcon(header)} class="ml-2 h-4 w-4" />
+																			<svelte:component
+																				this={getSortingIcon(header)}
+																				class="ml-2 h-4 w-4"
+																			/>
 																		{/if}
 																	{/if}
 																</Button>
@@ -358,9 +381,9 @@
 												>
 													{#each row.getVisibleCells() as cell}
 														<Table.Cell>
-																<svelte:component
-																	this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-																/>
+															<svelte:component
+																this={flexRender(cell.column.columnDef.cell, cell.getContext())}
+															/>
 														</Table.Cell>
 													{/each}
 												</Table.Row>
@@ -372,7 +395,13 @@
 								<!-- Pagination -->
 								<div class="flex items-center justify-between space-x-2 p-4 border-t">
 									<div class="flex-1 text-sm text-muted-foreground">
-										Showing {$currentTable.getState().pagination.pageIndex * $currentTable.getState().pagination.pageSize + 1} to {Math.min(($currentTable.getState().pagination.pageIndex + 1) * $currentTable.getState().pagination.pageSize, $currentTable.getRowModel().rows.length)} of {$currentTable.getRowModel().rows.length} timesheets
+										Showing {$currentTable.getState().pagination.pageIndex *
+											$currentTable.getState().pagination.pageSize +
+											1} to {Math.min(
+											($currentTable.getState().pagination.pageIndex + 1) *
+												$currentTable.getState().pagination.pageSize,
+											$currentTable.getRowModel().rows.length
+										)} of {$currentTable.getRowModel().rows.length} timesheets
 									</div>
 									<div class="flex items-center space-x-2">
 										<Button
@@ -403,7 +432,9 @@
 							{:else}
 								<!-- Empty state for specific tab -->
 								<div class="flex flex-col items-center justify-center py-12 text-center">
-									<div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+									<div
+										class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4"
+									>
 										{#if activeTab === 'discrepancy'}
 											<AlertTriangle class="w-8 h-8 text-gray-400" />
 										{:else}
@@ -411,7 +442,11 @@
 										{/if}
 									</div>
 									<h3 class="text-lg font-medium text-gray-900 mb-2">
-										No {activeTab === 'all' ? 'timesheets' : activeTab === 'discrepancy' ? 'discrepancies' : 'clean timesheets'} found
+										No {activeTab === 'all'
+											? 'timesheets'
+											: activeTab === 'discrepancy'
+												? 'discrepancies'
+												: 'clean timesheets'} found
 									</h3>
 									<p class="text-sm text-gray-500">
 										{#if searchTerm}

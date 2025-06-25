@@ -25,6 +25,9 @@ export const load = async ({ locals }) => {
 	}
 
 	if (user?.role === USER_ROLES.CLIENT) {
+		if (!user.completedOnboarding) {
+			redirect(302, '/onboarding/client/company');
+		}
 		const profile = await getClientProfilebyUserId(user.id);
 		await redirectIfNotValidCustomer(profile.id, user.role);
 

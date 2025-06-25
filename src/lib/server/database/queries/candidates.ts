@@ -130,7 +130,7 @@ export type CandidatesResult = CandidateWithProfileRaw[];
 export async function getAllCandidateProfiles(searchTerm?: string) {
 	const countResult = await db.select({ value: count() }).from(candidateProfileTable);
 	const results = await db
-		.select({
+		.selectDistinctOn([candidateProfileTable.id], {
 			user: {
 				id: userTable.id,
 				firstName: userTable.firstName,
@@ -163,7 +163,7 @@ export async function getAllCandidateProfiles(searchTerm?: string) {
 					)
 				: undefined
 		)
-		.orderBy(desc(candidateProfileTable.createdAt))
+		.orderBy(desc(candidateProfileTable.id), desc(candidateProfileTable.createdAt))
 		.limit(DEFAULT_MAX_RECORD_LIMIT);
 
 	return {

@@ -1,4 +1,4 @@
-import { desc, eq, count, sql, and, ne, notExists, or, ilike } from 'drizzle-orm';
+import { desc, eq, count, sql, and, ne, notExists, or, ilike, SQL } from 'drizzle-orm';
 import db from '$lib/server/database/drizzle';
 import {
 	clientCompanyTable,
@@ -331,7 +331,20 @@ export async function getAllClientStaffProfilesForLocation(
 
 	return results;
 }
-export async function getAllClientStaffProfiles(companyId: string) {
+export async function getAllClientStaffProfiles(companyId: string, searchTerm?: string) {
+	const whereConditions: SQL[] = [eq(clientStaffProfileTable.companyId, companyId)];
+
+	// Add search conditions if searchTerm is provided
+	if (searchTerm) {
+		whereConditions.push(
+			or(
+				ilike(userTable.firstName, `%${searchTerm}%`),
+				ilike(userTable.lastName, `%${searchTerm}%`),
+				ilike(userTable.email, `%${searchTerm}%`)
+			)
+		);
+	}
+
 	const results = await db
 		.select({
 			profile: { ...clientStaffProfileTable },
@@ -345,7 +358,9 @@ export async function getAllClientStaffProfiles(companyId: string) {
 		})
 		.from(clientStaffProfileTable)
 		.innerJoin(userTable, eq(clientStaffProfileTable.userId, userTable.id))
-		.where(eq(clientStaffProfileTable.companyId, companyId));
+		.where(and(...whereConditions))
+		.limit(DEFAULT_MAX_RECORD_LIMIT)
+		.orderBy(desc(clientStaffProfileTable.createdAt));
 
 	return results;
 }

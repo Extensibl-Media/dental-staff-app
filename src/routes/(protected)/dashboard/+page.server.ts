@@ -14,11 +14,6 @@ import { count, and, eq, lt, ne, sum } from 'drizzle-orm';
 import { getAdminDashboardData } from '$lib/server/database/queries/admin';
 
 export const load = async (event: RequestEvent) => {
-	//I only have this function here so it will check page again
-	//instead of keeping it cache if it was client side only.
-	//If only client side, it might still show the page even
-	//if the user has logged out.
-	// const session = await locals.auth.validate();
 	event.setHeaders({
 		'cache-control': 'max-age=60'
 	});

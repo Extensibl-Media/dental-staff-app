@@ -5,18 +5,12 @@
 	import {
 		AlertCircle,
 		FileClock,
-		MessageSquare,
 		UserPlus,
-		Users,
 		TicketIcon,
 		ArrowRight,
-		BellRing,
 		Clock,
-		LineChart,
 		TrendingUp,
 		CheckCircle2,
-		XCircle,
-		Clock3,
 		Building,
 		DollarSign
 	} from 'lucide-svelte';
@@ -24,9 +18,7 @@
 	import { formatCurrency, formatDate, formatTicketDate } from '$lib/_helpers';
 	import { Badge } from '$lib/components/ui/badge';
 	import { cn } from '$lib/utils';
-	import { format, parse, subDays } from 'date-fns';
-	import NotificationsMenu from '$lib/components/notifications-menu.svelte';
-	import { onMount } from 'svelte';
+	import { format } from 'date-fns';
 
 	export let user;
 	export let data;
@@ -44,7 +36,7 @@
 	$: newClientSignups = data.newClientSignups || [];
 	$: invoicesDue = data.invoicesDue || [];
 
-	$: console.log(discrepancies)
+	$: console.log(discrepancies);
 	// Calculate the % change in timesheets due from previous period (placeholder - you'll need to implement actual trend calculation)
 	const timesheetsTrendPercent = 12; // This should be calculated based on historical data
 	const supportTicketsTrendPercent = -5;
@@ -125,7 +117,7 @@
 							<p class="text-gray-500 text-sm font-medium">Timesheets Due</p>
 							<div class="flex items-baseline mt-1">
 								<p class="text-4xl font-bold text-gray-900">{timesheetsDueCount}</p>
-								<span
+								<!-- <span
 									class={`ml-2 ${getTrendColorClass(timesheetsTrendPercent)} text-sm font-medium flex items-center`}
 								>
 									{formatTrendValue(timesheetsTrendPercent)}
@@ -134,9 +126,9 @@
 									{:else}
 										<TrendingUp size={16} class="ml-1 transform rotate-180" />
 									{/if}
-								</span>
+								</span> -->
 							</div>
-							<p class="text-gray-400 text-xs mt-1">vs. previous period</p>
+							<!-- <p class="text-gray-400 text-xs mt-1">vs. previous period</p> -->
 						</div>
 						<div class="bg-blue-100 p-3 rounded-full">
 							<FileClock size={24} class="text-blue-600" />
@@ -159,7 +151,7 @@
 							<p class="text-gray-500 text-sm font-medium">Discrepancies</p>
 							<div class="flex items-baseline mt-1">
 								<p class="text-4xl font-bold text-gray-900">{discrepanciesCount}</p>
-								<span
+								<!-- <span
 									class={`ml-2 ${getTrendColorClass(discrepanciesTrendPercent)} text-sm font-medium flex items-center`}
 								>
 									{formatTrendValue(discrepanciesTrendPercent)}
@@ -168,20 +160,16 @@
 									{:else}
 										<TrendingUp size={16} class="ml-1 transform rotate-180" />
 									{/if}
-								</span>
+								</span> -->
 							</div>
-							<p class="text-gray-400 text-xs mt-1">vs. previous period</p>
+							<!-- <p class="text-gray-400 text-xs mt-1">vs. previous period</p> -->
 						</div>
 						<div class="bg-orange-100 p-3 rounded-full">
 							<AlertCircle size={24} class="text-orange-600" />
 						</div>
 					</div>
 					<div class="mt-4">
-						<Button
-							variant="link"
-							class="text-orange-600 p-0 h-auto"
-							href="/timesheets"
-						>
+						<Button variant="link" class="text-orange-600 p-0 h-auto" href="/timesheets">
 							Review discrepancies
 							<ArrowRight size={16} class="ml-1" />
 						</Button>
@@ -197,7 +185,7 @@
 							<p class="text-gray-500 text-sm font-medium">Support Tickets</p>
 							<div class="flex items-baseline mt-1">
 								<p class="text-4xl font-bold text-gray-900">{supportTicketsCount}</p>
-								<span
+								<!-- <span
 									class={`ml-2 ${getTrendColorClass(supportTicketsTrendPercent)} text-sm font-medium flex items-center`}
 								>
 									{formatTrendValue(supportTicketsTrendPercent)}
@@ -206,9 +194,9 @@
 									{:else}
 										<TrendingUp size={16} class="ml-1 transform rotate-180" />
 									{/if}
-								</span>
+								</span> -->
 							</div>
-							<p class="text-gray-400 text-xs mt-1">vs. previous period</p>
+							<!-- <p class="text-gray-400 text-xs mt-1">vs. previous period</p> -->
 						</div>
 						<div class="bg-purple-100 p-3 rounded-full">
 							<TicketIcon size={24} class="text-purple-600" />
@@ -231,7 +219,7 @@
 							<p class="text-gray-500 text-sm font-medium">Invoices Due</p>
 							<div class="flex items-baseline mt-1">
 								<p class="text-4xl font-bold text-gray-900">{invoicesDueCount}</p>
-								<span
+								<!-- <span
 									class={`ml-2 ${getTrendColorClass(invoicesTrendPercent)} text-sm font-medium flex items-center`}
 								>
 									{formatTrendValue(invoicesTrendPercent)}
@@ -240,9 +228,9 @@
 									{:else}
 										<TrendingUp size={16} class="ml-1 transform rotate-180" />
 									{/if}
-								</span>
+								</span> -->
 							</div>
-							<p class="text-gray-400 text-xs mt-1">vs. previous period</p>
+							<!-- <p class="text-gray-400 text-xs mt-1">vs. previous period</p> -->
 						</div>
 						<div class="bg-green-100 p-3 rounded-full">
 							<DollarSign size={24} class="text-green-600" />
@@ -340,7 +328,7 @@
 								</div>
 							{/if}
 							<div class="mt-4 flex justify-end">
-								<Button variant="outline" class="text-sm" href="/timesheets/discrepancies">
+								<Button variant="outline" class="text-sm" href="/timesheets/">
 									View all discrepancies
 									<ArrowRight size={14} class="ml-1" />
 								</Button>
@@ -470,7 +458,7 @@
 							<div class="flex justify-between items-center">
 								<Card.Title class="text-lg font-semibold flex items-center">
 									<UserPlus size={20} class="mr-2 text-blue-600" />
-									New Candidate Profiles
+									New Professional Members
 								</Card.Title>
 							</div>
 						</Card.Header>
@@ -478,28 +466,30 @@
 							{#if newCandidateProfiles.length > 0}
 								<ul class="space-y-3">
 									{#each newCandidateProfiles.slice(0, 4) as profileData, i (profileData.profile.id)}
-										<li
-											class="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer"
-											on:click={() => goto(`/candidates/${profileData.profile.id}`)}
-										>
-											<div
-												class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium mr-3"
+										<li>
+											<a
+												href={`/professionals/${profileData.profile.id}`}
+												class="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer"
 											>
-												{profileData.user.firstName[0]}{profileData.user.lastName[0]}
-											</div>
-											<div class="flex-1 min-w-0">
-												<p class="text-sm font-medium text-gray-900 truncate">
-													{profileData.user.firstName}
-													{profileData.user.lastName}
-												</p>
-												<p class="text-xs text-gray-500 truncate">
-													{profileData.profile.desiredPosition || 'Position not specified'}
-												</p>
-											</div>
-											<Badge
-												class="bg-yellow-100 text-yellow-800"
-												value={profileData.profile.status || 'PENDING'}
-											></Badge>
+												<div
+													class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium mr-3"
+												>
+													{profileData.user.firstName[0]}{profileData.user.lastName[0]}
+												</div>
+												<div class="flex-1 min-w-0">
+													<p class="text-sm font-medium text-gray-900 truncate">
+														{profileData.user.firstName}
+														{profileData.user.lastName}
+													</p>
+													<p class="text-xs text-gray-500 truncate">
+														{profileData.profile.desiredPosition || 'Position not specified'}
+													</p>
+												</div>
+												<Badge
+													class="bg-yellow-100 text-yellow-800"
+													value={profileData.profile.status || 'PENDING'}
+												></Badge>
+											</a>
 										</li>
 									{/each}
 								</ul>
@@ -509,8 +499,8 @@
 								</div>
 							{/if}
 							<div class="mt-4 text-center">
-								<Button variant="outline" size="sm" class="w-full" href="/candidates/pending">
-									View all candidates
+								<Button variant="outline" size="sm" class="w-full" href="/professionals">
+									View all professionals
 								</Button>
 							</div>
 						</Card.Content>
@@ -522,7 +512,7 @@
 							<div class="flex justify-between items-center">
 								<Card.Title class="text-lg font-semibold flex items-center">
 									<Building size={20} class="mr-2 text-indigo-600" />
-									New Client Signups
+									New Business Members
 								</Card.Title>
 							</div>
 						</Card.Header>
@@ -530,32 +520,34 @@
 							{#if newClientSignups.length > 0}
 								<ul class="space-y-3">
 									{#each newClientSignups.slice(0, 4) as clientData, i (clientData.clientProfile.id)}
-										<li
-											class="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer"
-											on:click={() => goto(`/clients/${clientData.clientProfile.id}`)}
-										>
-											<div
-												class="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-medium mr-3"
+										<li>
+											<a
+												href={`/clients/${clientData.clientProfile.id}`}
+												class="flex items-center p-2 rounded-md hover:bg-gray-50 cursor-pointer"
 											>
-												{clientData.company.companyName[0]}
-											</div>
-											<div class="flex-1 min-w-0">
-												<p class="text-sm font-medium text-gray-900 truncate">
-													{clientData.company.companyName}
-												</p>
-												<p class="text-xs text-gray-500 truncate">
-													{clientData.user.firstName}
-													{clientData.user.lastName}
-												</p>
-											</div>
-											<Badge
-												class={clientData.clientProfile.status === 'PENDING'
-													? 'bg-yellow-100 text-yellow-800'
-													: clientData.clientProfile.status === 'ACTIVE'
-														? 'bg-green-100 text-green-800'
-														: 'bg-gray-100 text-gray-800'}
-												value={clientData.clientProfile.status || 'PENDING'}
-											/>
+												{#if clientData.company.companyLogo}
+													<img
+														src={clientData.company.companyLogo}
+														alt="Company Logo"
+														class="h-8 w-8 rounded-full mr-3 object-cover"
+													/>
+												{:else}
+													<div
+														class="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium mr-3"
+													>
+														{clientData.company.companyName[0]}
+													</div>
+												{/if}
+												<div class="flex-1 min-w-0">
+													<p class="text-sm font-medium text-gray-900 truncate">
+														{clientData.company.companyName}
+													</p>
+													<p class="text-xs text-gray-500 truncate">
+														{clientData.user.firstName}
+														{clientData.user.lastName}
+													</p>
+												</div>
+											</a>
 										</li>
 									{/each}
 								</ul>
@@ -566,7 +558,7 @@
 							{/if}
 							<div class="mt-4 text-center">
 								<Button variant="outline" size="sm" class="w-full" href="/clients">
-									View all clients
+									View all business members
 								</Button>
 							</div>
 						</Card.Content>

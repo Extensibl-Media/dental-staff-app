@@ -12,6 +12,7 @@ import { error } from '@sveltejs/kit';
 import { getClientProfileById } from './clients';
 import { getUserById } from './users';
 import { DEFAULT_MAX_RECORD_LIMIT } from '$lib/config/constants';
+import { writeActionHistory } from './admin';
 
 export interface SupportTicketResult {
 	supportTicket: SupportTicket;
@@ -59,7 +60,7 @@ export async function getAllSupportTickets(searchTerm?: string) {
 			)
 		)
 		.innerJoin(userTable, eq(supportTicketTable.reportedById, userTable.id))
-		.orderBy(desc(supportTicketTable.createdAt))
+		.orderBy(desc(supportTicketTable.updatedAt))
 		.limit(DEFAULT_MAX_RECORD_LIMIT);
 }
 
@@ -136,15 +137,51 @@ export async function getSupportTicketsForUserWithLimit(userID: string, count: n
 }
 
 export async function closeSupportTicket(ticketId: string, closedById: string) {
-	return await db
+	const [original] = await db
+		.select()
+		.from(supportTicketTable)
+		.where(eq(supportTicketTable.id, ticketId));
+	if (!original) {
+		throw error(404, 'TICKET NOT FOUND');
+	}
+	const [result] = await db
 		.update(supportTicketTable)
 		.set({ closedById: closedById })
 		.where(eq(supportTicketTable.id, ticketId))
 		.returning();
+
+	await writeActionHistory({
+		table: 'SUPPORT_TICKETS',
+		userId: closedById,
+		action: 'UPDATE',
+		entityId: ticketId,
+		beforeState: original,
+		afterState: result
+	});
+	return result;
 }
 
-export async function deleteSupportTicket(ticketId: string) {
-	return await db.delete(supportTicketTable).where(eq(supportTicketTable.id, ticketId));
+export async function deleteSupportTicket(ticketId: string, userId: string) {
+	const [original] = await db
+		.select()
+		.from(supportTicketTable)
+		.where(eq(supportTicketTable.id, ticketId));
+	if (!original) {
+		throw error(404, 'TICKET NOT FOUND');
+	}
+	const [result] = await db
+		.delete(supportTicketTable)
+		.where(eq(supportTicketTable.id, ticketId))
+		.returning();
+	await writeActionHistory({
+		table: 'SUPPORT_TICKETS',
+		userId,
+		action: 'DELETE',
+		entityId: ticketId,
+		beforeState: original,
+		afterState: result
+	});
+	return result;
 }
 
 export async function getSupportTicketDetails(ticketId: string) {
@@ -219,7 +256,7 @@ export const getSupportTicketComments = async (ticketId: string) => {
 	}
 };
 
-export const createSupportTicketComment = async (data: SupportTicketComment) => {
+export const createSupportTicketComment = async (data: SupportTicketComment, userId: string) => {
 	try {
 		const [result] = await db
 			.insert(supportTicketCommentTable)
@@ -227,9 +264,13 @@ export const createSupportTicketComment = async (data: SupportTicketComment) => 
 			.onConflictDoNothing()
 			.returning();
 
-		await updateSupportTicket(data.supportTicketId, {
-			updatedAt: new Date()
-		});
+		await updateSupportTicket(
+			data.supportTicketId,
+			{
+				updatedAt: new Date()
+			},
+			userId
+		);
 		return result;
 	} catch (err) {
 		console.log(err);
@@ -237,13 +278,32 @@ export const createSupportTicketComment = async (data: SupportTicketComment) => 
 	}
 };
 
-export async function updateSupportTicket(ticketId: string, data: UpdateSuportTicket) {
+export async function updateSupportTicket(
+	ticketId: string,
+	data: UpdateSuportTicket,
+	userId: string
+) {
 	try {
+		const [original] = await db
+			.select()
+			.from(supportTicketTable)
+			.where(eq(supportTicketTable.id, ticketId));
+		if (!original) {
+			throw error(404, 'TICKET NOT FOUND');
+		}
 		const [result] = await db
 			.update(supportTicketTable)
 			.set({ ...data, updatedAt: new Date() })
 			.where(eq(supportTicketTable.id, ticketId))
 			.returning();
+		await writeActionHistory({
+			table: 'SUPPORT_TICKETS',
+			userId,
+			action: 'DELETE',
+			entityId: ticketId,
+			beforeState: original,
+			afterState: result
+		});
 		return result;
 	} catch (err) {
 		console.log(err);

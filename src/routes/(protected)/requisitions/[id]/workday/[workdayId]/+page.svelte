@@ -379,7 +379,7 @@
 					</div>
 
 					<div class="bg-muted p-4 rounded-md flex flex-col items-center justify-center">
-						{#if timesheet.validated}
+						{#if timesheet.status === 'APPROVED'}
 							<span class="text-3xl font-bold text-green-600">
 								<svg
 									xmlns="http://www.w3.org/2000/svg"

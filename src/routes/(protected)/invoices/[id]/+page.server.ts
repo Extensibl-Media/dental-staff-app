@@ -20,6 +20,9 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	if (user.role === USER_ROLES.CLIENT) {
+		if (!user.completedOnboarding) {
+			redirect(302, '/onboarding/client/company');
+		}
 		const client = await getClientProfilebyUserId(user.id);
 		const invoiceDetails = await getInvoiceById(event.params.id, client.id);
 

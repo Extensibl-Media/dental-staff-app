@@ -12,7 +12,8 @@ import {
 	lte,
 	SQL,
 	ilike,
-	inArray
+	inArray,
+	gt
 } from 'drizzle-orm';
 import db from '../drizzle';
 import {
@@ -322,146 +323,18 @@ export async function getRequisitionsAdmin(searchTerm?: string) {
 	}
 }
 
-// export async function getPaginatedRequisitionsAdmin({
-// 	limit = 10,
-// 	offset = 0,
-// 	orderBy = undefined
-// }: PaginateOptions) {
-// 	try {
-// 		const regionFields = ['region_abbreviation'];
-// 		const companyFields = ['company_name'];
-// 		const userCols = ['email', 'first_name', 'last_name'];
-// 		const locationFields = ['location_name', 'region_name'];
-// 		const disciplineFields = ['discipline_name'];
+export async function getRequisitionById(requisitionId: number): Promise<RequisitionSelect | null> {
+	const [result] = await db
+		.select()
+		.from(requisitionTable)
+		.where(and(eq(requisitionTable.id, requisitionId), eq(requisitionTable.archived, false)));
 
-// 		const orderSelector = orderBy
-// 			? companyFields.includes(orderBy.column)
-// 				? `co.${orderBy.column}`
-// 				: userCols.includes(orderBy.column)
-// 					? `u.${orderBy.column}`
-// 					: locationFields.includes(orderBy.column)
-// 						? `lo.${orderBy.column}`
-// 						: disciplineFields.includes(orderBy.column)
-// 							? `d.${orderBy.column}`
-// 							: regionFields.includes(orderBy.column)
-// 								? `re.${orderBy.column}`
-// 								: `r.${orderBy.column}`
-// 			: null;
-
-// 		const query = sql.empty();
-
-// 		query.append(sql`
-// 			SELECT r.*, lo.company_id AS company_id, lo.location_name, co.company_name, u.first_name, u.last_name, u.email, d.name AS discipline_name, re.name AS region_name, re.abbreviation AS region_abbreviation, sr.name AS subregion
-// 			FROM ${requisitionTable} as r
-// 			INNER JOIN ${companyOfficeLocationTable} lo ON r.location_id = lo.id
-// 			INNER JOIN ${clientCompanyTable} co ON co.id = company_id
-// 			INNER JOIN ${clientProfileTable} cl ON co.client_id = cl.id
-// 			INNER JOIN ${userTable} u ON u.id = cl.user_id
-// 			INNER JOIN ${disciplineTable} d ON d.id = r.discipline_id
-// 			INNER JOIN ${regionTable} re ON re.id = lo.region_id
-// 			LEFT JOIN ${subRegionTable} sr ON sr.region_id = re.id
-// 			WHERE r.archived = false
-// 		`);
-
-// 		// sorting segment
-// 		if (orderSelector && orderBy) {
-// 			query.append(sql`
-// 				ORDER BY ${
-// 					orderBy.direction === 'asc'
-// 						? sql`${sql.raw(orderSelector)} ASC`
-// 						: sql`${sql.raw(orderSelector)} DESC`
-// 				}
-// 			`);
-// 		} else {
-// 			query.append(sql`
-// 				ORDER BY r.created_at DESC
-// 			`);
-// 		}
-
-// 		// pagination segment
-// 		query.append(sql`
-// 			LIMIT ${limit}
-// 			OFFSET ${offset}
-// 		`);
-
-// 		const results = await db.execute(query);
-// 		const countResult = await db.select({ value: count() }).from(requisitionTable);
-
-// 		return { requisitions: results.rows, count: countResult[0].value };
-// 	} catch (error) {
-// 		console.log(error);
-// 	}
-// }
-
-// export async function getPaginatedRequisitionsforClient(
-// 	companyId: string,
-// 	{ limit = 10, offset = 0, orderBy = undefined }: PaginateOptions
-// ) {
-// 	try {
-// 		const regionFields = ['region_abbreviation'];
-// 		const companyFields = ['company_name'];
-// 		const userCols = ['email', 'first_name', 'last_name'];
-// 		const locationFields = ['location_name', 'region_name'];
-// 		const disciplineFields = ['discipline_name'];
-
-// 		const orderSelector = orderBy
-// 			? companyFields.includes(orderBy.column)
-// 				? `co.${orderBy.column}`
-// 				: userCols.includes(orderBy.column)
-// 					? `u.${orderBy.column}`
-// 					: locationFields.includes(orderBy.column)
-// 						? `lo.${orderBy.column}`
-// 						: disciplineFields.includes(orderBy.column)
-// 							? `d.${orderBy.column}`
-// 							: regionFields.includes(orderBy.column)
-// 								? `re.${orderBy.column}`
-// 								: `r.${orderBy.column}`
-// 			: null;
-
-// 		const query = sql.empty();
-
-// 		query.append(sql`
-// 			SELECT r.*, lo.company_id AS company_id, lo.location_name, co.company_name, u.first_name, u.last_name, u.email, d.name AS discipline_name, re.name AS region_name, re.abbreviation AS region_abbreviation, sr.name AS subregion
-// 			FROM ${requisitionTable} as r
-// 			INNER JOIN ${companyOfficeLocationTable} lo ON r.location_id = lo.id
-// 			INNER JOIN ${clientCompanyTable} co ON co.id = company_id
-// 			INNER JOIN ${clientProfileTable} cl ON co.client_id = cl.id
-// 			INNER JOIN ${userTable} u ON u.id = cl.user_id
-// 			INNER JOIN ${disciplineTable} d ON d.id = r.discipline_id
-// 			INNER JOIN ${regionTable} re ON re.id = lo.region_id
-// 			LEFT JOIN ${subRegionTable} sr ON sr.region_id = re.id
-// 			WHERE r.client_id = ${companyId} AND r.archived = false
-// 		`);
-
-// 		// sorting segment
-// 		if (orderSelector && orderBy) {
-// 			query.append(sql`
-// 				ORDER BY ${
-// 					orderBy.direction === 'asc'
-// 						? sql`${sql.raw(orderSelector)} ASC`
-// 						: sql`${sql.raw(orderSelector)} DESC`
-// 				}
-// 			`);
-// 		} else {
-// 			query.append(sql`
-// 				ORDER BY r.created_at DESC
-// 			`);
-// 		}
-
-// 		// pagination segment
-// 		query.append(sql`
-// 			LIMIT ${limit}
-// 			OFFSET ${offset}
-// 		`);
-
-// 		const results = await db.execute(query);
-// 		const countResult = await db.select({ value: count() }).from(requisitionTable);
-
-// 		return { requisitions: results.rows, count: countResult[0].value };
-// 	} catch (error) {
-// 		console.log(error);
-// 	}
-// }
+	if (!result) {
+		return null;
+	} else {
+		return result;
+	}
+}
 
 export async function getRequisitionDetailsByIdAdmin(requisitionId: number): Promise<any | null> {
 	const [result] = await db
@@ -1182,7 +1055,8 @@ export async function getAllTimesheetsAdmin(searchTerm?: string) {
 						)
 					: undefined
 			)
-			.orderBy(asc(timeSheetTable.createdAt));
+			.orderBy(asc(timeSheetTable.createdAt))
+			.limit(DEFAULT_MAX_RECORD_LIMIT);
 
 		return result || [];
 	} catch (err) {
@@ -1393,6 +1267,20 @@ export async function getRecurrenceDaysForTimesheet(timesheet: any): Promise<Rec
 		);
 }
 
+export async function getTimesheetById(timesheetId: string): Promise<TimeSheetSelect | null> {
+	try {
+		const [timesheet] = await db
+			.select()
+			.from(timeSheetTable)
+			.where(eq(timeSheetTable.id, timesheetId));
+
+		return timesheet || null;
+	} catch (err) {
+		console.error('Error fetching timesheet by ID:', err);
+		throw error(500, `Error fetching timesheet: ${err}`);
+	}
+}
+
 export async function getTimesheetDetailsAdmin(timesheetId: string) {
 	const [timesheet] = await db
 		.select({
@@ -1436,13 +1324,25 @@ export async function getTimesheetDetailsAdmin(timesheetId: string) {
 	return timesheet;
 }
 
-export async function closeAllRecurrenceDays(requisitionId: number | undefined, userId: string) {
+export async function closeAllUpcomingRecurrenceDays(
+	requisitionId: number | undefined,
+	userId: string
+) {
+	const beginningOfDay = new Date();
+	beginningOfDay.setHours(0, 0, 0, 0); // Set to the start of the day
+	const beginningOfDayString = beginningOfDay.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+
 	if (!requisitionId) throw error(400, 'Requisition ID is required');
 	try {
 		const result = await db
 			.update(recurrenceDayTable)
 			.set({ status: 'CANCELED', updatedAt: new Date() })
-			.where(eq(recurrenceDayTable.requisitionId, requisitionId))
+			.where(
+				and(
+					eq(recurrenceDayTable.requisitionId, requisitionId),
+					gt(recurrenceDayTable.date, beginningOfDayString)
+				)
+			)
 			.returning();
 
 		for (const day of result) {
@@ -1547,7 +1447,8 @@ export const getWorkdayDetails = async (
 					totalHoursBilled: timeSheetTable.totalHoursBilled,
 					validated: timeSheetTable.validated,
 					awaitingClientSignature: timeSheetTable.awaitingClientSignature,
-					hoursRaw: timeSheetTable.hoursRaw
+					hoursRaw: timeSheetTable.hoursRaw,
+					status: timeSheetTable.status
 				}
 			})
 			.from(workdayTable)
@@ -1851,6 +1752,7 @@ export async function getClientInvoices(
 		sourceType?: InvoiceSourceType;
 		includeStripeData?: boolean;
 		limit?: number;
+		searchTerm?: string;
 	}
 ): Promise<InvoiceWithRelations[]> {
 	if (!clientId) throw error(400, 'Must provide client ID');
@@ -1864,6 +1766,19 @@ export async function getClientInvoices(
 
 	if (options?.sourceType) {
 		whereConditions.push(eq(invoiceTable.sourceType, options.sourceType));
+	}
+
+	// Add search conditions
+	if (options?.searchTerm) {
+		whereConditions.push(
+			or(
+				ilike(invoiceTable.invoiceNumber, `%${options.searchTerm}%`),
+				ilike(requisitionTable.title, `%${options.searchTerm}%`),
+				ilike(sql`candidate_user.first_name`, `%${options.searchTerm}%`),
+				ilike(sql`candidate_user.last_name`, `%${options.searchTerm}%`),
+				ilike(clientCompanyTable.companyName, `%${options.searchTerm}%`)
+			)
+		);
 	}
 
 	const query = db
@@ -1927,8 +1842,23 @@ export async function getClientInvoices(
 	}));
 }
 
-export async function getAllInvoicesAdmin(): Promise<InvoiceWithRelations[]> {
+export async function getAllInvoicesAdmin(searchTerm?: string): Promise<InvoiceWithRelations[]> {
 	try {
+		const whereConditions: SQL[] = [];
+
+		// Add search conditions if searchTerm is provided
+		if (searchTerm) {
+			whereConditions.push(
+				or(
+					ilike(invoiceTable.invoiceNumber, `%${searchTerm}%`),
+					ilike(requisitionTable.title, `%${searchTerm}%`),
+					ilike(sql`candidate_user.first_name`, `%${searchTerm}%`),
+					ilike(sql`candidate_user.last_name`, `%${searchTerm}%`),
+					ilike(clientCompanyTable.companyName, `%${searchTerm}%`)
+				)
+			);
+		}
+
 		const result = await db
 			.select({
 				invoice: invoiceTable,
@@ -1951,6 +1881,7 @@ export async function getAllInvoicesAdmin(): Promise<InvoiceWithRelations[]> {
 				}
 			})
 			.from(invoiceTable)
+			.where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
 			.leftJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
 			.leftJoin(
 				sql`${userTable} as candidate_user`,
@@ -1964,7 +1895,8 @@ export async function getAllInvoicesAdmin(): Promise<InvoiceWithRelations[]> {
 				sql`${userTable} as client_user`,
 				sql`${clientProfileTable.userId} = client_user.id`
 			)
-			.orderBy(desc(invoiceTable.createdAt));
+			.orderBy(desc(invoiceTable.createdAt))
+			.limit(DEFAULT_MAX_RECORD_LIMIT);
 
 		return result.map((row) => ({
 			invoice: row.invoice,
@@ -2339,9 +2271,7 @@ export async function getRecurrenceDayByWorkdayId(
  * @param workdayId The ID of the workday
  * @returns Object containing the workday, requisition, and recurrence day
  */
-export async function getWorkdayWithRelations(
-	workdayId: string
-): Promise<{
+export async function getWorkdayWithRelations(workdayId: string): Promise<{
 	workday: WorkdaySelect | null;
 	requisition: RequisitionSelect | null;
 	recurrenceDay: RecurrenceDaySelect | null;
@@ -2390,43 +2320,28 @@ export async function getWorkdaysByRecurrenceDayId(
 	}
 }
 
-// export async function approveTimesheet(timesheetId: string, userId: string) {
-// 	try {
-// 		const [original] = await db
-// 			.select()
-// 			.from(timeSheetTable)
-// 			.where(eq(timeSheetTable.id, timesheetId));
-
-// 		const [result] = await db
-// 			.update(timeSheetTable)
-// 			.set({ status: 'APPROVED' })
-// 			.where(eq(timeSheetTable.id, original.id))
-// 			.returning();
-
-// 		await writeActionHistory({
-// 			table: 'TIMESHEETS',
-// 			userId,
-// 			action: 'UPDATE',
-// 			entityId: timesheetId,
-// 			beforeState: original,
-// 			afterState: result,
-// 			metadata: {
-// 				status: 'APPROVED'
-// 			}
-// 		});
-
-// 		return result;
-// 	} catch (err) {
-// 		throw error(500, `Error rejecting timesheet: ${error}`);
-// 	}
-// }
-export async function revertTimesheetToPending(timesheetId: string) {
+export async function revertTimesheetToPending(timesheetId: string, userId: string) {
 	try {
+		const [original] = await db
+			.select()
+			.from(timeSheetTable)
+			.where(eq(timeSheetTable.id, timesheetId));
+
 		const [result] = await db
 			.update(timeSheetTable)
 			.set({ status: 'PENDING' })
 			.where(eq(timeSheetTable.id, timesheetId))
 			.returning();
+
+		await writeActionHistory({
+			table: 'TIMESHEETS',
+			userId,
+			action: 'UPDATE',
+			entityId: timesheetId,
+			beforeState: original,
+			afterState: result,
+			metadata: { status: 'PENDING' }
+		});
 
 		return result;
 	} catch (err) {
@@ -2505,7 +2420,7 @@ export async function approveTimesheet(timesheetId: string, userId: string) {
 		// Update timesheet status to APPROVED
 		const [result] = await db
 			.update(timeSheetTable)
-			.set({ status: 'APPROVED' })
+			.set({ status: 'APPROVED', totalHoursBilled: original.totalHoursWorked })
 			.where(eq(timeSheetTable.id, timesheetId))
 			.returning();
 
@@ -2543,6 +2458,7 @@ export const adminOverrideTimesheet = async (
 
 		const updatedValues: UpdateTimeSheet = {
 			...values,
+			totalHoursBilled: original.totalHoursWorked, // Preserve total hours worked
 			status: 'APPROVED' // Force status to APPROVED
 		};
 
@@ -2590,17 +2506,20 @@ export async function getInvoiceByTimesheetId(
 	}
 }
 
-export async function createInvoiceRecord({
-	clientId,
-	timesheet,
-	stripeInvoice,
-	amountInDollars
-}: {
-	clientId: string;
-	timesheet?: TimeSheetSelect;
-	stripeInvoice: Stripe.Invoice;
-	amountInDollars: string;
-}): Promise<Invoice> {
+export async function createInvoiceRecord(
+	{
+		clientId,
+		timesheet,
+		stripeInvoice,
+		amountInDollars
+	}: {
+		clientId: string;
+		timesheet?: TimeSheetSelect;
+		stripeInvoice: Stripe.Invoice;
+		amountInDollars: string;
+	},
+	userId: string
+): Promise<Invoice> {
 	try {
 		if (timesheet) {
 			// Create dates with consistent timezone handling
@@ -2641,6 +2560,14 @@ export async function createInvoiceRecord({
 				})
 				.returning();
 
+			await writeActionHistory({
+				table: 'INVOICES',
+				userId,
+				action: 'CREATE',
+				entityId: invoice.id,
+				afterState: invoice
+			});
+
 			return invoice;
 		} else {
 			const [invoice] = await db
@@ -2671,6 +2598,14 @@ export async function createInvoiceRecord({
 				})
 				.returning();
 
+			await writeActionHistory({
+				table: 'INVOICES',
+				userId,
+				action: 'CREATE',
+				entityId: invoice.id,
+				afterState: invoice
+			});
+
 			return invoice;
 		}
 	} catch (err) {
@@ -2688,14 +2623,14 @@ export async function createInvoiceRecord({
  */
 export function convertToStripeAmount(
 	totalHoursWorked: string | number,
-	candidateRateBase: string | number | null,
-	candidateRateOvertime?: string | number | null
+	rateOfPayBase: string | number | null,
+	rateOfPayWithOvertime?: string | number | null
 ): number {
-	if (!candidateRateBase) throw new Error('Base rate is required');
+	if (!rateOfPayBase) throw new Error('Base rate is required');
 	// Convert all inputs to numbers, handling null/undefined
 	const hours = parseFloat(String(totalHoursWorked));
-	const baseRate = parseFloat(String(candidateRateBase));
-	const overtimeRate = candidateRateOvertime ? parseFloat(String(candidateRateOvertime)) : null;
+	const baseRate = parseFloat(String(rateOfPayBase));
+	const overtimeRate = rateOfPayWithOvertime ? parseFloat(String(rateOfPayWithOvertime)) : null;
 
 	// Validate inputs
 	if (isNaN(hours) || hours < 0) {
@@ -2703,7 +2638,7 @@ export function convertToStripeAmount(
 	}
 
 	if (isNaN(baseRate) || baseRate < 0) {
-		throw new Error('Invalid candidateRateBase: must be a valid positive number');
+		throw new Error('Invalid rateOfPayBase: must be a valid positive number');
 	}
 
 	if (overtimeRate !== null && (isNaN(overtimeRate) || overtimeRate < 0)) {

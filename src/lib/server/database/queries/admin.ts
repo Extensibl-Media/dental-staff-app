@@ -243,8 +243,9 @@ export async function getSupportTicketsPreview(limit: number) {
 		})
 		.from(supportTicketTable)
 		.innerJoin(userTable, eq(supportTicketTable.reportedById, userTable.id))
+		.where(ne(supportTicketTable.status, 'CLOSED'))
 		.limit(limit)
-		.orderBy(desc(supportTicketTable.createdAt));
+		.orderBy(desc(supportTicketTable.updatedAt));
 
 	return result;
 }
@@ -284,7 +285,9 @@ export async function getDiscrepanciesForAdminDashboard() {
 			candidateProfileTable,
 			eq(timeSheetTable.associatedCandidateId, candidateProfileTable.id)
 		)
-		.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId));
+		.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
+		.where(ne(timeSheetTable.status, 'APPROVED'))
+		.limit(DEFAULT_MAX_RECORD_LIMIT);
 
 	const allDiscrepancies: TimesheetDiscrepancy[] = [];
 

@@ -51,6 +51,9 @@ export const load: PageServerLoad = async (event) => {
 	const clientForm = await superValidate(event, clientRequisitionSchema);
 
 	if (user.role === USER_ROLES.CLIENT) {
+		if (!user.completedOnboarding) {
+			redirect(302, '/onboarding/client/company');
+		}
 		const client = await getClientProfilebyUserId(user.id);
 		await redirectIfNotValidCustomer(client.id, user.role);
 

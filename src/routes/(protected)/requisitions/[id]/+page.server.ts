@@ -11,7 +11,7 @@ import {
 	getRequisitionTimesheets,
 	getRequisitionDetailsForAdmin,
 	getRequisitionDetailsByIdAdmin,
-	closeAllRecurrenceDays
+	closeAllUpcomingRecurrenceDays
 } from '$lib/server/database/queries/requisitions';
 import { fail, redirect } from '@sveltejs/kit';
 import { message, setError, superValidate } from 'sveltekit-superforms/server';
@@ -70,6 +70,9 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 	}
 
 	if (user.role === USER_ROLES.CLIENT) {
+		if (!user.completedOnboarding) {
+			redirect(302, '/onboarding/client/company');
+		}
 		const client = await getClientProfilebyUserId(user.id);
 
 		await redirectIfNotValidCustomer(client.id, user.role);
@@ -151,7 +154,7 @@ export const actions = {
 
 			await changeRequisitionStatus(values, Number(requisitionId), user.id);
 			if (status === 'CANCELED') {
-				await closeAllRecurrenceDays(Number(requisitionId), user.id);
+				await closeAllUpcomingRecurrenceDays(Number(requisitionId), user.id);
 			}
 			setFlash(
 				{
@@ -263,15 +266,20 @@ export const actions = {
 			) {
 				fail(400, { form });
 			}
+			const requisition = await getRequisitionDetailsById(+requisitionId);
+			const utcDay = convertRecurrenceDayToUTC(
+				{ date, dayStartTime, dayEndTime, lunchEndTime, lunchStartTime, requisitionId },
+				requisition.requisition.referenceTimezone
+			);
 
 			const values = {
 				updatedAt: new Date(),
 				requisitionId: Number(requisitionId),
 				date: date,
-				dayStart: dayStartTime,
-				dayEnd: dayEndTime,
-				lunchStart: lunchStartTime,
-				lunchEnd: lunchEndTime
+				dayStart: utcDay.dayStart,
+				dayEnd: utcDay.dayEnd,
+				lunchStart: utcDay.lunchStart,
+				lunchEnd: utcDay.lunchEnd
 			};
 
 			await editRecurrenceDay(id, values, user.id);

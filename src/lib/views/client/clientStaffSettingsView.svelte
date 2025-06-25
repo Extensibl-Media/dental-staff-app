@@ -15,6 +15,7 @@
 	export let userProfileForm;
 	export let passwordForm;
 	export let companyForm;
+	export let hasAdminPrivileges = false;
 	const { form: userFormObj, enhance: userFormEnhance } = superForm(userProfileForm);
 	const { form: companyFormObj, enhance: companyFormEnhance } = superForm(companyForm);
 	const {

@@ -31,7 +31,7 @@
 		on:click={() => {
 			// form = data.form;
 			open = true;
-		}}><PlusIcon size={20} class="mr-2" />Invite Staff</Dialog.Trigger
+		}}><PlusIcon size={20} class="mr-2" />Add Staff to Location</Dialog.Trigger
 	>
 	<Dialog.Content class="sm:max-w-[425px]">
 		<form use:enhance method="POST" action="?/inviteStaff" class="space-y-4">

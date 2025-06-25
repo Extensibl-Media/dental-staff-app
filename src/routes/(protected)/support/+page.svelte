@@ -95,9 +95,9 @@
 					value: original.getValue(),
 					class: cn(
 						'text-white',
-						original.getValue() === 'PENDING' && 'bg-yellow-500 hover:bg-yellow-600',
+						original.getValue() === 'PENDING' && 'bg-yellow-400 hover:bg-yellow-500',
 						original.getValue() === 'NEW' && 'bg-green-500 hover:bg-green-600',
-						original.getValue() === 'CLOSED' && 'bg-red-500 hover:bg-red-600'
+						original.getValue() === 'CLOSED' && 'bg-gray-500 hover:bg-gray-600'
 					)
 				})
 		}
@@ -129,9 +129,9 @@
 					value: original.getValue(),
 					class: cn(
 						'text-white',
-						original.getValue() === 'PENDING' && 'bg-yellow-500 hover:bg-yellow-600',
+						original.getValue() === 'PENDING' && 'bg-yellow-400 hover:bg-yellow-500',
 						original.getValue() === 'NEW' && 'bg-green-500 hover:bg-green-600',
-						original.getValue() === 'CLOSED' && 'bg-red-500 hover:bg-red-600'
+						original.getValue() === 'CLOSED' && 'bg-gray-500 hover:bg-gray-600'
 					)
 				})
 		}

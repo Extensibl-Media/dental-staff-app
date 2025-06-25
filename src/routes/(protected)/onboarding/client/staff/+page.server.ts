@@ -7,7 +7,6 @@ import {
 	getClientProfilebyUserId,
 	getClientStaffProfilesCount,
 	getPrimaryLocationForCompany,
-	getStaffProfilesForLocation,
 	inviteStaffUsersToAccount
 } from '$lib/server/database/queries/clients.js';
 import { updateUser } from '$lib/server/database/queries/users.js';
@@ -46,9 +45,10 @@ export const load = async (event) => {
 	const staffCount = await getClientStaffProfilesCount(company.id);
 
 	const form = await superValidate(newStaffInvitesSchema);
-	// if (staffCount > 0) {
-	//   redirect(302, '/dashboard')
-	// }
+
+	if (staffCount > 0) {
+		redirect(302, '/dashboard');
+	}
 
 	return {
 		user,
@@ -64,7 +64,6 @@ export const actions = {
 
 		// Parse the invitees from the form data
 		const rawInvitees = formData.get('invitees');
-		console.log('Raw invitees:', rawInvitees);
 
 		const user = event.locals.user;
 

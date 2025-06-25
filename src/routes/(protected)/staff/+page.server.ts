@@ -18,6 +18,7 @@ import { getUserByEmail } from '$lib/server/database/queries/users';
 
 export const load = async (event: RequestEvent) => {
 	const user = event.locals.user;
+	const searchTerm = event.url.searchParams.get('search') || '';
 
 	if (!user) {
 		redirect(301, '/auth/sign-in');
@@ -26,6 +27,7 @@ export const load = async (event: RequestEvent) => {
 	if (user.role === USER_ROLES.SUPERADMIN) {
 		return redirect(302, '/dashboard');
 	}
+
 	const inviteForm = await superValidate(
 		event,
 		z.object({
@@ -34,27 +36,33 @@ export const load = async (event: RequestEvent) => {
 			staffRole: z.string().min(1, 'Staff role is required')
 		})
 	);
+
 	if (user.role === USER_ROLES.CLIENT) {
+		if (!user.completedOnboarding) {
+			redirect(302, '/onboarding/client/company');
+		}
 		const client = await getClientProfilebyUserId(user.id);
 		await redirectIfNotValidCustomer(client.id, user.role);
 		const company = await getClientCompanyByClientId(client.id);
 		const locations = await getAllClientLocationsByCompanyId(company.id);
 
-		const staffList = await getAllClientStaffProfiles(company.id);
+		const staffList = await getAllClientStaffProfiles(company.id, searchTerm);
 
 		return {
 			user,
 			staff: staffList,
 			locations,
 			company,
-			inviteForm
+			inviteForm,
+			searchTerm
 		};
 	}
+
 	if (user.role === USER_ROLES.CLIENT_STAFF) {
 		const profile = await getClientStaffProfilebyUserId(user.id);
 
 		await redirectIfNotValidCustomer(profile.clientId, user.role);
-		const staffList = await getAllClientStaffProfiles(profile.clientId);
+		const staffList = await getAllClientStaffProfiles(profile.clientId, searchTerm);
 		const company = await getClientCompanyByClientId(profile.clientId);
 
 		const locations = await getAllClientLocationsByCompanyId(profile.companyId);
@@ -63,7 +71,8 @@ export const load = async (event: RequestEvent) => {
 			staff: staffList,
 			locations,
 			company,
-			inviteForm
+			inviteForm,
+			searchTerm
 		};
 	}
 };
