@@ -10,6 +10,7 @@ import type {
 	SendEmailParams
 } from './types';
 import { EMAIL_TEMPLATES } from './templates';
+import type { Invoice } from '../database/schemas/requisition';
 
 export class EmailService {
 	private readonly mailer: Resend;
@@ -479,6 +480,30 @@ export class EmailService {
 		}
 	}
 
+	/**
+	 * Send Overdue Invoice Reminder email
+	 */
+	async sendOverdueInvoiceReminderEmail(
+		email: string,
+		invoiceDetails: Invoice
+	): Promise<EmailSendResult> {
+		try {
+			const template = EMAIL_TEMPLATES.overdueInvoiceReminderEmail(invoiceDetails);
+			const result = await this.sendEmail({
+				to: [{ email }],
+				subject: template.subject,
+				html: template.htmlEmail,
+				text: template.textEmail
+			});
+			return result;
+		} catch (error: any) {
+			return {
+				id: crypto.randomUUID(),
+				success: false,
+				error: error.message || 'Failed to send overdue invoice reminder email'
+			};
+		}
+	}
 	// ========================================
 	// PRIVATE HELPER METHODS
 	// ========================================

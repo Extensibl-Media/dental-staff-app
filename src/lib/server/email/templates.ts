@@ -1,5 +1,7 @@
 import { APP_NAME, BASE_URL } from '$lib/config/constants';
 import { env } from '$env/dynamic/private';
+import type { Invoice } from '../database/schemas/requisition';
+import { format } from 'date-fns';
 
 export const EMAIL_TEMPLATES: Record<
 	string,
@@ -197,21 +199,21 @@ export const EMAIL_TEMPLATES: Record<
 
 		return { textEmail, htmlEmail, subject };
 	},
-	invoiceReminderEmail: (invoiceLink: string, dueDate: string) => {
+	overdueInvoiceReminderEmail: (invoiceDetails: Invoice) => {
 		const textEmail = `
-            This is a reminder that your invoice is due on ${dueDate}.
+            This is a reminder that your invoice is due on ${format(invoiceDetails.dueDate!, 'PPp')}.
             Please visit the link below to view and pay your invoice:
-            ${invoiceLink}
+            ${invoiceDetails.stripeHostedUrl}
             
             If you have any questions, please contact us.
         `.trim();
 		const htmlEmail = `
-            <p>This is a reminder that your invoice is due on <strong>${dueDate}</strong>.</p>
+            <p>This is a reminder that your invoice is due on <strong>${format(invoiceDetails.dueDate!, 'PPp')}</strong>.</p>
             <p>Please visit the link below to view and pay your invoice:</p>
-            <p><a href="${invoiceLink}">${invoiceLink}</a></p>
+            <p><a href="${invoiceDetails.stripeHostedUrl}">${invoiceDetails.stripeHostedUrl}</a></p>
             <p>If you have any questions, please contact us.</p>
         `.trim();
-		const subject = `Invoice Reminder - Due on ${dueDate} | ${APP_NAME}`;
+		const subject = `Invoice Reminder - Due on ${format(invoiceDetails.dueDate!, 'PPp')} | ${APP_NAME}`;
 		return { textEmail, htmlEmail, subject };
 	},
 	invoicePaymentSuccessEmail: (invoiceLink: string, paymentDate: string) => {
@@ -251,7 +253,7 @@ export const EMAIL_TEMPLATES: Record<
 			lastName: string;
 		}
 	) => {
-		const { url, companyName, location, date, workdayStart, workdayEnd } = workdayDetails;
+		const { url, location, date, workdayStart, workdayEnd } = workdayDetails;
 		const { firstName, lastName } = candidateDetails;
 		const textEmail = `
             Your workday shift on ${date} has been filled by: ${firstName} ${lastName} for the following position:\n

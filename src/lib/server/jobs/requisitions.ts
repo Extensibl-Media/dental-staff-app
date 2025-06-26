@@ -81,3 +81,46 @@ export const processOutdatedRequisitionsJob = () => {
 		}
 	});
 };
+
+/**
+ * Process sending out 48hr reminder for workdays to candidate
+ *
+ * This job runs at 6:00 AM EST
+ */
+export const processWorkday48HrReminderJob = () => {
+	const rule = new RecurrenceRule();
+	rule.hour = 6;
+	rule.minute = 0;
+	rule.second = 0;
+	rule.tz = 'America/New_York';
+
+	return scheduleJob('processWorkday48HrReminder', rule, async function (fireDate) {
+		const timestamp = fireDate.toISOString();
+		const signature = crypto.createHmac('sha256', CRON_SECRET).digest('hex');
+
+		try {
+			console.log(`Starting processWorkday48HrReminderJob - ${fireDate}`);
+
+			// Call your API endpoint
+			const result = await fetch(`${API_URL}/jobs/requisitions/processWorkday48HrReminder`, {
+				method: 'GET',
+				headers: {
+					'X-Timestamp': timestamp,
+					'X-Signature': signature
+				}
+			});
+
+			if (!result.ok) {
+				const errorText = await result.text();
+				throw new Error(`API returned error status ${result.status}: ${errorText}`);
+			}
+
+			const data = await result.json();
+			console.log(`Processed ${data.sent || 0} workday reminders`);
+		} catch (error) {
+			console.error('Error sending workday reminders:', error);
+		} finally {
+			console.log(`Finished processWorkday48HrReminderJob - ${fireDate}`);
+		}
+	});
+};

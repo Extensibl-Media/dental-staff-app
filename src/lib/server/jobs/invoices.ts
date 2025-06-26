@@ -4,7 +4,7 @@ import crypto from 'crypto';
 
 export const processInvoiceRemindersJob = () => {
 	const rule = new RecurrenceRule();
-	rule.hour = 7; // 9 AM
+	rule.hour = 7; // 7 AM
 	rule.minute = 0; // 0 minutes
 	rule.second = 0; // 0 seconds
 	rule.tz = 'America/New_York';
