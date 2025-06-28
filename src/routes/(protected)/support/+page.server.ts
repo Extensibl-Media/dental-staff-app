@@ -15,7 +15,7 @@ export const load: PageServerLoad = async (event) => {
 	const search = event.url.searchParams.get('search') || '';
 
 	if (!user) {
-		return redirect(302, '/sign-in');
+		redirect(302, '/auth/sign-in');
 	}
 	const form = await superValidate(event, newSupportTicketSchema);
 

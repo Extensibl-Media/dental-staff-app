@@ -10,7 +10,7 @@ export const load: PageServerLoad = async (event) => {
 	const user = event.locals.user;
 
 	if (!user) {
-		redirect(301, '/sign-in');
+		redirect(301, '/auth/sign-in');
 	}
 
 	const form = await superValidate(event, newMessageSchema);

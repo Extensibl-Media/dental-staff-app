@@ -24,7 +24,7 @@ export const load: PageServerLoad = async (event) => {
 	const user = event.locals.user;
 
 	if (!user) {
-		return redirect(301, '/sign-in');
+		return redirect(301, '/auth/sign-in');
 	}
 
 	if (user.role === USER_ROLES.CLIENT) {
@@ -89,7 +89,7 @@ export const actions = {
 		const user = event.locals.user;
 
 		if (!user) {
-			return redirect(301, '/sign-in');
+			return redirect(301, '/auth/sign-in');
 		}
 
 		if (user.role === USER_ROLES.CLIENT || user.role === USER_ROLES.CLIENT_STAFF) {

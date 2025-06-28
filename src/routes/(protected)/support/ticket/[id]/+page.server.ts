@@ -18,7 +18,7 @@ export async function load(event: RequestEvent) {
 	const user = event.locals.user;
 	const { id } = event.params;
 	if (!user) {
-		redirect(302, '/sign-in');
+		redirect(302, '/auth/sign-in');
 	}
 
 	const supportTicket = await getSupportTicketDetails(id);

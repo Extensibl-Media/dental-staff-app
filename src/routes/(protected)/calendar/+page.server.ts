@@ -12,7 +12,7 @@ export const load = async ({ locals }) => {
 	const user = locals.user;
 
 	if (!user) {
-		redirect(301, '/sign-in');
+		redirect(301, '/auth/sign-in');
 	}
 
 	if (user.role === USER_ROLES.SUPERADMIN) {

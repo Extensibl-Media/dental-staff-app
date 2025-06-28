@@ -163,11 +163,10 @@ export const POST: RequestHandler = async ({ request }) => {
 				.returning();
 
 			// Change Status of the recurrence day
-			const [updatedRecurrenceDay] = await db
+			await db
 				.update(recurrenceDayTable)
 				.set({ status: 'FILLED' })
-				.where(eq(recurrenceDayTable.id, recurrenceDayId))
-				.returning();
+				.where(eq(recurrenceDayTable.id, recurrenceDayId));
 
 			// TODO Notify the client of a claimed workday
 			console.log('Recurrence day claimed:', {

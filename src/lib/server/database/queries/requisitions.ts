@@ -67,6 +67,7 @@ import { normalizeDate } from '$lib/_helpers';
 import type Stripe from 'stripe';
 import { calculateMaxHours, toUTCDateString } from '$lib/_helpers/UTCTimezoneUtils';
 import { DEFAULT_MAX_RECORD_LIMIT } from '$lib/config/constants';
+import { actionHistoryTable } from '../schemas/admin';
 
 // Types and Interfaces
 export interface TimesheetDiscrepancy {
@@ -2439,6 +2440,65 @@ export async function approveTimesheet(timesheetId: string, userId: string) {
 		console.error('Error in approveTimesheet:', err);
 		throw error(500, `Error approving timesheet: ${err}`);
 	}
+}
+
+export async function updateTimesheetHours(
+	timesheetId: string,
+	updateData: {
+		hoursRaw: Array<{
+			date: string;
+			hours: number;
+			startTime: string;
+			endTime: string;
+		}>;
+		totalHoursWorked: string;
+		userId: string;
+	}
+) {
+	const { hoursRaw, totalHoursWorked, userId } = updateData;
+
+	// Get the current timesheet for audit trail
+	const currentTimesheet = await getTimesheetById(timesheetId);
+	if (!currentTimesheet) {
+		throw new Error('Timesheet not found');
+	}
+
+	// Update the timesheet
+	const [updatedTimesheet] = await db
+		.update(timeSheetTable)
+		.set({
+			hoursRaw: hoursRaw,
+			totalHoursWorked,
+			updatedAt: new Date()
+		})
+		.where(eq(timeSheetTable.id, timesheetId))
+		.returning();
+
+	// Create audit history entry
+	await db.insert(actionHistoryTable).values({
+		id: crypto.randomUUID(),
+		entityId: timesheetId,
+		entityType: 'TIMESHEETS',
+		userId,
+		action: 'UPDATE',
+		changes: {
+			before: {
+				hoursRaw: currentTimesheet.hoursRaw,
+				totalHoursWorked: currentTimesheet.totalHoursWorked
+			},
+			after: {
+				hoursRaw,
+				totalHoursWorked
+			}
+		},
+		metadata: {
+			editType: 'HOURS_EDIT'
+		},
+		createdAt: new Date(),
+		updatedAt: new Date()
+	});
+
+	return updatedTimesheet;
 }
 
 export const adminOverrideTimesheet = async (

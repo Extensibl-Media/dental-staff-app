@@ -18,7 +18,7 @@ export const load = async (event: RequestEvent) => {
 	const user = event.locals.user;
 
 	if (!user) {
-		redirect(301, '/sign-in');
+		redirect(301, '/auth/sign-in');
 	}
 	const inboxService = new InboxService();
 

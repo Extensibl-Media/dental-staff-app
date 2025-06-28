@@ -21,6 +21,7 @@ import {
 	getWorkdaysForTimesheet,
 	rejectTimesheet,
 	revertTimesheetToPending,
+	updateTimesheetHours,
 	validateTimesheet,
 	voidTimesheet
 } from '$lib/server/database/queries/requisitions';
@@ -293,5 +294,38 @@ export const actions = {
 			setFlash({ type: 'success', message: 'Timesheet approved' }, event);
 			return { success: true, message: 'Timesheet approved', overridden, stripeInvoice };
 		} catch (error) {}
+	},
+	adminEditTimesheet: async (event: RequestEvent) => {
+		const user = event.locals.user;
+		if (!user) {
+			redirect(302, '/auth/sign-in');
+		}
+
+		if (user.role !== USER_ROLES.SUPERADMIN) {
+			throw error(403, 'Forbidden');
+		}
+
+		const { id } = event.params;
+		const formData = await event.request.formData();
+
+		try {
+			// Parse the updated hours data from form
+			const hoursRaw = JSON.parse(formData.get('hoursRaw') as string);
+			const totalHoursWorked = formData.get('totalHoursWorked') as string;
+
+			// Update timesheet with new hours
+			const updatedTimesheet = await updateTimesheetHours(id, {
+				hoursRaw,
+				totalHoursWorked,
+				userId: user.id
+			});
+
+			setFlash({ type: 'success', message: 'Timesheet hours updated successfully' }, event);
+			return { success: true, timesheet: updatedTimesheet };
+		} catch (error) {
+			console.error('Error updating timesheet:', error);
+			setFlash({ type: 'error', message: 'Error updating timesheet hours' }, event);
+			return { success: false };
+		}
 	}
 };
