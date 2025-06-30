@@ -23,7 +23,6 @@ export async function authenticateUser(event: Request) {
 
 	const token = authHeader.split(' ')[1];
 
-	console.log(token);
 	if (!token) {
 		throw error(401, 'No token provided');
 	}
