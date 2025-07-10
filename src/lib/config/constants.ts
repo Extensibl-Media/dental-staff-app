@@ -1,19 +1,19 @@
 // Comment out the next two lines to seed db
 
 import { dev } from '$app/environment';
-export const BASE_URL = dev ? 'http://localhost:3000' : 'https://dentalstaff.us';
+export const BASE_URL = dev ? 'http://localhost:3000' : 'https://business-portal.dentalstaff.us';
 
-export const APP_NAME = 'DentalStaff.us';
+export const APP_NAME = 'DentalStaff.US';
 export const CONTACT_EMAIL = 'brett@dentalstaff.us';
-export const DOMAIN = 'https://dentalstaff.us';
+export const DOMAIN = 'https://business-portal.dentalstaff.us';
 /* WARNING!!! TERMS AND CONDITIONS AND PRIVACY POLICY
 WERE CREATED BY CHATGPT AS AN EXAMPLE ONLY.
 CONSULT A LAWYER AND DEVELOP YOUR OWN TERMS AND PRIVACY POLICY!!! */
-export const TERMS_PRIVACY_CONTACT_EMAIL = 'info@dentalstaff.us';
-export const TERMS_PRIVACY_WEBSITE = 'dentalstaff.us';
+export const TERMS_PRIVACY_CONTACT_EMAIL = 'support@dentalstaff.us';
+export const TERMS_PRIVACY_WEBSITE = 'https://business-portal.dentalstaff.us';
 export const TERMS_PRIVACY_COMPANY = 'Dental Staff US';
 export const TERMS_PRIVACY_EFFECTIVE_DATE = 'January 1, 2023';
-export const TERMS_PRIVACY_APP_NAME = 'DentalStaff.us';
+export const TERMS_PRIVACY_APP_NAME = 'Dental Staff US';
 export const TERMS_PRIVACY_APP_PRICING_AND_SUBSCRIPTIONS =
 	'[Details about the pricing, subscription model, refund policy]';
 export const TERMS_PRIVACY_COUNTRY = 'United States';
