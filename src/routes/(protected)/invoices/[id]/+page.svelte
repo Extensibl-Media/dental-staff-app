@@ -22,12 +22,18 @@
 	import { USER_ROLES } from '$lib/config/constants';
 	import type { InvoiceWithRelations } from '$lib/server/database/schemas/requisition';
 	import type { PageData } from './$types';
+	import { enhance } from '$app/forms';
 
 	export let data: PageData;
 
 	$: user = data.user;
 	$: invoiceData = data.invoice as InvoiceWithRelations;
 	$: isAdmin = user?.role === USER_ROLES.SUPERADMIN;
+
+	$: console.log(user.role, 'isAdmin:', isAdmin);
+	$: isOverdue = invoiceData.invoice.dueDate
+		? new Date(invoiceData.invoice.dueDate) < new Date() && invoiceData.invoice.status !== 'paid'
+		: false;
 
 	// Helper functions
 	function formatCurrency(amount: number) {
@@ -130,14 +136,27 @@
 			</p>
 		</div>
 
-		<div class="flex items-center gap-2">
+		<div class="flex items-center gap-2 flex-wrap">
 			{#if !isAdmin && invoiceData.invoice.status === 'open'}
-				<Button size="sm" href={invoiceData.invoice.stripeHostedUrl} class="w-full justify-start">
+				<Button size="sm" href={invoiceData.invoice.stripeHostedUrl} class="w-full sm:w-fit">
 					<CreditCard class="h-4 w-4 mr-2" />
 					Pay Invoice
 				</Button>
 			{/if}
-			<Button href={invoiceData.invoice.stripePdfUrl} variant="outline" size="sm">
+			{#if isAdmin && isOverdue}
+				<form use:enhance action="?/adminProcessInvoice" method="POST">
+					<Button type="submit" size="sm" class="w-full sm:w-fit">
+						<CreditCard class="h-4 w-4 mr-2" />
+						Process Invoice
+					</Button>
+				</form>
+			{/if}
+			<Button
+				href={invoiceData.invoice.stripePdfUrl}
+				variant="outline"
+				size="sm"
+				class="w-full sm:w-fit"
+			>
 				<Download class="h-4 w-4 mr-2" />
 				Download PDF
 			</Button>

@@ -25,7 +25,7 @@ export const load = async (event: RequestEvent) => {
 
 	if (user?.role === USER_ROLES.SUPERADMIN) {
 		const requisitions = await getRequisitionsAdmin(searchTerm);
-		const form = superValidate(event, adminRequisitionSchema);
+		const form = await superValidate(event, adminRequisitionSchema);
 
 		return {
 			user: event.locals.user,

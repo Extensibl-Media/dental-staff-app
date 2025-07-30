@@ -145,9 +145,12 @@ export const adminRequisitionSchema = z.object({
 	clientId: z.string(),
 	locationId: z.string(),
 	disciplineId: z.string(),
+	hourlyRate: z.string(),
 	experienceLevelId: z.string().optional(),
 	jobDescription: z.string(),
-	specialInstructions: z.string().optional()
+	specialInstructions: z.string().optional(),
+	permanentPosition: z.boolean().default(false),
+	timezone: z.string()
 });
 
 export type AdminRequisitionSchema = typeof adminRequisitionSchema;

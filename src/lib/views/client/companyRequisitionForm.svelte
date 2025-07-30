@@ -92,7 +92,6 @@
 			$formObj.timezone = selectedLocation.timezone;
 		}
 	}
-	$: console.log('form data', $formObj);
 </script>
 
 <form

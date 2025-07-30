@@ -42,7 +42,8 @@
 		History,
 		Clipboard,
 		Undo2,
-		Trash2
+		Trash2,
+		Eye
 	} from 'lucide-svelte';
 	import { format, parseISO, addDays } from 'date-fns';
 	import { cn } from '$lib/utils';
@@ -212,9 +213,9 @@
 					<ArrowLeft class="h-4 w-4" />
 					Back to List
 				</Button>
-				<Button variant="outline" class="gap-1">
-					<RefreshCw class="h-4 w-4" />
-					Refresh Data
+				<Button href={`/requisitions/${data.requisition.id}`} variant="outline" class="gap-1">
+					<Eye class="h-4 w-4" />
+					View Requisition
 				</Button>
 			</div>
 		</div>
@@ -255,14 +256,14 @@
 								<p class="text-sm text-gray-600">Total Hours</p>
 								<p class="text-xl font-bold flex items-center justify-center gap-1">
 									{bulkEditMode ? editedTotalHours : data?.timesheet?.totalHoursWorked}
-									{#if !bulkEditMode}
+									<!-- {#if !bulkEditMode}
 										<button
 											class="text-gray-500 hover:text-gray-700"
 											title="Recalculate Total Hours"
 										>
 											<RefreshCw class="h-4 w-4" />
 										</button>
-									{/if}
+									{/if} -->
 								</p>
 							</div>
 							<div class="p-3 bg-gray-50 rounded-lg">

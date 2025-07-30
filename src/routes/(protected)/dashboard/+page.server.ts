@@ -12,6 +12,7 @@ import db from '$lib/server/database/drizzle';
 import { invoiceTable } from '$lib/server/database/schemas/requisition';
 import { count, and, eq, lt, ne, sum } from 'drizzle-orm';
 import { getAdminDashboardData } from '$lib/server/database/queries/admin';
+import { adminRequisitionSchema, clientRequisitionSchema } from '$lib/config/zod-schemas';
 
 export const load = async (event: RequestEvent) => {
 	event.setHeaders({
@@ -32,8 +33,10 @@ export const load = async (event: RequestEvent) => {
 			newCandidateProfiles,
 			newClientSignups,
 			invoicesDueCount,
-			invoicesDue
+			invoicesDue,
+			requisitions
 		} = await getAdminDashboardData();
+		const form = superValidate(event, adminRequisitionSchema);
 
 		// console.log(discrepancies)
 		return {
@@ -42,10 +45,13 @@ export const load = async (event: RequestEvent) => {
 			supportTickets,
 			openSupportTicketsCount,
 			discrepancies,
+			requisitions,
 			newCandidateProfiles,
 			newClientSignups,
 			invoicesDueCount,
-			invoicesDue
+			invoicesDue,
+			clientForm: null,
+			adminForm: form
 		};
 	}
 
@@ -92,7 +98,7 @@ export const load = async (event: RequestEvent) => {
 					ne(invoiceTable.status, 'void')
 				)
 			);
-
+		const form = await superValidate(event, clientRequisitionSchema);
 		return {
 			user,
 			profile: client,
@@ -107,7 +113,9 @@ export const load = async (event: RequestEvent) => {
 			invoices,
 			totalAmountDue: totalAmountDue[0]?.sum,
 			overdueInvoicesCount: overdueInvoicesCount[0]?.count,
-			pendingInvoicesCount: pendingInvoicesCount[0]?.count
+			pendingInvoicesCount: pendingInvoicesCount[0]?.count,
+			clientForm: form,
+			adminForm: null
 		};
 	}
 
@@ -156,7 +164,7 @@ export const load = async (event: RequestEvent) => {
 					ne(invoiceTable.status, 'void')
 				)
 			);
-
+		const form = await superValidate(event, clientRequisitionSchema);
 		return {
 			user,
 			profile,
@@ -171,9 +179,28 @@ export const load = async (event: RequestEvent) => {
 			invoices,
 			totalAmountDue: totalAmountDue[0]?.sum,
 			overdueInvoicesCount: overdueInvoicesCount[0]?.count,
-			pendingInvoicesCount: pendingInvoicesCount[0]?.count
+			pendingInvoicesCount: pendingInvoicesCount[0]?.count,
+			clientForm: form,
+			adminForm: null
 		};
 	}
 
-	return null;
+	return {
+		user,
+		profile: null,
+		client: null,
+		requisitions: [],
+		recentApplications: [],
+		supportTickets: [],
+		newApplicationsCount: 0,
+		timesheetsDue: [],
+		timesheetsDueCount: 0,
+		discrepanciesCount: 0,
+		invoices: [],
+		totalAmountDue: 0,
+		overdueInvoicesCount: 0,
+		pendingInvoicesCount: 0,
+		clientForm: null,
+		adminForm: null
+	};
 };

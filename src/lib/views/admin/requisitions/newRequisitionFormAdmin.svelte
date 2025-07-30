@@ -5,6 +5,10 @@
 
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import type { AdminRequisitionSchema } from '$lib/config/zod-schemas';
+	import { superForm } from 'sveltekit-superforms/client';
+	import { Label } from '$lib/components/ui/label';
+	import { Input } from '$lib/components/ui/input';
+	import { onDestroy } from 'svelte';
 
 	export let form: SuperValidated<AdminRequisitionSchema>;
 	export let schema: AdminRequisitionSchema;
@@ -14,6 +18,19 @@
 	let locations: any[] = [];
 	let disciplines: any[] = [];
 	let experienceLevels: any[] = [];
+	let selectedLocation = null;
+	let timezone = '';
+
+	const {
+		form: formObj,
+		enhance,
+		submitting,
+		reset,
+		isTainted
+	} = superForm(form, {
+		clearOnSubmit: 'errors-and-message',
+		resetForm: true
+	});
 
 	const handleFetchClients = async () => {
 		if (!clients.length) {
@@ -50,17 +67,52 @@
 			experienceLevels = experienceRes;
 		}
 	};
+
+	onDestroy(() => {
+		window.removeEventListener('beforeunload', handleBeforeUnload);
+	});
+
+	function handleReset() {
+		reset();
+	}
+
+	function handleDrawerClose() {
+		handleReset();
+		drawerExpanded = false;
+	}
+
+	function handleBeforeUnload(event: BeforeUnloadEvent) {
+		if (isTainted()) {
+			event.preventDefault();
+			event.returnValue = '';
+		}
+	}
+
+	$: if (!drawerExpanded) {
+		handleReset();
+	}
+
+	$: {
+		console.log({ selectedLocation, timezone });
+	}
+
+	// $: if ($formObj.locationId) {
+	// 	const selectedLocation = locations.find((location) => location.id === $formObj.locationId);
+	// 	if (selectedLocation) {
+	// 		$formObj.timezone = selectedLocation.timezone;
+	// 	}
+	// }
 </script>
 
 <Form.Root
+	{form}
+	{schema}
 	class="grow flex flex-col h-full max-h-[calc(100vh_-_70px)]"
 	let:submitting
 	let:errors
 	method="POST"
-	{form}
-	{schema}
-	let:config
 	action="/requisitions?/admin"
+	let:config
 >
 	<div class="grow p-4 overflow-y-auto">
 		<Form.Field {config} name="title">
@@ -108,7 +160,14 @@
 		<Form.Field {config} name="locationId">
 			<Form.Item>
 				<Form.Label>Location</Form.Label>
-				<Form.Select>
+				<Form.Select
+					onSelectedChange={(el) => {
+						selectedLocation = locations.find((location) => location.id === el?.value);
+						if (selectedLocation) {
+							timezone = selectedLocation.timezone;
+						}
+					}}
+				>
 					<Form.SelectTrigger tabindex={drawerExpanded ? 0 : -1} placeholder="Select Location"
 					></Form.SelectTrigger>
 					<Form.SelectContent class=" max-h-[170px] md:max-h-[300px] h-full overflow-y-auto">
@@ -198,17 +257,19 @@
 			</Form.Item>
 		</Form.Field>
 	</div>
+	<input name="timezone" type="hidden" bind:value={timezone} />
+
 	<div class="flex justify-end gap-4 p-4 border-t border-t-gray-200">
 		<Button
 			tabindex={drawerExpanded ? 0 : -1}
 			type="button"
-			on:click={() => (drawerExpanded = false)}
+			on:click={handleDrawerClose}
 			class="bg-white hover:bg-red-500 hover:text-white border border-red-500 text-red-500 rounded-md"
-			>Cancel</Button
 		>
+			Cancel
+		</Button>
 		<Button
 			tabindex={drawerExpanded ? 0 : -1}
-			disabled={submitting}
 			type="submit"
 			class="px-4 py-2 border border-green-400 bg-green-400 hover:bg-green-400 text-white rounded-md"
 			>{#if submitting}

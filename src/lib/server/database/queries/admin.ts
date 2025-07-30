@@ -250,6 +250,30 @@ export async function getSupportTicketsPreview(limit: number) {
 	return result;
 }
 
+export async function getRequisitionsPreviewAdmin(limit: number) {
+	const result = await db
+		.select({
+			requisition: { ...requisitionTable },
+			client: { ...clientProfileTable },
+			company: { ...clientCompanyTable },
+			user: {
+				id: userTable.id,
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				avatarUrl: userTable.avatarUrl,
+				email: userTable.email
+			}
+		})
+		.from(requisitionTable)
+		.leftJoin(clientCompanyTable, eq(requisitionTable.companyId, clientCompanyTable.id))
+		.leftJoin(clientProfileTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
+		.leftJoin(userTable, eq(clientProfileTable.userId, userTable.id))
+		.limit(limit)
+		.orderBy(desc(requisitionTable.createdAt));
+
+	return result;
+}
+
 export async function getDiscrepanciesForAdminDashboard() {
 	const timesheets = await db
 		.select({
@@ -405,7 +429,8 @@ export async function getAdminDashboardData() {
 		newCandidateProfilesPreview,
 		newClientSignups,
 		invoicesDueCount,
-		invoicesDue
+		invoicesDue,
+		requisitions
 	] = await Promise.all([
 		await getTimesheetsDueCount(),
 		await getSupportTicketsPreview(10),
@@ -414,7 +439,8 @@ export async function getAdminDashboardData() {
 		await getNewCandidateSignupsPreview(10),
 		await getNewClientSignupsPreview(10),
 		await getInvoicesDueCount(),
-		await getInvoicesDuePreview(10)
+		await getInvoicesDuePreview(10),
+		await getRequisitionsPreviewAdmin(10)
 	]);
 
 	return {
@@ -425,6 +451,7 @@ export async function getAdminDashboardData() {
 		newCandidateProfiles: newCandidateProfilesPreview,
 		newClientSignups,
 		invoicesDueCount,
-		invoicesDue
+		invoicesDue,
+		requisitions
 	};
 }

@@ -12,16 +12,20 @@
 		TrendingUp,
 		CheckCircle2,
 		Building,
-		DollarSign
+		DollarSign,
+		PlusIcon
 	} from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { formatCurrency, formatDate, formatTicketDate } from '$lib/_helpers';
 	import { Badge } from '$lib/components/ui/badge';
 	import { cn } from '$lib/utils';
 	import { format } from 'date-fns';
+	import AddRequisitionDrawer from '$lib/components/drawers/addRequisitionDrawer.svelte';
 
 	export let user;
 	export let data;
+	export let adminForm;
+	let drawerExpanded = false;
 
 	// Stats data from actual API response
 	$: timesheetsDueCount = data.timesheetsDueCount || 0;
@@ -35,13 +39,13 @@
 	$: newCandidateProfiles = data.newCandidateProfiles || [];
 	$: newClientSignups = data.newClientSignups || [];
 	$: invoicesDue = data.invoicesDue || [];
-
+	$: requisitions = data.requisitions || [];
 	$: console.log(discrepancies);
 	// Calculate the % change in timesheets due from previous period (placeholder - you'll need to implement actual trend calculation)
-	const timesheetsTrendPercent = 12; // This should be calculated based on historical data
-	const supportTicketsTrendPercent = -5;
-	const discrepanciesTrendPercent = 8;
-	const invoicesTrendPercent = 15;
+	// const timesheetsTrendPercent = 12; // This should be calculated based on historical data
+	// const supportTicketsTrendPercent = -5;
+	// const discrepanciesTrendPercent = 8;
+	// const invoicesTrendPercent = 15;
 
 	let activeTab = 'timesheets';
 
@@ -61,14 +65,14 @@
 	}
 
 	// Function to format trend value with + or - sign
-	function formatTrendValue(value) {
-		return value > 0 ? `+${value}%` : `${value}%`;
-	}
+	// function formatTrendValue(value) {
+	// 	return value > 0 ? `+${value}%` : `${value}%`;
+	// }
 
 	// Function to get trend color
-	function getTrendColorClass(value) {
-		return value > 0 ? 'text-green-500' : 'text-red-500';
-	}
+	// function getTrendColorClass(value) {
+	// 	return value > 0 ? 'text-green-500' : 'text-red-500';
+	// }
 
 	// Function to get discrepancy type badge color
 	function getDiscrepancyTypeColor(type) {
@@ -250,6 +254,76 @@
 		<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 			<!-- Left column - Tables section -->
 			<div class="lg:col-span-3 space-y-6">
+				<div class="col-span-12 lg:col-span-4">
+					<Card.Root>
+						<Card.Header class="flex flex-row justify-between items-center flex-wrap">
+							<Card.Title class="text-xl md:text-2xl">Recent Requisitions</Card.Title>
+							<Button
+								on:click={() => (drawerExpanded = true)}
+								size="sm"
+								class="bg-blue-900 hover:bg-blue-800"
+							>
+								<PlusIcon size={16} class="mr-1" /> New Requisition
+							</Button>
+						</Card.Header>
+						<Card.Content class="p-2 md:p-4">
+							<Table.Root>
+								<Table.Header>
+									<Table.Row>
+										<Table.Head>Title</Table.Head>
+										<Table.Head>Status</Table.Head>
+										<Table.Head class="text-right">Rate</Table.Head>
+									</Table.Row>
+								</Table.Header>
+								<Table.Body>
+									{#each requisitions.slice(0, 5) as req, i (req.requisition.id)}
+										<Table.Row
+											class="cursor-pointer"
+											on:click={() => goto(`/requisitions/${req.requisition.id}`)}
+										>
+											<Table.Cell>
+												<div class="flex flex-col">
+													<span class="font-medium truncate max-w-[150px]"
+														>{req.requisition.title}</span
+													>
+													<span class="text-xs text-gray-500">{req.company.companyName}</span>
+												</div>
+											</Table.Cell>
+											<Table.Cell>
+												<Badge
+													variant="secondary"
+													value={req.requisition.status}
+													class={cn(
+														req.requisition.status === 'PENDING' &&
+															'bg-yellow-300 hover:bg-yellow-400',
+														req.requisition.status === 'OPEN' && 'bg-blue-500 hover:bg-blue-600',
+														req.requisition.status === 'FILLED' &&
+															'bg-green-400 hover:bg-bg-green-500',
+														req.requisition.status === 'UNFULFILLED' &&
+															'bg-orange-400 hover:bg-orange-500',
+														req.requisition.status === 'CANCELED' && 'bg-red-500 hover:bg-red-600',
+														'text-white'
+													)}
+												/>
+											</Table.Cell>
+											<Table.Cell class="text-right"
+												>{formatCurrency(req.requisition.hourlyRate)}</Table.Cell
+											>
+										</Table.Row>
+									{/each}
+								</Table.Body>
+							</Table.Root>
+						</Card.Content>
+						<Card.Footer>
+							<div class="w-full flex justify-end">
+								<Button variant="outline" class="text-sm" href="/requisitions/">
+									View all Requisitions
+									<ArrowRight size={14} class="ml-1" />
+								</Button>
+							</div>
+						</Card.Footer>
+					</Card.Root>
+				</div>
 				<!-- Tab navigation -->
 				<div class="bg-white shadow-sm rounded-lg border border-gray-200 overflow-hidden">
 					<div class="flex border-b border-gray-200">
@@ -568,3 +642,4 @@
 		</div>
 	</div>
 </section>
+<AddRequisitionDrawer {user} bind:drawerExpanded {adminForm} />

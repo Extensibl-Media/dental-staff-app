@@ -12,7 +12,7 @@
 	import type { ClientCompanyLocationSelect } from '$lib/server/database/schemas/client';
 
 	export let adminForm: SuperValidated<AdminRequisitionSchema> | null = null;
-	export let clientForm: SuperValidated<ClientRequisitionSchema>;
+	export let clientForm: SuperValidated<ClientRequisitionSchema> | null = null;
 	export let user;
 	export let drawerExpanded: boolean;
 	export let location: ClientCompanyLocationSelect | null | undefined = null;
@@ -29,10 +29,10 @@
 		<p class="text-xl font-bold">Create New Requisition</p>
 	</div>
 	{#if drawerExpanded}
-		{#if user?.role === USER_ROLES.SUPERADMIN}
+		{#if user?.role === USER_ROLES.SUPERADMIN && adminForm}
 			<AdminRequisitionForm form={adminForm} schema={adminRequisitionSchema} bind:drawerExpanded />
 		{/if}
-		{#if user?.role === USER_ROLES.CLIENT || user?.role === USER_ROLES.CLIENT_STAFF}
+		{#if (user?.role === USER_ROLES.CLIENT && clientForm) || (user?.role === USER_ROLES.CLIENT_STAFF && clientForm)}
 			<CompanyRequisitionForm {location} form={clientForm} bind:drawerExpanded />
 		{/if}
 	{:else}

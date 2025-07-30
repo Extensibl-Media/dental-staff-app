@@ -619,6 +619,37 @@ export async function getStaffProfilesForLocation(locationId: string) {
 		.where(eq(clientStaffLocationTable.locationId, locationId));
 }
 
+export async function getPrimaryLocationForStaff(staffId: string) {
+	const [result] = await db
+		.select({
+			id: companyOfficeLocationTable.id,
+			name: companyOfficeLocationTable.name,
+			streetOne: companyOfficeLocationTable.streetOne,
+			streetTwo: companyOfficeLocationTable.streetTwo,
+			city: companyOfficeLocationTable.city,
+			state: companyOfficeLocationTable.state,
+			zipcode: companyOfficeLocationTable.zipcode,
+			isPrimary: clientStaffLocationTable.isPrimary
+		})
+		.from(clientStaffLocationTable)
+		.innerJoin(
+			companyOfficeLocationTable,
+			eq(clientStaffLocationTable.locationId, companyOfficeLocationTable.id)
+		)
+		.where(
+			and(
+				eq(clientStaffLocationTable.staffId, staffId),
+				eq(clientStaffLocationTable.isPrimary, true)
+			)
+		)
+		.limit(1);
+	if (!result) {
+		return null;
+	} else {
+		return result;
+	}
+}
+
 export async function getLocationsForStaffUser(staffId: string): Promise<StaffLocation[]> {
 	try {
 		const locations = await db

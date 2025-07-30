@@ -17,10 +17,16 @@
 	import { cn } from '$lib/utils';
 	import { format, parse } from 'date-fns';
 	import { USER_ROLES } from '$lib/config/constants';
+	import AddRequisitionDrawer from '$lib/components/drawers/addRequisitionDrawer.svelte';
+	import type { ClientRequisitionSchema } from '$lib/config/zod-schemas';
+	import type { SuperValidated } from 'sveltekit-superforms';
 
 	export let user;
 	export let data;
+	export let clientForm;
+	let drawerExpanded = false;
 
+	$: clientForm = data.clientForm as SuperValidated<ClientRequisitionSchema> | null;
 	$: console.log({ data });
 	$: requisitions = data.requisitions;
 	$: newApplicationsCount = data.newApplicationsCount;
@@ -34,8 +40,6 @@
 	$: overdueInvoicesCount = data.overdueInvoicesCount || 0;
 	$: pendingInvoicesCount = data.pendingInvoicesCount || 0;
 	$: totalAmountDue = parseInt(data.totalAmountDue || '0');
-
-	$: console.log(invoices);
 </script>
 
 <section class="grow grid grid-cols-1 lg:grid-cols-3">
@@ -145,9 +149,6 @@
 			<Card.Root>
 				<Card.Header class="flex flex-row justify-between items-center flex-wrap">
 					<Card.Title class="text-xl md:text-2xl">Recent Invoices</Card.Title>
-					<Button class="bg-blue-900 hover:bg-blue-800" href="/invoices/new">
-						<PlusIcon size={20} class="mr-2" /> New Invoice
-					</Button>
 				</Card.Header>
 				<Card.Content class="p-2 md:p-4">
 					<Table.Root>
@@ -237,11 +238,11 @@
 				<Card.Header class="flex flex-row justify-between items-center flex-wrap">
 					<Card.Title class="text-xl md:text-2xl">Recent Requisitions</Card.Title>
 					<Button
-						on:click={() => goto('/requisitions')}
+						on:click={() => (drawerExpanded = true)}
 						size="sm"
 						class="bg-blue-900 hover:bg-blue-800"
 					>
-						<PlusIcon size={16} class="mr-1" /> New
+						<PlusIcon size={16} class="mr-1" /> New Requisition
 					</Button>
 				</Card.Header>
 				<Card.Content class="p-2 md:p-4">
@@ -415,3 +416,6 @@
 		</div>
 	</div>
 </section>
+
+<!-- Add Requisition Drawer -->
+<AddRequisitionDrawer {user} bind:drawerExpanded {clientForm} />

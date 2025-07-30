@@ -61,7 +61,7 @@
 			DentalStaff.US
 		</p>
 	</div>
-	<ul class="flex flex-col gap-2 mt-8 grow overflow-y-auto">
+	<ul class="flex flex-col gap-2 mt-8 grow overflow-y-auto no-scrollbar">
 		{#if user?.role === USER_ROLES.SUPERADMIN}
 			<DashboardNavLink bind:expanded link={{ name: 'Dashboard', path: '/dashboard' }}>
 				<LayoutGrid class="shrink-0" />

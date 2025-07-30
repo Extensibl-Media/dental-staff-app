@@ -39,7 +39,6 @@
 	import AddRequisitionDrawer from '$lib/components/drawers/addRequisitionDrawer.svelte';
 
 	export let data: PageData;
-	export let adminForm: SuperValidated<AdminRequisitionSchema> | null = null;
 
 	type RequisitionData = {
 		id: string;
@@ -67,6 +66,7 @@
 	$: user = data.user;
 	$: requisitions = (data.requisitions as RequisitionData[]) || [];
 	$: clientForm = data.clientForm as SuperValidated<ClientRequisitionSchema>;
+	$: adminForm = data.adminForm as SuperValidated<AdminRequisitionSchema>;
 	$: isAdmin = user?.role === USER_ROLES.SUPERADMIN;
 
 	// Define columns for different user roles
@@ -220,12 +220,10 @@
 		</div>
 
 		<div class="flex items-center gap-3">
-			{#if !isAdmin}
-				<Button on:click={() => (drawerExpanded = true)}>
-					<Plus class="h-4 w-4 mr-2" />
-					New Requisition
-				</Button>
-			{/if}
+			<Button on:click={() => (drawerExpanded = true)} class="bg-blue-800 hover:bg-blue-900">
+				<Plus class="h-4 w-4 mr-2" />
+				New Requisition
+			</Button>
 		</div>
 	</div>
 
@@ -399,4 +397,4 @@
 </section>
 
 <!-- Add Requisition Drawer -->
-<AddRequisitionDrawer {user} bind:drawerExpanded {clientForm} adminForm={adminForm ?? null} />
+<AddRequisitionDrawer {user} bind:drawerExpanded {clientForm} {adminForm} />

@@ -4,7 +4,8 @@ import {
 	getAllClientStaffProfiles,
 	getCalendarEventsForClient,
 	getClientProfileById,
-	getClientSubscription
+	getClientSubscription,
+	getPrimaryLocationForStaff
 } from '$lib/server/database/queries/clients';
 import { redirect } from '@sveltejs/kit';
 import { USER_ROLES } from '$lib/config/constants';
@@ -73,6 +74,16 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const invoices = await getClientInvoices(id, { includeStripeData: true });
 	const invoiceForm = await superValidate(NewInvoiceSchema);
 
+	const staffWithPrimaryLocation = await Promise.all(
+		staff.map(async (member) => {
+			const primaryLocation = await getPrimaryLocationForStaff(member.profile.id);
+			return {
+				...member,
+				primaryLocation: primaryLocation ? primaryLocation : null
+			};
+		})
+	);
+
 	return result
 		? {
 				user,
@@ -84,7 +95,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 				},
 				requisitions,
 				supportTickets,
-				staff,
+				staff: staffWithPrimaryLocation,
 				invoices,
 				invoiceForm
 			}

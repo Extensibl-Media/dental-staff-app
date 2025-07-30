@@ -14,6 +14,7 @@ import { message, setError, superValidate } from 'sveltekit-superforms/server';
 import type { RequestEvent } from './$types';
 import { setFlash } from 'sveltekit-flash-message/server';
 import { CandidateStatusSchema } from '$lib/config/zod-schemas';
+import { getUserById, updateUser } from '$lib/server/database/queries/users';
 
 export const load: PageServerLoad = async (event) => {
 	const user = event.locals.user;
@@ -60,9 +61,9 @@ export const load: PageServerLoad = async (event) => {
 };
 
 export const actions = {
-	updatePersonalInformation: async ({ request, locals }) => {},
-	updateRateOfPay: async ({ request, locals }) => {},
-	updateLocationDetails: async ({ request, locals }) => {},
+	// updatePersonalInformation: async ({ request, locals }) => {},
+	// updateRateOfPay: async ({ request, locals }) => {},
+	// updateLocationDetails: async ({ request, locals }) => {},
 	updateStatus: async (event: RequestEvent) => {
 		const user = event.locals.user;
 		if (!user) {
@@ -77,11 +78,15 @@ export const actions = {
 		const { status } = form.data;
 
 		try {
+			const profile = await getCandidateProfileById(id);
+			const user = profile.candidate.user;
 			const newValues = {
 				updatedAt: new Date(),
 				status: status as 'ACTIVE' | 'INACTIVE' | 'PENDING',
 				approved: status === 'ACTIVE' ? true : false
 			};
+
+			await updateUser(user.id, { completedOnboarding: status === 'ACTIVE' ? true : false });
 
 			await updateCandidateProfile(id, newValues);
 			setFlash(

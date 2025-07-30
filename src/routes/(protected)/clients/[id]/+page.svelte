@@ -133,6 +133,16 @@
 			email: string;
 			avatarUrl: string;
 		};
+		primaryLocation: {
+			id: string;
+			name: string;
+			streetOne: string;
+			streetTwo: string;
+			city: string;
+			state: string;
+			zipcode: string;
+			isPrimary: boolean;
+		} | null;
 	};
 
 	type SupportTicket = {
@@ -393,6 +403,7 @@
 
 	// Sync items to form whenever items change
 	$: $invoiceForm.items = JSON.stringify(items);
+	$: console.log(selectedProfile);
 </script>
 
 {#if client}
@@ -1177,6 +1188,10 @@
 								{STAFF_ROLE_ENUM[selectedProfile.profile.staffRole]}
 							</p>
 						{/if}
+						<p>
+							<strong>Primary Location:</strong>
+							{selectedProfile.primaryLocation?.name || 'None Assigned'}
+						</p>
 						<p><strong>Birthday:</strong> {selectedProfile.profile.birthday || 'N/A'}</p>
 						<p>
 							<strong>Created At:</strong>
