@@ -79,9 +79,10 @@
 	let savingChanges = false;
 
 	// Format dates for display
-	const weekBeginDate = parseISO(
-		new Date(data?.timesheet?.weekBeginDate || (new Date() as Date)).toISOString()
-	);
+	const weekBeginDate = new Date(
+		data?.timesheet?.weekBeginDate || (new Date() as Date)
+	).toISOString();
+
 	const weekEndDate = addDays(weekBeginDate, 6);
 	const formattedWeekRange = `${format(weekBeginDate, 'MMM d')} - ${format(weekEndDate, 'MMM d, yyyy')}`;
 
@@ -724,34 +725,42 @@
 {:else}
 	<!-- Client view remains the same -->
 	<section class="container mx-auto px-4 py-6 space-y-6">
-		<div>
-			<div class="flex flex-wrap items-center gap-3">
-				<h1 class="text-2xl font-bold">Timesheet Review</h1>
-				<Badge
-					class={cn(
-						data?.timesheet?.status === 'PENDING' && 'bg-yellow-300 hover:bg-yellow-400',
-						data?.timesheet?.status === 'DISCREPANCY' && 'bg-orange-400 hover:bg-bg-orange-500',
-						data?.timesheet?.status === 'APPROVED' && 'bg-green-400 hover:bg-green-600',
-						data?.timesheet?.status === 'VOID' && 'bg-gray-200 hover:bg-gray-300',
-						data?.timesheet?.status === 'REJECTED' && 'bg-red-500 hover:bg-red-500'
-					)}
-					value={data?.timesheet?.status}
-				></Badge>
-
-				{#if hasDiscrepancies()}
+		<div class="flex flex-wrap justify-between">
+			<div>
+				<div class="flex flex-wrap items-center gap-3">
+					<h1 class="text-2xl font-bold">Timesheet Review</h1>
 					<Badge
-						variant="outline"
-						class="bg-amber-50 text-amber-800 border-amber-200 gap-1"
-						value={`${data.discrepancies?.length} Issue${data.discrepancies?.length > 1 ? 's' : ''}`}
-					>
-						<AlertTriangle class="h-3 w-3" />
-					</Badge>
-				{/if}
+						class={cn(
+							data?.timesheet?.status === 'PENDING' && 'bg-yellow-300 hover:bg-yellow-400',
+							data?.timesheet?.status === 'DISCREPANCY' && 'bg-orange-400 hover:bg-bg-orange-500',
+							data?.timesheet?.status === 'APPROVED' && 'bg-green-400 hover:bg-green-600',
+							data?.timesheet?.status === 'VOID' && 'bg-gray-200 hover:bg-gray-300',
+							data?.timesheet?.status === 'REJECTED' && 'bg-red-500 hover:bg-red-500'
+						)}
+						value={data?.timesheet?.status}
+					></Badge>
+
+					{#if hasDiscrepancies()}
+						<Badge
+							variant="outline"
+							class="bg-amber-50 text-amber-800 border-amber-200 gap-1"
+							value={`${data.discrepancies?.length} Issue${data.discrepancies?.length > 1 ? 's' : ''}`}
+						>
+							<AlertTriangle class="h-3 w-3" />
+						</Badge>
+					{/if}
+				</div>
+				<p class="text-gray-600 flex items-center mt-1">
+					<Calendar class="h-4 w-4 mr-1" />
+					Week of {formattedWeekRange}
+				</p>
 			</div>
-			<p class="text-gray-600 flex items-center mt-1">
-				<Calendar class="h-4 w-4 mr-1" />
-				Week of {formattedWeekRange}
-			</p>
+			<div class="flex gap-2">
+				<Button href={`/requisitions/${data.requisition.id}`} variant="outline" class="gap-1">
+					<Eye class="h-4 w-4" />
+					View Requisition
+				</Button>
+			</div>
 		</div>
 
 		<!-- Discrepancy Alert -->

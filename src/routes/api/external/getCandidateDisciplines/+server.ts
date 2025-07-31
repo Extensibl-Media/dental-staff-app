@@ -64,8 +64,6 @@ export const GET: RequestHandler = async ({ request }) => {
 				)
 			);
 
-		console.log({ disciplines });
-
 		return json({ success: true, disciplines }, { status: 200, headers: corsHeaders });
 	} catch (err) {
 		console.error('Error fetching documents:', err);

@@ -38,7 +38,6 @@ export const load = async (event: RequestEvent) => {
 		} = await getAdminDashboardData();
 		const form = superValidate(event, adminRequisitionSchema);
 
-		// console.log(discrepancies)
 		return {
 			user,
 			timesheetsDueCount,
