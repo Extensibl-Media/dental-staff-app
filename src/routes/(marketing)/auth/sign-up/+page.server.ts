@@ -18,6 +18,7 @@ import {
 import { getClientIdByCompanyId } from '$lib/server/database/queries/clients.js';
 import type { PageServerLoad, RequestEvent } from './$types';
 import { getUserTimezone } from '$lib/_helpers/UTCTimezoneUtils';
+import { USER_ROLES } from '$lib/config/constants';
 
 const signUpSchema = userSchema.pick({
 	firstName: true,
@@ -37,12 +38,6 @@ export const load: PageServerLoad = async (event) => {
 	const invite = Boolean(queryParams.get('invite'));
 
 	const form = await superValidate(event, signUpSchema);
-
-	console.log({ email, invite });
-
-	const staffInviteCookie = event.cookies.get('staff_invite');
-
-	console.log({ staffInviteCookie });
 
 	if (email && invite) {
 		form.data.email = email;
@@ -93,7 +88,7 @@ export const actions = {
 				firstName: form.data.firstName,
 				lastName: form.data.lastName,
 				password: password,
-				role: inviteData ? inviteData.invitedRole : 'CLIENT', // Use invite role if available
+				role: inviteData ? inviteData.invitedRole : USER_ROLES.CLIENT, // Use invite role if available
 				verified: inviteData ? true : false, // Auto-verify invited users since they came through an email link
 				receiveEmail: true,
 				token,
