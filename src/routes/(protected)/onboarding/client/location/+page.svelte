@@ -9,6 +9,18 @@
 	import { STATES } from '$lib/config/constants';
 
 	export let form: SuperValidated<CompanyLocationSchema>;
+
+	const companyLocationSchema = clientCompanyLocationSchema.pick({
+		name: true,
+		streetOne: true,
+		streetTwo: true,
+		city: true,
+		state: true,
+		zipcode: true,
+		phoneNumber: true,
+		phoneNumberType: true,
+		email: true
+	});
 </script>
 
 <section class="flex flex-col items-center justify-center min-h-screen">
@@ -19,7 +31,7 @@
 			let:errors
 			method="POST"
 			{form}
-			schema={clientCompanyLocationSchema}
+			schema={companyLocationSchema}
 			let:config
 		>
 			<Card.Root>

@@ -7,6 +7,10 @@
 	import type { SuperValidated } from 'sveltekit-superforms';
 
 	export let form: SuperValidated<ClientCompanySchema>;
+
+	const companySchema = clientCompanySchema.pick({
+		companyName: true
+	});
 </script>
 
 <section class="flex flex-col items-center justify-center min-h-screen">
@@ -17,8 +21,12 @@
 			let:errors
 			method="POST"
 			{form}
-			schema={clientCompanySchema}
+			schema={companySchema}
 			let:config
+			on:submit={(e) => {
+				console.log('Submit event triggered', e);
+				console.log('Form data:', e.detail);
+			}}
 		>
 			<Card.Root>
 				<Card.Header>

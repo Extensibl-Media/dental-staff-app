@@ -56,11 +56,14 @@
 	}
 
 	const handleAddInvite = (email: string) => {
-		const emailExpression = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/g;
+		console.log('Adding invite for email:', email);
+		const emailExpression = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 		const includes = $form.invitees.find((invite) => invite.email === email);
 		const isEmail = emailExpression.test(email);
 
 		if (!includes && isEmail && inviteRole) {
+			console.log('Adding invite for email:', email);
+			console.log('Invite added:', email, inviteRole);
 			$form.invitees = [
 				{
 					email,
@@ -70,6 +73,16 @@
 			];
 			inviteEmail = '';
 			inviteRole = '';
+		} else {
+			if (includes) {
+				console.log('Invite already exists for email:', email);
+			}
+			if (!isEmail) {
+				console.log('Invalid email format:', email);
+			}
+			if (!inviteRole) {
+				console.log('No role selected for email:', email);
+			}
 		}
 	};
 

@@ -51,7 +51,6 @@ export const load: PageServerLoad = async (event) => {
 export const actions = {
 	default: async (event: RequestEvent) => {
 		const form = await superValidate(event, signUpSchema);
-		console.log(form.data);
 
 		if (!form.valid) {
 			return fail(400, {
@@ -78,7 +77,14 @@ export const actions = {
 			}
 
 			// Verify the invite email matches the registration email
-			if (inviteData.email.toLowerCase() !== form.data.email.toLowerCase()) {
+			if (inviteData && inviteData?.email?.toLowerCase() !== form.data?.email?.toLowerCase()) {
+				setFlash(
+					{
+						type: 'error',
+						message: 'The email address does not match the invitation.'
+					},
+					event
+				);
 				return setError(form, 'email', 'Please use the email address from your invitation.');
 			}
 
@@ -104,6 +110,8 @@ export const actions = {
 				stripeCustomerId: null,
 				timezone: getUserTimezone()
 			};
+
+			console.log('user to be created:', user);
 
 			const newUser = await db.transaction(async (tx) => {
 				// First create the user
