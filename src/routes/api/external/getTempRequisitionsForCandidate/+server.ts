@@ -11,7 +11,8 @@ import {
 } from '$lib/server/database/schemas/requisition';
 import { authenticateUser } from '$lib/server/serverUtils';
 import { type RequestHandler, error, json } from '@sveltejs/kit';
-import { eq, and, inArray, notInArray, or, isNull, isNotNull } from 'drizzle-orm';
+import { eq, and, inArray, notInArray, or, isNull, isNotNull, sql } from 'drizzle-orm';
+import { METERS_PER_MILE, RADIUS_METERS, RADIUS_MILES } from '$lib/config/constants';
 
 export const GET: RequestHandler = async ({ request }) => {
 	const user = await authenticateUser(request);
@@ -28,19 +29,51 @@ export const GET: RequestHandler = async ({ request }) => {
 			throw error(404, 'Candidate profile not found');
 		}
 
-		const candidateRegionId = candidateProfile.regionId;
-
-		if (!candidateRegionId) {
-			throw error(400, 'Candidate region not set');
+		// Check if candidate has location coordinates
+		if (!candidateProfile.lat || !candidateProfile.lon) {
+			throw error(
+				400,
+				'Candidate location coordinates not found. Please update your profile with your address.'
+			);
 		}
 
-		// Fetch office locations in the candidate's region
-		const officeLocations = await db
-			.select({ id: companyOfficeLocationTable.id })
+		// Fetch office locations within the radius using PostGIS
+		const nearbyOfficeLocations = await db
+			.select({
+				id: companyOfficeLocationTable.id,
+				distanceMiles: sql<number>`ST_Distance(
+					geom::geography,
+					ST_SetSRID(ST_MakePoint(${candidateProfile.lon}::float, ${candidateProfile.lat}::float), 4326)::geography
+				) / ${METERS_PER_MILE}`
+			})
 			.from(companyOfficeLocationTable)
-			.where(eq(companyOfficeLocationTable.regionId, candidateRegionId));
+			.where(
+				and(
+					isNotNull(companyOfficeLocationTable.geom),
+					// Filter by distance using ST_DWithin for performance
+					sql`ST_DWithin(
+						geom::geography,
+						ST_SetSRID(ST_MakePoint(${candidateProfile.lon}::float, ${candidateProfile.lat}::float), 4326)::geography,
+						${RADIUS_METERS}
+					)`
+				)
+			);
 
-		const officeLocationIds = officeLocations.map((location) => location.id);
+		const officeLocationIds = nearbyOfficeLocations.map((location) => location.id);
+
+		if (officeLocationIds.length === 0) {
+			return json({
+				candidateLocation: {
+					lat: candidateProfile.lat,
+					lon: candidateProfile.lon,
+					address: candidateProfile.completeAddress
+				},
+				recurrenceDays: [],
+				searchRadius: RADIUS_MILES,
+				totalFound: 0,
+				message: 'No office locations found within 30 miles of your location.'
+			});
+		}
 
 		// First, fetch the dates this candidate already has accepted workdays for
 		// to avoid showing other opportunities on the same days
@@ -102,10 +135,18 @@ export const GET: RequestHandler = async ({ request }) => {
 				},
 				location: {
 					id: companyOfficeLocationTable.id,
+					completeAddress: companyOfficeLocationTable.completeAddress,
 					name: companyOfficeLocationTable.name,
 					city: companyOfficeLocationTable.city,
 					state: companyOfficeLocationTable.state,
-					zip: companyOfficeLocationTable.zipcode
+					zip: companyOfficeLocationTable.zipcode,
+					lat: companyOfficeLocationTable.lat,
+					lon: companyOfficeLocationTable.lon,
+					// Include distance to this specific location
+					distanceMiles: sql<number>`ST_Distance(
+						${companyOfficeLocationTable.geom}::geography,
+						ST_SetSRID(ST_MakePoint(${candidateProfile.lon}::float, ${candidateProfile.lat}::float), 4326)::geography
+					) / ${METERS_PER_MILE}`
 				},
 				// Only get workdays for this candidate
 				workday: {
@@ -146,9 +187,27 @@ export const GET: RequestHandler = async ({ request }) => {
 					// KEY CHANGE: We use the prepared condition that handles empty bookedDates
 					dateCondition
 				)
+			)
+			// Order by distance (closest first), then by date
+			.orderBy(
+				sql`ST_Distance(
+					${companyOfficeLocationTable.geom}::geography,
+					ST_SetSRID(ST_MakePoint(${candidateProfile.lon}::float, ${candidateProfile.lat}::float), 4326)::geography
+				)`,
+				recurrenceDayTable.date
 			);
 
-		return json(recurrenceDays);
+		return json({
+			candidateLocation: {
+				lat: candidateProfile.lat,
+				lon: candidateProfile.lon,
+				address: candidateProfile.completeAddress
+			},
+			recurrenceDays,
+			searchRadius: RADIUS_MILES,
+			totalFound: recurrenceDays.length,
+			nearbyOfficeCount: officeLocationIds.length
+		});
 	} catch (err) {
 		console.error('Error fetching recurrence days:', err);
 		throw error(500, 'Internal server error');

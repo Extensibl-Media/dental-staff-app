@@ -64,8 +64,11 @@ export type CompanyLocationRaw = {
 	cell_phone: string;
 	hours_of_operation: string;
 	email: string;
-	region_id: string;
+	lat: string;
+	lon: string;
+	timezone: string | null;
 	location_name: string;
+	complete_address: string;
 };
 
 export type LocationsResults = CompanyLocationRaw[];
@@ -102,8 +105,10 @@ export type StaffLocation = {
 	cellPhone: string | null;
 	operatingHours: OperatingHours | null;
 	email: string | null;
-	regionId: string | null;
 	isPrimary: boolean | null;
+	completeAddress: string | null;
+	lat: string | null;
+	lon: string | null;
 };
 
 export async function createClientProfile(values: ClientProfile) {
@@ -119,6 +124,7 @@ export async function createClientProfile(values: ClientProfile) {
 		return result[0];
 	}
 }
+
 export async function updateClientProfile(clientId: string, values: UpdateClientProfile) {
 	const result = await db
 		.update(clientProfileTable)
@@ -252,6 +258,7 @@ export async function getClientCompanyByClientId(clientId: string | undefined) {
 
 	return result;
 }
+
 export async function getClientCompanyById(companyId: string | null) {
 	if (!companyId) return error(400, 'Must provide company id');
 	const [result] = await db
@@ -331,6 +338,7 @@ export async function getAllClientStaffProfilesForLocation(
 
 	return results;
 }
+
 export async function getAllClientStaffProfiles(companyId: string, searchTerm?: string) {
 	const whereConditions: SQL[] = [eq(clientStaffProfileTable.companyId, companyId)];
 
@@ -386,38 +394,41 @@ export async function getPaginatedClientStaffProfiles(
 		const query = sql.empty();
 
 		query.append(sql`
-        SELECT
-            s.*,
-            u.first_name,
-            u.last_name,
-            u.email,
-            u.avatar_url,
-            l.location_name,
-            sl.is_primary_location,
-            c.company_name
-        FROM ${clientStaffProfileTable} AS s
-        INNER JOIN ${userTable} u ON s.user_id = u.id
-        INNER JOIN ${clientCompanyTable} c ON s.company_id = c.id
-        LEFT JOIN ${clientStaffLocationTable} sl ON s.id = sl.staff_id
-        LEFT JOIN ${companyOfficeLocationTable} l ON sl.location_id = l.id
-            AND (sl.is_primary_location = true OR sl.is_primary_location IS NULL)
-        WHERE s.company_id = ${companyId}
-    `);
+			SELECT s.*,
+						 u.first_name,
+						 u.last_name,
+						 u.email,
+						 u.avatar_url,
+						 l.location_name,
+						 sl.is_primary_location,
+						 c.company_name
+			FROM ${clientStaffProfileTable} AS s
+						 INNER JOIN ${userTable} u ON s.user_id = u.id
+						 INNER JOIN ${clientCompanyTable} c ON s.company_id = c.id
+						 LEFT JOIN ${clientStaffLocationTable} sl ON s.id = sl.staff_id
+						 LEFT JOIN ${companyOfficeLocationTable} l ON sl.location_id = l.id
+				AND (sl.is_primary_location = true OR sl.is_primary_location IS NULL)
+			WHERE s.company_id = ${companyId}
+		`);
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-                ORDER BY ${sql.raw(orderSelector)} ${sql.raw(orderBy.direction.toUpperCase())}
-            `);
+				ORDER BY
+				${sql.raw(orderSelector)}
+				${sql.raw(orderBy.direction.toUpperCase())}
+			`);
 		} else {
 			query.append(sql`
-                ORDER BY s.created_at DESC
-            `);
+				ORDER BY s.created_at DESC
+			`);
 		}
 
 		query.append(sql`
-            LIMIT ${limit}
-            OFFSET ${offset}
-        `);
+			LIMIT
+			${limit}
+            OFFSET
+			${offset}
+		`);
 
 		const results = await db.execute(query);
 
@@ -502,30 +513,34 @@ export async function getPaginatedLocationsByCompanyId(
 		const query = sql.empty();
 
 		query.append(sql`
-		SELECT
-			l.*
-		FROM ${companyOfficeLocationTable} AS l
-		WHERE l.company_id = ${companyId}
-     `);
+			SELECT l.*
+			FROM ${companyOfficeLocationTable} AS l
+			WHERE l.company_id = ${companyId}
+		`);
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-		   ORDER BY ${
+				ORDER BY
+				${
 					orderBy.direction === 'asc'
-						? sql`${sql.raw(orderSelector)} ASC`
-						: sql`${sql.raw(orderSelector)} DESC`
+						? sql`${sql.raw(orderSelector)}
+						ASC`
+						: sql`${sql.raw(orderSelector)}
+						DESC`
 				}
-		 `);
+			`);
 		} else {
 			query.append(sql`
-		   ORDER BY l.created_at DESC
-		 `);
+				ORDER BY l.created_at DESC
+			`);
 		}
 
 		query.append(sql`
-       LIMIT ${limit}
-       OFFSET ${offset}
-     `);
+			LIMIT
+			${limit}
+       OFFSET
+			${offset}
+		`);
 
 		const results = await db.execute(query);
 
@@ -665,8 +680,10 @@ export async function getLocationsForStaffUser(staffId: string): Promise<StaffLo
 				cellPhone: companyOfficeLocationTable.cellPhone,
 				operatingHours: companyOfficeLocationTable.operatingHours,
 				email: companyOfficeLocationTable.email,
-				regionId: companyOfficeLocationTable.regionId,
-				isPrimary: clientStaffLocationTable.isPrimary
+				isPrimary: clientStaffLocationTable.isPrimary,
+				completeAddress: companyOfficeLocationTable.completeAddress,
+				lat: companyOfficeLocationTable.lat,
+				lon: companyOfficeLocationTable.lon
 			})
 			.from(clientStaffLocationTable)
 			.innerJoin(

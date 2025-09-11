@@ -52,7 +52,6 @@ import {
 	type Discipline,
 	type ExperienceLevel
 } from '../schemas/skill';
-import { regionTable, subRegionTable } from '../schemas/region';
 import {
 	candidateProfileTable,
 	candidateDisciplineExperienceTable,
@@ -62,7 +61,6 @@ import {
 } from '../schemas/candidate';
 import { error } from '@sveltejs/kit';
 import { writeActionHistory } from './admin';
-import type { PaginateOptions } from '$lib/types';
 import { normalizeDate } from '$lib/_helpers';
 import type Stripe from 'stripe';
 import { calculateMaxHours, toUTCDateString } from '$lib/_helpers/UTCTimezoneUtils';
@@ -138,9 +136,6 @@ export type RequisitionDetailsRaw = {
 	last_name: string;
 	email: string;
 	discipline_name: string;
-	region_name: string;
-	region_abbreviation: string;
-	subregion: string | null;
 	permanent_position: boolean;
 };
 export type RequisitionResults = RequisitionDetailsRaw[];
@@ -193,14 +188,7 @@ export async function getRequisitionsForClient(companyId: string, searchTerm?: s
 				email: userTable.email,
 
 				// Discipline fields
-				disciplineName: disciplineTable.name,
-
-				// Region fields
-				regionName: regionTable.name,
-				regionAbbreviation: regionTable.abbreviation,
-
-				// Subregion fields
-				subregionName: subRegionTable.name
+				disciplineName: disciplineTable.name
 			})
 			.from(requisitionTable)
 			.innerJoin(
@@ -214,8 +202,6 @@ export async function getRequisitionsForClient(companyId: string, searchTerm?: s
 			.innerJoin(clientProfileTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
 			.innerJoin(userTable, eq(clientProfileTable.userId, userTable.id))
 			.innerJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id))
-			.innerJoin(regionTable, eq(companyOfficeLocationTable.regionId, regionTable.id))
-			.leftJoin(subRegionTable, eq(subRegionTable.regionId, regionTable.id))
 			.where(
 				and(
 					eq(requisitionTable.companyId, companyId),
@@ -225,8 +211,6 @@ export async function getRequisitionsForClient(companyId: string, searchTerm?: s
 						searchTerm ? ilike(userTable.firstName, `%${searchTerm}%`) : undefined,
 						searchTerm ? ilike(userTable.lastName, `%${searchTerm}%`) : undefined,
 						searchTerm ? ilike(disciplineTable.name, `%${searchTerm}%`) : undefined,
-						searchTerm ? ilike(regionTable.name, `%${searchTerm}%`) : undefined,
-						searchTerm ? ilike(subRegionTable.name, `%${searchTerm}%`) : undefined,
 						searchTerm ? ilike(companyOfficeLocationTable.name, `%${searchTerm}%`) : undefined,
 						searchTerm ? ilike(clientCompanyTable.companyName, `%${searchTerm}%`) : undefined,
 						searchTerm ? ilike(companyOfficeLocationTable.city, `%${searchTerm}%`) : undefined,
@@ -274,14 +258,7 @@ export async function getRequisitionsAdmin(searchTerm?: string) {
 				email: userTable.email,
 
 				// Discipline fields
-				disciplineName: disciplineTable.name,
-
-				// Region fields
-				regionName: regionTable.name,
-				regionAbbreviation: regionTable.abbreviation,
-
-				// Subregion fields
-				subregionName: subRegionTable.name
+				disciplineName: disciplineTable.name
 			})
 			.from(requisitionTable)
 			.innerJoin(
@@ -295,8 +272,6 @@ export async function getRequisitionsAdmin(searchTerm?: string) {
 			.innerJoin(clientProfileTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
 			.innerJoin(userTable, eq(clientProfileTable.userId, userTable.id))
 			.innerJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id))
-			.innerJoin(regionTable, eq(companyOfficeLocationTable.regionId, regionTable.id))
-			.leftJoin(subRegionTable, eq(subRegionTable.regionId, regionTable.id))
 			.where(
 				and(
 					eq(requisitionTable.archived, false),
@@ -305,8 +280,6 @@ export async function getRequisitionsAdmin(searchTerm?: string) {
 						searchTerm ? ilike(userTable.firstName, `%${searchTerm}%`) : undefined,
 						searchTerm ? ilike(userTable.lastName, `%${searchTerm}%`) : undefined,
 						searchTerm ? ilike(disciplineTable.name, `%${searchTerm}%`) : undefined,
-						searchTerm ? ilike(regionTable.name, `%${searchTerm}%`) : undefined,
-						searchTerm ? ilike(subRegionTable.name, `%${searchTerm}%`) : undefined,
 						searchTerm ? ilike(companyOfficeLocationTable.name, `%${searchTerm}%`) : undefined,
 						searchTerm ? ilike(clientCompanyTable.companyName, `%${searchTerm}%`) : undefined,
 						searchTerm ? ilike(companyOfficeLocationTable.city, `%${searchTerm}%`) : undefined,
@@ -632,6 +605,7 @@ export async function createNewRecurrenceDay(values: RecurrenceDay, userId: stri
 		return error(500, 'Error creating recurrence day');
 	}
 }
+
 export async function editRecurrenceDay(id: string, values: UpdateRecurrenceDay, userId: string) {
 	try {
 		const [existing] = await db
@@ -916,6 +890,7 @@ export async function approveApplication(applicationId: string, userId: string) 
 		throw error(500, `${err}`);
 	}
 }
+
 export async function denyApplication(applicationId: string, userId: string) {
 	try {
 		const [application] = await db
@@ -1107,6 +1082,7 @@ export async function getAllTimesheetsForClient(clientId: string | undefined, se
 		return error(500, 'Error feching timesheets');
 	}
 }
+
 export async function getTimesheetsDueCount(clientId: string) {
 	try {
 		const [result] = await db
@@ -1262,8 +1238,12 @@ export async function getRecurrenceDaysForTimesheet(timesheet: any): Promise<Rec
 		.where(
 			and(
 				eq(recurrenceDayTable.requisitionId, timesheet.requisitionId),
-				sql`${recurrenceDayTable.date} >= ${startDateString}`,
-				sql`${recurrenceDayTable.date} <= ${endDateString}`
+				sql`${recurrenceDayTable.date}
+				>=
+				${startDateString}`,
+				sql`${recurrenceDayTable.date}
+				<=
+				${endDateString}`
 			)
 		);
 }
@@ -1363,6 +1343,7 @@ export async function closeAllUpcomingRecurrenceDays(
 		throw error(500, `Error closing recurrence days: ${err}`);
 	}
 }
+
 export async function getTimesheetDetails(timesheetId: string, clientId: string | undefined) {
 	if (!clientId) throw error(400, 'Client ID required');
 	const [timesheet] = await db
@@ -1775,8 +1756,18 @@ export async function getClientInvoices(
 			or(
 				ilike(invoiceTable.invoiceNumber, `%${options.searchTerm}%`),
 				ilike(requisitionTable.title, `%${options.searchTerm}%`),
-				ilike(sql`candidate_user.first_name`, `%${options.searchTerm}%`),
-				ilike(sql`candidate_user.last_name`, `%${options.searchTerm}%`),
+				ilike(
+					sql`candidate_user
+				.
+				first_name`,
+					`%${options.searchTerm}%`
+				),
+				ilike(
+					sql`candidate_user
+				.
+				last_name`,
+					`%${options.searchTerm}%`
+				),
 				ilike(clientCompanyTable.companyName, `%${options.searchTerm}%`)
 			)
 		);
@@ -1787,34 +1778,57 @@ export async function getClientInvoices(
 			invoice: invoiceTable,
 			candidateProfile: candidateProfileTable,
 			candidateUser: {
-				id: sql<string>`candidate_user.id`,
-				firstName: sql<string>`candidate_user.first_name`,
-				lastName: sql<string>`candidate_user.last_name`,
-				avatarUrl: sql<string>`candidate_user.avatar_url`
+				id: sql<string>`candidate_user
+				.
+				id`,
+				firstName: sql<string>`candidate_user
+				.
+				first_name`,
+				lastName: sql<string>`candidate_user
+				.
+				last_name`,
+				avatarUrl: sql<string>`candidate_user
+				.
+				avatar_url`
 			},
 			timesheet: timeSheetTable,
 			requisition: requisitionTable,
 			client: clientProfileTable,
 			clientCompany: clientCompanyTable,
 			clientUser: {
-				id: sql<string>`client_user.id`,
-				firstName: sql<string>`client_user.first_name`,
-				lastName: sql<string>`client_user.last_name`,
-				avatarUrl: sql<string>`client_user.avatar_url`
+				id: sql<string>`client_user
+				.
+				id`,
+				firstName: sql<string>`client_user
+				.
+				first_name`,
+				lastName: sql<string>`client_user
+				.
+				last_name`,
+				avatarUrl: sql<string>`client_user
+				.
+				avatar_url`
 			}
 		})
 		.from(invoiceTable)
 		.where(and(...whereConditions))
 		.leftJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
 		.leftJoin(
-			sql`${userTable} as candidate_user`,
-			sql`${candidateProfileTable.userId} = candidate_user.id`
+			sql`${userTable}
+			as candidate_user`,
+			sql`${candidateProfileTable.userId}
+			= candidate_user.id`
 		)
 		.leftJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
 		.leftJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
 		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
 		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
-		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
+		.innerJoin(
+			sql`${userTable}
+		as client_user`,
+			sql`${clientProfileTable.userId}
+		= client_user.id`
+		)
 		.orderBy(desc(invoiceTable.createdAt));
 
 	if (options?.limit) {
@@ -1853,8 +1867,18 @@ export async function getAllInvoicesAdmin(searchTerm?: string): Promise<InvoiceW
 				or(
 					ilike(invoiceTable.invoiceNumber, `%${searchTerm}%`),
 					ilike(requisitionTable.title, `%${searchTerm}%`),
-					ilike(sql`candidate_user.first_name`, `%${searchTerm}%`),
-					ilike(sql`candidate_user.last_name`, `%${searchTerm}%`),
+					ilike(
+						sql`candidate_user
+					.
+					first_name`,
+						`%${searchTerm}%`
+					),
+					ilike(
+						sql`candidate_user
+					.
+					last_name`,
+						`%${searchTerm}%`
+					),
 					ilike(clientCompanyTable.companyName, `%${searchTerm}%`)
 				)
 			);
@@ -1865,36 +1889,56 @@ export async function getAllInvoicesAdmin(searchTerm?: string): Promise<InvoiceW
 				invoice: invoiceTable,
 				candidateProfile: candidateProfileTable,
 				candidateUser: {
-					id: sql<string>`candidate_user.id`,
-					firstName: sql<string>`candidate_user.first_name`,
-					lastName: sql<string>`candidate_user.last_name`,
-					avatarUrl: sql<string>`candidate_user.avatar_url`
+					id: sql<string>`candidate_user
+					.
+					id`,
+					firstName: sql<string>`candidate_user
+					.
+					first_name`,
+					lastName: sql<string>`candidate_user
+					.
+					last_name`,
+					avatarUrl: sql<string>`candidate_user
+					.
+					avatar_url`
 				},
 				timesheet: timeSheetTable,
 				requisition: requisitionTable,
 				client: clientProfileTable,
 				clientCompany: clientCompanyTable,
 				clientUser: {
-					id: sql<string>`client_user.id`,
-					firstName: sql<string>`client_user.first_name`,
-					lastName: sql<string>`client_user.last_name`,
-					avatarUrl: sql<string>`client_user.avatar_url`
+					id: sql<string>`client_user
+					.
+					id`,
+					firstName: sql<string>`client_user
+					.
+					first_name`,
+					lastName: sql<string>`client_user
+					.
+					last_name`,
+					avatarUrl: sql<string>`client_user
+					.
+					avatar_url`
 				}
 			})
 			.from(invoiceTable)
 			.where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
 			.leftJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
 			.leftJoin(
-				sql`${userTable} as candidate_user`,
-				sql`${candidateProfileTable.userId} = candidate_user.id`
+				sql`${userTable}
+				as candidate_user`,
+				sql`${candidateProfileTable.userId}
+				= candidate_user.id`
 			)
 			.leftJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
 			.leftJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
 			.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
 			.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
 			.innerJoin(
-				sql`${userTable} as client_user`,
-				sql`${clientProfileTable.userId} = client_user.id`
+				sql`${userTable}
+				as client_user`,
+				sql`${clientProfileTable.userId}
+				= client_user.id`
 			)
 			.orderBy(desc(invoiceTable.createdAt))
 			.limit(DEFAULT_MAX_RECORD_LIMIT);
@@ -1945,34 +1989,57 @@ export async function getTimesheetInvoices(
 			invoice: invoiceTable,
 			candidateProfile: candidateProfileTable,
 			candidateUser: {
-				id: sql<string>`candidate_user.id`,
-				firstName: sql<string>`candidate_user.first_name`,
-				lastName: sql<string>`candidate_user.last_name`,
-				avatarUrl: sql<string>`candidate_user.avatar_url`
+				id: sql<string>`candidate_user
+				.
+				id`,
+				firstName: sql<string>`candidate_user
+				.
+				first_name`,
+				lastName: sql<string>`candidate_user
+				.
+				last_name`,
+				avatarUrl: sql<string>`candidate_user
+				.
+				avatar_url`
 			},
 			timesheet: timeSheetTable,
 			requisition: requisitionTable,
 			client: clientProfileTable,
 			clientCompany: clientCompanyTable,
 			clientUser: {
-				id: sql<string>`client_user.id`,
-				firstName: sql<string>`client_user.first_name`,
-				lastName: sql<string>`client_user.last_name`,
-				avatarUrl: sql<string>`client_user.avatar_url`
+				id: sql<string>`client_user
+				.
+				id`,
+				firstName: sql<string>`client_user
+				.
+				first_name`,
+				lastName: sql<string>`client_user
+				.
+				last_name`,
+				avatarUrl: sql<string>`client_user
+				.
+				avatar_url`
 			}
 		})
 		.from(invoiceTable)
 		.where(and(...whereConditions))
 		.innerJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
 		.innerJoin(
-			sql`${userTable} as candidate_user`,
-			sql`${candidateProfileTable.userId} = candidate_user.id`
+			sql`${userTable}
+			as candidate_user`,
+			sql`${candidateProfileTable.userId}
+			= candidate_user.id`
 		)
 		.innerJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
 		.innerJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
 		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
 		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
-		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
+		.innerJoin(
+			sql`${userTable}
+		as client_user`,
+			sql`${clientProfileTable.userId}
+		= client_user.id`
+		)
 		.orderBy(desc(invoiceTable.createdAt));
 
 	return results.map((row) => ({
@@ -2014,17 +2081,30 @@ export async function getManualInvoices(
 			client: clientProfileTable,
 			clientCompany: clientCompanyTable,
 			clientUser: {
-				id: sql<string>`client_user.id`,
-				firstName: sql<string>`client_user.first_name`,
-				lastName: sql<string>`client_user.last_name`,
-				avatarUrl: sql<string>`client_user.avatar_url`
+				id: sql<string>`client_user
+				.
+				id`,
+				firstName: sql<string>`client_user
+				.
+				first_name`,
+				lastName: sql<string>`client_user
+				.
+				last_name`,
+				avatarUrl: sql<string>`client_user
+				.
+				avatar_url`
 			}
 		})
 		.from(invoiceTable)
 		.where(and(...whereConditions))
 		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
 		.innerJoin(clientCompanyTable, eq(clientProfileTable.id, clientCompanyTable.clientId))
-		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
+		.innerJoin(
+			sql`${userTable}
+		as client_user`,
+			sql`${clientProfileTable.userId}
+		= client_user.id`
+		)
 		.orderBy(desc(invoiceTable.createdAt));
 
 	return results.map((row) => ({
@@ -2046,35 +2126,58 @@ export async function getInvoiceByIdAdmin(invoiceId: string): Promise<InvoiceWit
 			invoice: invoiceTable,
 			candidateProfile: candidateProfileTable,
 			candidateUser: {
-				id: sql<string>`candidate_user.id`,
-				firstName: sql<string>`candidate_user.first_name`,
-				lastName: sql<string>`candidate_user.last_name`,
-				avatarUrl: sql<string>`candidate_user.avatar_url`
+				id: sql<string>`candidate_user
+				.
+				id`,
+				firstName: sql<string>`candidate_user
+				.
+				first_name`,
+				lastName: sql<string>`candidate_user
+				.
+				last_name`,
+				avatarUrl: sql<string>`candidate_user
+				.
+				avatar_url`
 			},
 			timesheet: timeSheetTable,
 			requisition: requisitionTable,
 			client: clientProfileTable,
 			clientCompany: clientCompanyTable,
 			clientUser: {
-				id: sql<string>`client_user.id`,
-				firstName: sql<string>`client_user.first_name`,
-				lastName: sql<string>`client_user.last_name`,
-				avatarUrl: sql<string>`client_user.avatar_url`
+				id: sql<string>`client_user
+				.
+				id`,
+				firstName: sql<string>`client_user
+				.
+				first_name`,
+				lastName: sql<string>`client_user
+				.
+				last_name`,
+				avatarUrl: sql<string>`client_user
+				.
+				avatar_url`
 			}
 		})
 		.from(invoiceTable)
 		.where(eq(invoiceTable.id, invoiceId))
 		.leftJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
 		.leftJoin(
-			sql`${userTable} as candidate_user`,
-			sql`${candidateProfileTable.userId} = candidate_user.id`
+			sql`${userTable}
+			as candidate_user`,
+			sql`${candidateProfileTable.userId}
+			= candidate_user.id`
 		)
 		.leftJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
 		.leftJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
 		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
 		.innerJoin(clientCompanyTable, eq(clientProfileTable.id, clientCompanyTable.clientId))
 
-		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
+		.innerJoin(
+			sql`${userTable}
+		as client_user`,
+			sql`${clientProfileTable.userId}
+		= client_user.id`
+		)
 		.limit(1);
 
 	if (!result.length) {
@@ -2096,6 +2199,7 @@ export async function getInvoiceByIdAdmin(invoiceId: string): Promise<InvoiceWit
 		company: row.clientCompany
 	};
 }
+
 export async function getInvoiceById(
 	invoiceId: string,
 	clientId: string | undefined
@@ -2106,35 +2210,58 @@ export async function getInvoiceById(
 			invoice: invoiceTable,
 			candidateProfile: candidateProfileTable,
 			candidateUser: {
-				id: sql<string>`candidate_user.id`,
-				firstName: sql<string>`candidate_user.first_name`,
-				lastName: sql<string>`candidate_user.last_name`,
-				avatarUrl: sql<string>`candidate_user.avatar_url`
+				id: sql<string>`candidate_user
+				.
+				id`,
+				firstName: sql<string>`candidate_user
+				.
+				first_name`,
+				lastName: sql<string>`candidate_user
+				.
+				last_name`,
+				avatarUrl: sql<string>`candidate_user
+				.
+				avatar_url`
 			},
 			timesheet: timeSheetTable,
 			requisition: requisitionTable,
 			client: clientProfileTable,
 			clientCompany: clientCompanyTable,
 			clientUser: {
-				id: sql<string>`client_user.id`,
-				firstName: sql<string>`client_user.first_name`,
-				lastName: sql<string>`client_user.last_name`,
-				avatarUrl: sql<string>`client_user.avatar_url`
+				id: sql<string>`client_user
+				.
+				id`,
+				firstName: sql<string>`client_user
+				.
+				first_name`,
+				lastName: sql<string>`client_user
+				.
+				last_name`,
+				avatarUrl: sql<string>`client_user
+				.
+				avatar_url`
 			}
 		})
 		.from(invoiceTable)
 		.where(and(eq(invoiceTable.id, invoiceId), eq(invoiceTable.clientId, clientId)))
 		.leftJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
 		.leftJoin(
-			sql`${userTable} as candidate_user`,
-			sql`${candidateProfileTable.userId} = candidate_user.id`
+			sql`${userTable}
+			as candidate_user`,
+			sql`${candidateProfileTable.userId}
+			= candidate_user.id`
 		)
 		.leftJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
 		.leftJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
 		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
 		.innerJoin(clientCompanyTable, eq(clientProfileTable.id, clientCompanyTable.clientId))
 
-		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
+		.innerJoin(
+			sql`${userTable}
+		as client_user`,
+			sql`${clientProfileTable.userId}
+		= client_user.id`
+		)
 		.limit(1);
 
 	if (!result.length) {
@@ -2378,6 +2505,7 @@ export async function voidTimesheet(timesheetId: string, userId: string) {
 		throw error(500, `Error rejecting timesheet: ${error}`);
 	}
 }
+
 export async function rejectTimesheet(timesheetId: string, userId: string) {
 	try {
 		const [original] = await db
@@ -2731,6 +2859,7 @@ export function convertToStripeAmount(
 
 	return amountInCents;
 }
+
 export async function getCompanyByRequisitionIdAdmin(id: number) {
 	try {
 		const [result] = await db

@@ -60,8 +60,10 @@ export function normalizeDate(date: string | Date | null | undefined): string {
 	}
 }
 
+// AIzaSyAZhgbiPAhVE61G6O4xtzcsqpZq3mldJYc
+
 // Function to get the correct weekBeginDate regardless of timezone
-export function getConsistentWeekBeginDate(dateString) {
+export function getConsistentWeekBeginDate(dateString: Date | string) {
 	// Parse the ISO string but force it to be interpreted at local timezone midnight
 	const localDate = parseISO(`${dateString}T00:00:00`);
 
@@ -76,3 +78,11 @@ export const getDayName = (dayIndex: number): string => {
 	const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 	return days[dayIndex];
 };
+
+export function getMiles(meters: number) {
+	return meters * 0.000621371192;
+}
+
+export function getMeters(miles: number) {
+	return miles * 1609.344;
+}

@@ -13,14 +13,11 @@ import {
 	updateCompanyLocation
 } from '$lib/server/database/queries/clients';
 import { getRequsitionsForLocation } from '$lib/server/database/queries/requisitions';
-import { message, setError, superValidate } from 'sveltekit-superforms/server';
+import { setError, superValidate } from 'sveltekit-superforms/server';
 import { z } from 'zod';
 import { setFlash } from 'sveltekit-flash-message/server';
 import {
-	NewAddressSchema,
-	ContactSchema,
 	OperatingHoursSchema,
-	LocationSchema,
 	ClientLocationDetailsSchema,
 	clientRequisitionSchema
 } from '$lib/config/zod-schemas';
@@ -72,7 +69,10 @@ export const load: PageServerLoad = async (event) => {
 			state: location.state || '',
 			zipcode: location.zipcode || '',
 			companyPhone: location.companyPhone || '',
-			email: location.email || ''
+			email: location.email || '',
+			completeAddress: location.completeAddress || '',
+			lat: parseFloat(location.lat as string),
+			lon: parseFloat(location.lon as string)
 		};
 		operatingHoursForm.data = {
 			operatingHours: JSON.stringify(location.operatingHours || {})
@@ -100,6 +100,7 @@ export const load: PageServerLoad = async (event) => {
 		const requisitions = await getRequsitionsForLocation(location.id);
 		const locationStaff = await getClientStaffProfilebyClientId(client?.id);
 		const staff = await getAllClientStaffProfilesForLocation(company.id, location.id);
+
 		locationForm.data = {
 			name: location.name || '',
 			timezone: location.timezone || 'America/New_York',
@@ -109,7 +110,10 @@ export const load: PageServerLoad = async (event) => {
 			state: location.state || '',
 			zipcode: location.zipcode || '',
 			companyPhone: location.companyPhone || '',
-			email: location.email || ''
+			email: location.email || '',
+			completeAddress: location.completeAddress || '',
+			lat: parseFloat(location.lat as string),
+			lon: parseFloat(location.lon as string)
 		};
 		operatingHoursForm.data = {
 			operatingHours: JSON.stringify(location.operatingHours || {})
@@ -181,20 +185,18 @@ export const actions = {
 		}
 		const form = await superValidate(event, ClientLocationDetailsSchema);
 
+		console.log(form);
 		if (!form.valid) {
 			return fail(400, { form });
 		}
 		const { id } = event.params;
 
-		const { streetOne, streetTwo, city, state, zipcode, name, email, companyPhone, timezone } =
-			form.data;
+		const { completeAddress, lat, lon, name, email, companyPhone, timezone } = form.data;
 
 		const details = {
-			streetOne,
-			streetTwo: streetTwo || '',
-			city,
-			state,
-			zipcode,
+			completeAddress,
+			lat: lat?.toString(),
+			lon: lon?.toString(),
 			timezone,
 			companyPhone,
 			email,

@@ -9,7 +9,6 @@ import type {
 	companyOfficeLocationTable,
 	clientCompanyTable
 } from '../database/schemas/client';
-import type { regionTable } from '../database/schemas/region';
 import type {
 	requisitionTable,
 	requisitionApplicationTable
@@ -80,7 +79,6 @@ export type TableTypes = {
 	client_staff: typeof clientStaffProfileTable;
 	company_location: typeof companyOfficeLocationTable;
 	client_company: typeof clientCompanyTable;
-	region: typeof regionTable;
 
 	// Add any other tables you want to reference in notifications
 };

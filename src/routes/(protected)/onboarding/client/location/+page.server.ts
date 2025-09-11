@@ -9,15 +9,13 @@ import {
 	getClientProfilebyUserId,
 	getPrimaryLocationForCompany
 } from '$lib/server/database/queries/clients.js';
-import { getRegionByAbbreviation } from '$lib/server/database/queries/regions.js';
 
 const companyLocationSchema = clientCompanyLocationSchema.pick({
 	name: true,
-	streetOne: true,
-	streetTwo: true,
-	city: true,
-	state: true,
-	zipcode: true,
+	completeAddress: true,
+	lat: true,
+	lon: true,
+	timezone: true,
 	phoneNumber: true,
 	phoneNumberType: true,
 	email: true
@@ -26,21 +24,21 @@ const companyLocationSchema = clientCompanyLocationSchema.pick({
 export const load = async (event) => {
 	const form = await superValidate(event, companyLocationSchema);
 
-	const user = event.locals.user
+	const user = event.locals.user;
 
 	if (!user) {
-		redirect(302, '/auth/sign-in')
+		redirect(302, '/auth/sign-in');
 	}
 
-	const client = await getClientProfilebyUserId(user.id)
+	const client = await getClientProfilebyUserId(user.id);
 
-	const company = await getClientCompanyByClientId(client.id)
+	const company = await getClientCompanyByClientId(client.id);
 
-	if (!company) redirect(302, "/onboarding/client/company")
+	if (!company) redirect(302, '/onboarding/client/company');
 
-	const location = await getPrimaryLocationForCompany(company.id)
+	const location = await getPrimaryLocationForCompany(company.id);
 
-	if (location) redirect(302, '/onboarding/client/staff')
+	if (location) redirect(302, '/onboarding/client/staff');
 
 	return {
 		user,
@@ -62,20 +60,19 @@ export const actions = {
 			const locationId = await crypto.randomUUID();
 			const client = await getClientProfilebyUserId(event.locals.user!.id);
 			const company = await getClientCompanyByClientId(client.id);
-			const region = form.data.state ? await getRegionByAbbreviation(form.data.state) : null;
 			const newLocation = await createCompanyLocation({
 				id: locationId,
 				createdAt: new Date(),
 				updatedAt: new Date(),
 				companyId: company.id,
 				name: form.data.name,
-				streetOne: form.data.streetOne || null,
-				streetTwo: form.data.streetTwo || null,
-				city: form.data.city || null,
+				completeAddress: form.data.completeAddress,
+				lat: form.data.lat?.toString(),
+				lon: form.data.lon?.toString(),
+				timezone: form.data.timezone,
 				cellPhone: form.data.phoneNumberType === 'cell' ? form.data.phoneNumber : null,
 				companyPhone: form.data.phoneNumberType === 'office' ? form.data.phoneNumber : null,
-				email: form.data.email || null,
-				regionId: region?.id || null
+				email: form.data.email || null
 			});
 
 			if (newLocation) {

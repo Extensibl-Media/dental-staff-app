@@ -5,32 +5,7 @@ import db from '$lib/server/database/drizzle';
 import { newCandidateProfileSchema } from '$lib/config/zod-schemas';
 import { candidateProfileTable } from '$lib/server/database/schemas/candidate';
 import { eq } from 'drizzle-orm';
-import { regionTable } from '$lib/server/database/schemas/region';
-import { STATES } from '$lib/config/constants';
 import { updateUser } from '$lib/server/database/queries/users';
-
-async function updateRegionFromState(profileId: string, state: string) {
-	if (!state) return null;
-
-	const validRegionCode = STATES.find((stateObj) => stateObj.abbreviation === state)?.abbreviation;
-
-	if (!validRegionCode) return null;
-
-	const [regionData] = await db
-		.select()
-		.from(regionTable)
-		.where(eq(regionTable.abbreviation, validRegionCode));
-
-	if (!regionData) return null;
-
-	const [updatedProfile] = await db
-		.update(candidateProfileTable)
-		.set({ regionId: regionData.id })
-		.where(eq(candidateProfileTable.id, profileId))
-		.returning();
-
-	return updatedProfile;
-}
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': env.CANDIDATE_APP_DOMAIN,
@@ -92,10 +67,6 @@ export const POST: RequestHandler = async ({ request }) => {
 				.where(eq(candidateProfileTable.id, existingProfile.id))
 				.returning();
 
-			if (updatedProfile.state) {
-				await updateRegionFromState(updatedProfile.id, updatedProfile.state);
-				console.log('profile and region updated!');
-			}
 			console.log('profile updated!');
 
 			await updateUser(user.id, { onboardingStep: 2 });
@@ -129,10 +100,6 @@ export const POST: RequestHandler = async ({ request }) => {
 				{ success: false, message: 'Failed to create profile' },
 				{ status: 500, headers: corsHeaders }
 			);
-		}
-
-		if (newProfile.state) {
-			await updateRegionFromState(newProfile.id, newProfile.state);
 		}
 
 		await updateUser(user.id, { onboardingStep: 2 });

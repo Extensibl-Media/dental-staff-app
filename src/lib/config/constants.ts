@@ -4,7 +4,7 @@ import { dev } from '$app/environment';
 export const BASE_URL = dev ? 'http://localhost:3000' : 'https://business-portal.dentalstaff.us';
 
 export const APP_NAME = 'DentalStaff.US';
-export const CONTACT_EMAIL = 'brett@dentalstaff.us';
+export const CONTACT_EMAIL = 'support@dentalstaff.us';
 export const DOMAIN = 'https://business-portal.dentalstaff.us';
 /* WARNING!!! TERMS AND CONDITIONS AND PRIVACY POLICY
 WERE CREATED BY CHATGPT AS AN EXAMPLE ONLY.
@@ -294,3 +294,7 @@ export const STAFF_ROLE_ENUM = {
 	CLIENT_MANAGER: 'Manager',
 	CLIENT_EMPLOYEE: 'Employee'
 } as const;
+
+export const RADIUS_MILES = 30;
+export const METERS_PER_MILE = 1609.34;
+export const RADIUS_METERS = RADIUS_MILES * METERS_PER_MILE;

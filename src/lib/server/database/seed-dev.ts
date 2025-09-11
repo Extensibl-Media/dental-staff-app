@@ -5,7 +5,6 @@ import {
 	CLIENT_STAFF_ROLES,
 	DEV_SUPERADMIN_EMAIL,
 	DEV_SUPERADMIN_PASSWORD,
-	STATES,
 	USER_ROLES,
 	dentalStaffDisciplines,
 	experienceLevels,
@@ -24,7 +23,6 @@ import {
 	type ClientProfile
 } from './schemas/client';
 import { format } from 'date-fns';
-import { regionTable, type Region } from './schemas/region';
 import {
 	candidateDisciplineExperienceTable,
 	candidateProfileTable,
@@ -83,7 +81,8 @@ async function generateClientRecords(count: number) {
 			completedOnboarding: false,
 			onboardingStep: null,
 			blacklisted: false,
-			stripeCustomerId: null
+			stripeCustomerId: null,
+			timezone: null
 		});
 		clientRecords.push({
 			id: clientId,
@@ -104,26 +103,7 @@ async function generateClientRecords(count: number) {
 	return { clientRecords, companyRecords, userRecords };
 }
 
-async function generateRegionsRecords() {
-	const regions: Region[] = [];
-	for (const state of STATES) {
-		const id = crypto.randomUUID();
-
-		regions.push({
-			id,
-			createdAt: new Date(),
-			updatedAt: new Date(),
-			...state
-		});
-	}
-	return regions;
-}
-
-async function generateClientCompanyOfficesRecords(
-	count: number,
-	companyId: string,
-	regionId: string
-) {
+async function generateClientCompanyOfficesRecords(count: number, companyId: string) {
 	const records: ClientCompanyLocation[] = [];
 
 	for (let i = 0; i < count; i++) {
@@ -133,7 +113,6 @@ async function generateClientCompanyOfficesRecords(
 			companyId,
 			createdAt: new Date(),
 			updatedAt: new Date(),
-			regionId,
 			companyPhone: faker.phone.number(),
 			streetOne: faker.location.streetAddress(),
 			streetTwo: faker.location.secondaryAddress(),
@@ -175,7 +154,8 @@ async function generateStaffRecords(count: number, companyId: string, clientId: 
 			completedOnboarding: false,
 			onboardingStep: null,
 			blacklisted: false,
-			stripeCustomerId: null
+			stripeCustomerId: null,
+			timezone: null
 		});
 
 		staffRecords.push({
@@ -190,6 +170,7 @@ async function generateStaffRecords(count: number, companyId: string, clientId: 
 	}
 	return { userRecords, staffRecords };
 }
+
 async function generateCandidateRecords(count: number, regionId: string) {
 	const userRecords: User[] = [];
 	const candidateRecords: CandidateProfile[] = [];
@@ -217,7 +198,8 @@ async function generateCandidateRecords(count: number, regionId: string) {
 			completedOnboarding: false,
 			onboardingStep: null,
 			blacklisted: false,
-			stripeCustomerId: null
+			stripeCustomerId: null,
+			timezone: null
 		});
 
 		candidateRecords.push({
@@ -234,7 +216,6 @@ async function generateCandidateRecords(count: number, regionId: string) {
 			employeeNumber: faker.number.bigInt({ min: 999999999n }).toString(),
 			birthday: format(faker.date.birthdate({ min: 18, max: 50 }), 'P'),
 			cellPhone: faker.phone.number(),
-			regionId,
 			featureMe: faker.datatype.boolean()
 		});
 	}
@@ -272,19 +253,6 @@ async function generateExperienceRecords() {
 		});
 	}
 	return records;
-}
-
-async function generateCandidateExperience(
-	candidateId: string,
-	disciplineId: string,
-	experienceLevelId: string
-) {
-	return {
-		id: crypto.randomUUID(),
-		candidateId,
-		disciplineId,
-		experienceLevelId
-	};
 }
 
 async function generateSkillsRecords() {
@@ -352,7 +320,6 @@ async function seed() {
 
 		await db.delete(sessionTable);
 		await db.delete(companyOfficeLocationTable);
-		await db.delete(regionTable);
 		await db.delete(clientStaffLocationTable);
 		await db.delete(clientStaffProfileTable);
 		await db.delete(clientProfileTable);
@@ -388,7 +355,8 @@ async function seed() {
 				completedOnboarding: true,
 				onboardingStep: null,
 				blacklisted: false,
-				stripeCustomerId: null
+				stripeCustomerId: null,
+				timezone: null
 			},
 			{
 				id: crypto.randomUUID(),
@@ -408,7 +376,8 @@ async function seed() {
 				completedOnboarding: true,
 				onboardingStep: null,
 				blacklisted: false,
-				stripeCustomerId: null
+				stripeCustomerId: null,
+				timezone: null
 			},
 			{
 				id: crypto.randomUUID(),
@@ -428,7 +397,8 @@ async function seed() {
 				completedOnboarding: true,
 				onboardingStep: null,
 				blacklisted: false,
-				stripeCustomerId: null
+				stripeCustomerId: null,
+				timezone: null
 			},
 			{
 				id: crypto.randomUUID(),
@@ -448,7 +418,8 @@ async function seed() {
 				completedOnboarding: true,
 				onboardingStep: null,
 				blacklisted: false,
-				stripeCustomerId: null
+				stripeCustomerId: null,
+				timezone: null
 			}
 		];
 
@@ -463,10 +434,6 @@ async function seed() {
 		await db.insert(skillCategoryTable).values(categories).returning();
 		await db.insert(skillTable).values(skills).returning();
 		await db.insert(experienceLevelTable).values(experienceLevels).returning();
-
-		// Generate Regions for all 50 States
-		const regions = await generateRegionsRecords();
-		await db.insert(regionTable).values(regions).returning();
 
 		// Add Client Records
 		const newClientRecords = await generateClientRecords(20);
@@ -483,27 +450,6 @@ async function seed() {
 			const staff = await generateStaffRecords(5, company!.id, client.id);
 			await db.insert(userTable).values(staff.userRecords).returning();
 			await db.insert(clientStaffProfileTable).values(staff.staffRecords).returning();
-
-			for (const region of regions) {
-				const locations = await generateClientCompanyOfficesRecords(1, company!.id, region.id);
-				await db.insert(companyOfficeLocationTable).values(locations).returning();
-			}
-		}
-
-		// Add Candidate Records with some experience/discipline data
-		for (const region of regions) {
-			const candidates = await generateCandidateRecords(3, region.id);
-			await db.insert(userTable).values(candidates.userRecords).returning();
-			await db.insert(candidateProfileTable).values(candidates.candidateRecords).returning();
-
-			for (const candidate of candidates.candidateRecords) {
-				const candidateExperience = await generateCandidateExperience(
-					candidate.id,
-					disciplines[Math.floor(Math.random() * disciplines.length)].id,
-					experienceLevels[Math.floor(Math.random() * experienceLevels.length)].id
-				);
-				await db.insert(candidateDisciplineExperienceTable).values(candidateExperience);
-			}
 		}
 
 		console.timeEnd('DB has been seeded!');

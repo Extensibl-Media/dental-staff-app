@@ -2,7 +2,10 @@ import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { USER_ROLES } from '$lib/config/constants';
 import { superValidate } from 'sveltekit-superforms/server';
-import { clientCompanyLocationSchema } from '$lib/config/zod-schemas';
+import {
+	clientCompanyLocationSchema,
+	newClientCompanyLocationSchema
+} from '$lib/config/zod-schemas';
 import {
 	createCompanyLocation,
 	getClientCompanyByClientId,
@@ -10,7 +13,6 @@ import {
 	getClientProfilebyUserId,
 	getPaginatedLocationsByCompanyId
 } from '$lib/server/database/queries/clients';
-import { getRegionByAbbreviation } from '$lib/server/database/queries/regions';
 import { setFlash } from 'sveltekit-flash-message/server';
 import { redirectIfNotValidCustomer } from '$lib/server/database/queries/billing';
 
@@ -35,7 +37,7 @@ export const load: PageServerLoad = async (event) => {
 		await redirectIfNotValidCustomer(client.id, user.role);
 		const clientCompany = await getClientCompanyByClientId(client.id);
 
-		const locationForm = await superValidate(event, clientCompanyLocationSchema);
+		const locationForm = await superValidate(event, newClientCompanyLocationSchema);
 
 		const result = await getPaginatedLocationsByCompanyId(clientCompany.id, {
 			limit: 10,
@@ -80,12 +82,13 @@ export const load: PageServerLoad = async (event) => {
 
 export const actions = {
 	createLocation: async (event) => {
-		const form = await superValidate(event, clientCompanyLocationSchema);
+		const form = await superValidate(event, newClientCompanyLocationSchema);
 
 		if (!form.valid) {
 			return { form };
 		}
 
+		console.log({ form });
 		const user = event.locals.user;
 
 		if (!user) {
@@ -99,23 +102,24 @@ export const actions = {
 			if (!clientCompany) {
 				return { form };
 			}
-			const regionId = (await getRegionByAbbreviation(form.data.state!)).id;
 
 			const result = await createCompanyLocation({
 				id: crypto.randomUUID(),
 				createdAt: new Date(),
 				updatedAt: new Date(),
 				name: form.data.name,
-				streetOne: form.data.streetOne,
-				streetTwo: form.data.streetTwo,
 				companyPhone: form.data.companyPhone,
 				email: form.data.email || null,
-				city: form.data.city,
-				state: form.data.state,
-				zipcode: form.data.zipcode,
 				companyId: form.data.companyId,
-				regionId,
+				streetOne: form.data.streetOne || null,
+				streetTwo: form.data.streetTwo || null,
+				city: form.data.city || null,
+				state: form.data.state || null,
+				zipcode: form.data.zipcode || null,
 				timezone: form.data.timezone,
+				lat: form.data.lat.toString(),
+				lon: form.data.lon.toString(),
+				completeAddress: form.data.completeAddress,
 				operatingHours: {
 					0: {
 						openTime: '00:00',

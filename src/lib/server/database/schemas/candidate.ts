@@ -7,15 +7,20 @@ import {
 	pgEnum,
 	boolean,
 	primaryKey,
-	uuid
+	uuid,
+	decimal,
+	customType
 } from 'drizzle-orm/pg-core';
 import { userTable } from './auth';
 import { disciplineTable, experienceLevelTable } from './skill';
 import { clientCompanyTable } from './client';
-import { regionTable } from './region';
 
 export const candidateStatusEnum = pgEnum('candidate_status', ['INACTIVE', 'PENDING', 'ACTIVE']);
-
+const geometry = customType<{ data: string; notNull: false; default: false }>({
+	dataType() {
+		return 'geometry(POINT, 4326)';
+	}
+});
 export const candidateProfileTable = pgTable('candidate_profiles', {
 	id: text('id').notNull().primaryKey(),
 	userId: text('user_id')
@@ -45,9 +50,12 @@ export const candidateProfileTable = pgTable('candidate_profiles', {
 	citizenship: text('citizenship'),
 	birthday: date('birthday'),
 	avgRating: smallint('avg_rating').default(0),
-	regionId: text('region_id').references(() => regionTable.id, { onDelete: 'set null' }),
 	featureMe: boolean('feature_me').default(false),
-	approved: boolean('approved').default(false)
+	approved: boolean('approved').default(false),
+	completeAddress: text('complete_address'),
+	lat: decimal('lat'),
+	lon: decimal('lon'),
+	geom: geometry('geom')
 });
 
 export const candidateRatingTable = pgTable('candidate_ratings', {

@@ -5,9 +5,7 @@ import {
 } from '$lib/server/database/queries/clients';
 import { fail, redirect } from '@sveltejs/kit';
 import { setError, superValidate } from 'sveltekit-superforms/server';
-import { z } from 'zod';
 import type { PageServerLoad } from './$types';
-import { getAllRegions, getRegionById } from '$lib/server/database/queries/regions';
 import { setFlash } from 'sveltekit-flash-message/server';
 import {
 	ContactSchema,
@@ -27,21 +25,17 @@ export const load: PageServerLoad = async (event) => {
 	const { id, locationId } = event.params;
 
 	const client = await getClientProfileById(id);
-	const location = await getLocationByIdForCompany(locationId, client.company.id);
-	const region = await getRegionById(location.regionId);
-	const regions = await getAllRegions();
-
+	const location = await getLocationByIdForCompany(locationId, client?.company?.id);
+	console.log(location);
 	const addressForm = await superValidate(event, NewAddressSchema);
 	const contactForm = await superValidate(event, ContactSchema);
 	const operatingHoursForm = await superValidate(event, OperatingHoursSchema);
 	const locationForm = await superValidate(event, LocationSchema);
 
 	addressForm.data = {
-		streetOne: location.streetOne || '',
-		streetTwo: location.streetTwo || '',
-		city: location.city || '',
-		state: location.state || '',
-		zipcode: location.zipcode || ''
+		completeAddress: location.completeAddress || '',
+		lat: parseFloat(location.lat || '0'),
+		lon: parseFloat(location.lon || '0')
 	};
 
 	contactForm.data = {
@@ -54,20 +48,17 @@ export const load: PageServerLoad = async (event) => {
 	};
 
 	locationForm.data = {
-		timezone: location.timezone || 'America/New_York',
-		regionId: location.regionId || ''
+		timezone: location.timezone || 'America/New_York'
 	};
 
 	return {
 		user,
 		client,
 		location,
-		region,
 		addressForm,
 		contactForm,
 		operatingHoursForm,
-		locationForm,
-		regions
+		locationForm
 	};
 };
 
@@ -84,14 +75,11 @@ export const actions = {
 		}
 		const { locationId } = event.params;
 
-		const { streetOne, streetTwo, city, state, zipcode } = form.data;
-
+		const { completeAddress, lat, lon } = form.data;
 		const addressData = {
-			streetOne,
-			streetTwo: streetTwo || '',
-			city,
-			state,
-			zipcode
+			completeAddress,
+			lat: lat.toString() || null,
+			lon: lon.toString() || null
 		};
 
 		try {
@@ -217,12 +205,11 @@ export const actions = {
 			return fail(400, { form });
 		}
 		const { locationId } = event.params;
-		const { timezone, regionId } = form.data;
+		const { timezone } = form.data;
 
 		try {
 			await updateCompanyLocation(locationId, {
-				timezone,
-				regionId
+				timezone
 			});
 			setFlash(
 				{

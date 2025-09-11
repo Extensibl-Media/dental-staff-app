@@ -10,7 +10,8 @@ import {
 import { requisitionTable } from '$lib/server/database/schemas/requisition';
 import { authenticateUser } from '$lib/server/serverUtils';
 import { type RequestHandler, error, json } from '@sveltejs/kit';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, sql } from 'drizzle-orm';
+import { METERS_PER_MILE, RADIUS_METERS, RADIUS_MILES } from '$lib/config/constants';
 
 export const GET: RequestHandler = async ({ request }) => {
 	const user = await authenticateUser(request);
@@ -27,27 +28,67 @@ export const GET: RequestHandler = async ({ request }) => {
 			throw error(404, 'Candidate profile not found');
 		}
 
+		const candidate = candidateProfile[0];
+
+		// Check if candidate has location coordinates
+		if (!candidate.lat || !candidate.lon) {
+			throw error(
+				400,
+				'Candidate location coordinates not found. Please update your profile with your address.'
+			);
+		}
+
+		// Fetch candidate's disciplines
 		const candidateDisciplines = await db
 			.select()
 			.from(candidateDisciplineExperienceTable)
-			.where(eq(candidateDisciplineExperienceTable.candidateId, candidateProfile[0].id));
+			.where(eq(candidateDisciplineExperienceTable.candidateId, candidate.id));
 
-		const candidateRegionId = candidateProfile[0].regionId;
-
-		if (!candidateRegionId) {
-			throw error(400, 'Candidate region not set');
+		if (candidateDisciplines.length === 0) {
+			throw error(400, 'No discipline experience found. Please update your profile.');
 		}
 
-		// Fetch office locations in the candidate's region
-		const officeLocations = await db
-			.select({ id: companyOfficeLocationTable.id })
+		// Fetch office locations within the radius using PostGIS
+		const nearbyOfficeLocations = await db
+			.select({
+				id: companyOfficeLocationTable.id,
+				distanceMiles: sql<number>`ST_Distance(
+          geom::geography,
+          ST_SetSRID(ST_MakePoint(${candidate.lon}::float, ${candidate.lat}::float), 4326)::geography
+        ) / ${METERS_PER_MILE}`
+			})
 			.from(companyOfficeLocationTable)
-			.where(eq(companyOfficeLocationTable.regionId, candidateRegionId));
+			.where(
+				and(
+					isNotNull(companyOfficeLocationTable.geom),
+					// Filter by distance using ST_DWithin for performance
+					sql`ST_DWithin(
+            geom::geography,
+            ST_SetSRID(ST_MakePoint(${candidate.lon}::float, ${candidate.lat}::float), 4326)::geography,
+            ${RADIUS_METERS}
+          )`
+				)
+			);
 
-		const officeLocationIds = officeLocations.map((location) => location.id);
+		const nearbyOfficeLocationIds = nearbyOfficeLocations.map((location) => location.id);
 
-		// Fetch requisitions for the office locations in the candidate's region
-		const requisitions = await db
+		if (nearbyOfficeLocationIds.length === 0) {
+			return json({
+				candidateLocation: {
+					lat: candidate.lat,
+					lon: candidate.lon,
+					address: candidate.completeAddress
+				},
+				requisitions: [],
+				searchRadius: RADIUS_MILES,
+				totalFound: 0,
+				message: 'No office locations found within 30 miles of your location.'
+			});
+		}
+
+		// Fetch requisitions for nearby office locations
+		const requisitions = await // Order by distance (closest first)
+		db
 			.select({
 				id: requisitionTable.id,
 				title: requisitionTable.title,
@@ -62,7 +103,12 @@ export const GET: RequestHandler = async ({ request }) => {
 				},
 				location: {
 					...companyOfficeLocationTable
-				}
+				},
+				// Include distance to this specific location
+				distanceMiles: sql<number>`ST_Distance(
+          ${companyOfficeLocationTable.geom}::geography,
+          ST_SetSRID(ST_MakePoint(${candidate.lon}::float, ${candidate.lat}::float), 4326)::geography
+        ) / ${METERS_PER_MILE}`
 			})
 			.from(requisitionTable)
 			.innerJoin(clientCompanyTable, eq(requisitionTable.companyId, clientCompanyTable.id))
@@ -72,20 +118,32 @@ export const GET: RequestHandler = async ({ request }) => {
 			)
 			.where(
 				and(
-					inArray(requisitionTable.locationId, officeLocationIds),
+					inArray(requisitionTable.locationId, nearbyOfficeLocationIds),
 					eq(requisitionTable.status, 'OPEN'),
 					eq(requisitionTable.archived, false),
 					eq(requisitionTable.permanentPosition, true),
-
 					// Ensure the requisition's discipline matches one of the candidate's disciplines
 					inArray(
 						requisitionTable.disciplineId,
 						candidateDisciplines.map((d) => d.disciplineId)
 					)
 				)
-			);
+			).orderBy(sql`ST_Distance(
+        ${companyOfficeLocationTable.geom}::geography,
+        ST_SetSRID(ST_MakePoint(${candidate.lon}::float, ${candidate.lat}::float), 4326)::geography
+      )`);
 
-		return json(requisitions);
+		return json({
+			candidateLocation: {
+				lat: candidate.lat,
+				lon: candidate.lon,
+				address: candidate.completeAddress
+			},
+			requisitions,
+			searchRadius: RADIUS_MILES,
+			totalFound: requisitions.length,
+			nearbyOfficeCount: nearbyOfficeLocationIds.length
+		});
 	} catch (err) {
 		console.error('Error fetching requisitions:', err);
 		throw error(500, 'Internal server error');

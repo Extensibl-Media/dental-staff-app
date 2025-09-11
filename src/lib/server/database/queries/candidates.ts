@@ -10,8 +10,6 @@ import {
 } from '../schemas/candidate';
 import { disciplineTable, experienceLevelTable, type Discipline } from '../schemas/skill';
 import { DEFAULT_MAX_RECORD_LIMIT, type CANDIDATE_STATUS } from '$lib/config/constants';
-import { regionTable, subRegionTable, type Region, type Subregion } from '../schemas/region';
-import type { PaginateOptions } from '$lib/types';
 import { error } from '@sveltejs/kit';
 import {
 	recurrenceDayTable,
@@ -25,8 +23,6 @@ export type CandidateWithProfile = {
 	user: User;
 	profile: CandidateProfile;
 	discipline: Discipline;
-	region?: Region;
-	subRegion?: Subregion;
 };
 
 export type CandidateWithProfileRaw = {
@@ -57,7 +53,6 @@ export type CandidateWithProfileRaw = {
 	provider: string;
 	provider_id: string;
 	receive_email: boolean;
-	region_id: string | null;
 	role: string;
 	state: string | null;
 	token: string | null;
@@ -65,67 +60,10 @@ export type CandidateWithProfileRaw = {
 	user_id: string;
 	verified: boolean;
 	zipcode: string | null;
+	lat: string | null;
+	lon: string | null;
+	complete_address: string | null;
 };
-
-export type CandidatesResult = CandidateWithProfileRaw[];
-
-// export async function getPaginatedCandidateProfiles({
-// 	limit = 25,
-// 	offset = 0,
-// 	orderBy = undefined
-// }: PaginateOptions) {
-// 	try {
-// 		const userCols = ['email', 'first_name', 'last_name'];
-// 		const disciplineCols = ['discipline_name'];
-// 		const orderSelector = orderBy
-// 			? userCols.includes(orderBy.column)
-// 				? `u.${orderBy.column}`
-// 				: disciplineCols.includes(orderBy.column)
-// 					? `${orderBy.column}`
-// 					: `c.${orderBy.column}`
-// 			: null;
-
-// 		const query = sql.empty();
-
-// 		query.append(sql`
-//       SELECT c.*, u.first_name, u.last_name, u.email, d.name AS discipline_name, d.abbreviation AS discipline_abbreviation
-//       FROM ${candidateProfileTable} AS c
-//       INNER JOIN ${userTable} u ON c.user_id = u.id
-// 			INNER JOIN ${candidateDisciplineExperienceTable} cd ON c.id = cd.candidate_id
-//       INNER JOIN ${disciplineTable} d ON cd.discipline_id = d.id
-//     `);
-
-// 		if (orderSelector && orderBy) {
-// 			query.append(sql`
-//     ORDER BY ${
-// 			orderBy.direction === 'asc'
-// 				? sql`${sql.raw(orderSelector)} ASC`
-// 				: sql`${sql.raw(orderSelector)} DESC`
-// 		}
-//   `);
-// 		} else {
-// 			query.append(sql`
-//     ORDER BY c.created_at DESC
-//   `);
-// 		}
-
-// 		query.append(sql`
-//       LIMIT ${limit}
-//       OFFSET ${offset}
-//     `);
-
-// 		const countResult = await db.select({ value: count() }).from(candidateProfileTable);
-
-// 		const results = await db.execute(query);
-
-// 		return {
-// 			candidates: results.rows,
-// 			count: countResult[0].value
-// 		};
-// 	} catch (error) {
-// 		console.error(error);
-// 	}
-// }
 
 export async function getAllCandidateProfiles(searchTerm?: string) {
 	const countResult = await db.select({ value: count() }).from(candidateProfileTable);
@@ -202,15 +140,11 @@ export async function getCandidateProfileById(candidateId: string) {
 				lastName: userTable.lastName,
 				email: userTable.email,
 				avatarUrl: userTable.avatarUrl
-			},
-			region: { ...regionTable },
-			subRegion: { ...subRegionTable }
+			}
 		})
 		.from(candidateProfileTable)
 		.where(eq(candidateProfileTable.id, candidateId))
-		.innerJoin(userTable, eq(candidateProfileTable.userId, userTable.id))
-		.innerJoin(regionTable, eq(candidateProfileTable.regionId, regionTable.id))
-		.leftJoin(subRegionTable, eq(regionTable.id, subRegionTable.regionId));
+		.innerJoin(userTable, eq(candidateProfileTable.userId, userTable.id));
 
 	const disciplines = await db
 		.select({
@@ -256,9 +190,7 @@ export async function getCandidatesByStatus(status: keyof typeof CANDIDATE_STATU
 				email: userTable.email,
 				avatarUrl: userTable.avatarUrl
 			},
-			discipline: { ...disciplineTable },
-			region: { ...regionTable },
-			subRegion: { ...subRegionTable }
+			discipline: { ...disciplineTable }
 		})
 		.from(candidateProfileTable)
 		.where(eq(candidateProfileTable.status, status));
@@ -276,9 +208,7 @@ export async function getCandidateByEmail(email: string) {
 				email: userTable.email,
 				avatarUrl: userTable.avatarUrl
 			},
-			discipline: { ...disciplineTable },
-			region: { ...regionTable },
-			subRegion: { ...subRegionTable }
+			discipline: { ...disciplineTable }
 		})
 		.from(candidateProfileTable)
 		.where(eq(userTable.email, email));
@@ -287,8 +217,6 @@ export async function getCandidateByEmail(email: string) {
 
 	return result;
 }
-
-export function createCandidateProfile(userId: string, profile: CandidateProfile) {}
 
 export async function updateCandidateProfile(candidateId: string, data: UpdateCandidateProfile) {
 	const [result] = await db

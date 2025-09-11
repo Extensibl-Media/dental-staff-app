@@ -5,31 +5,7 @@ import db from '$lib/server/database/drizzle';
 import { newCandidateProfileSchema } from '$lib/config/zod-schemas';
 import { candidateProfileTable } from '$lib/server/database/schemas/candidate';
 import { eq } from 'drizzle-orm';
-import { regionTable } from '$lib/server/database/schemas/region';
 import { STATES } from '$lib/config/constants';
-
-async function updateRegionFromState(profileId: string, state: string) {
-	if (!state) return null;
-
-	const validRegionCode = STATES.find((stateObj) => stateObj.abbreviation === state)?.abbreviation;
-
-	if (!validRegionCode) return null;
-
-	const [regionData] = await db
-		.select()
-		.from(regionTable)
-		.where(eq(regionTable.abbreviation, validRegionCode));
-
-	if (!regionData) return null;
-
-	const [updatedProfile] = await db
-		.update(candidateProfileTable)
-		.set({ regionId: regionData.id })
-		.where(eq(candidateProfileTable.id, profileId))
-		.returning();
-
-	return updatedProfile;
-}
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': env.CANDIDATE_APP_DOMAIN,
@@ -61,8 +37,9 @@ export const POST: RequestHandler = async ({ request }) => {
 				{ status: 400, headers: corsHeaders }
 			);
 		}
-
+		console.log(body);
 		const parsedProfile = newCandidateProfileSchema.safeParse(body);
+		console.log(parsedProfile?.error);
 		if (!parsedProfile.success) {
 			return json(
 				{ success: false, message: 'Invalid profile', errors: parsedProfile.error.flatten() },
@@ -96,21 +73,6 @@ export const POST: RequestHandler = async ({ request }) => {
 			.where(eq(candidateProfileTable.id, existingProfile.id))
 			.returning();
 
-		if (updatedProfile.state) {
-			const updatedProfileData = await updateRegionFromState(
-				updatedProfile.id,
-				updatedProfile.state
-			);
-			console.log('profile and region updated!');
-			return json(
-				{
-					success: true,
-					message: 'Profile updated successfully',
-					profile: updatedProfileData || updatedProfile // Fall back to original if null
-				},
-				{ status: 200, headers: corsHeaders }
-			);
-		}
 		console.log('profile updated!');
 
 		return json(

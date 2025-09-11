@@ -1,4 +1,3 @@
-import { time } from 'drizzle-orm/mysql-core';
 import { z } from 'zod';
 
 export type Primitive = string | number | boolean | null;
@@ -104,9 +103,32 @@ export const clientCompanyLocationSchema = z.object({
 	email: z.string().optional(),
 	phoneNumber: z.string().optional(),
 	phoneNumberType: z.union([z.literal('cell'), z.literal('office')]).optional(),
-	timezone: z.string().optional()
+	timezone: z.string().optional(),
+	lat: z.number().optional(),
+	lon: z.number().optional(),
+	completeAddress: z.string().optional()
 });
 
+export const newClientCompanyLocationSchema = z.object({
+	companyId: z.string(),
+	name: z.string(),
+	companyPhone: z.string().optional(),
+	hoursOfOperation: z.string().optional(),
+	streetOne: z.string().optional(),
+	streetTwo: z.string().optional(),
+	city: z.string().optional(),
+	state: z.string().optional(),
+	zipcode: z.string().optional(),
+	email: z.string().optional(),
+	phoneNumber: z.string().optional(),
+	phoneNumberType: z.union([z.literal('cell'), z.literal('office')]).optional(),
+	timezone: z.string().optional(),
+	lat: z.number(),
+	lon: z.number(),
+	completeAddress: z.string()
+});
+
+export type NewClientCompanyLocationSchema = typeof newClientCompanyLocationSchema;
 export type CompanyLocationSchema = typeof clientCompanyLocationSchema;
 
 export const newDisciplineSchema = z.object({
@@ -236,15 +258,14 @@ export const newSupportTicketSchema = z.object({
 export type NewSupportTicketSchema = typeof newSupportTicketSchema;
 
 export const newCandidateProfileSchema = z.object({
-	address: z.string().optional(),
 	hourlyRateMin: z.number().optional(),
 	hourlyRateMax: z.number().optional(),
-	city: z.string().optional(),
-	state: z.string().optional(),
-	zipcode: z.string().optional(),
 	cellPhone: z.string().optional(),
 	citizenship: z.string().optional(),
 	birthday: z.string().optional(),
+	completeAddress: z.string().optional(),
+	lat: z.string().optional(),
+	lon: z.string().optional(),
 	regionId: z.string().optional()
 });
 export type NewCandidateProfileSchema = typeof newCandidateProfileSchema;
@@ -288,11 +309,14 @@ export const ApproveTimesheetSchema = z.object({
 });
 
 export const NewAddressSchema = z.object({
-	streetOne: z.string().min(1, 'Street address is required'),
+	completeAddress: z.string().min(1, 'Complete address is required'),
+	lat: z.number(),
+	lon: z.number(),
+	streetOne: z.string().optional(),
 	streetTwo: z.string().optional(),
-	city: z.string().min(1, 'City is required'),
-	state: z.string().min(1, 'State is required'),
-	zipcode: z.string().min(1, 'Zipcode is required')
+	city: z.string().optional(),
+	state: z.string().optional(),
+	zipcode: z.string().optional()
 });
 
 export const ContactSchema = z.object({
@@ -305,8 +329,7 @@ export const OperatingHoursSchema = z.object({
 });
 
 export const LocationSchema = z.object({
-	timezone: z.string().min(1, 'Timezone is required'),
-	regionId: z.string().min(1, 'Region ID is required')
+	timezone: z.string().min(1, 'Timezone is required')
 });
 
 export const ClientLocationDetailsSchema = NewAddressSchema.merge(ContactSchema).merge(

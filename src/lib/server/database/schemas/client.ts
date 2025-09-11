@@ -6,10 +6,11 @@ import {
 	pgEnum,
 	date,
 	smallint,
-	jsonb
+	jsonb,
+	decimal,
+	customType
 } from 'drizzle-orm/pg-core';
 import { userTable } from './auth';
-import { regionTable } from './region';
 import { candidateProfileTable } from './candidate';
 
 export type DaySchedule = {
@@ -136,6 +137,12 @@ export const clientCompanyTable = pgTable('client_companies', {
 		})
 });
 
+const geometry = customType<{ data: string; notNull: false; default: false }>({
+	dataType() {
+		return 'geometry(POINT, 4326)';
+	}
+});
+
 export const companyOfficeLocationTable = pgTable('company_office_locations', {
 	id: text('id').notNull().primaryKey(),
 	companyId: text('company_id')
@@ -208,8 +215,11 @@ export const companyOfficeLocationTable = pgTable('company_office_locations', {
 			}
 		}),
 	email: text('email'),
-	regionId: text('region_id').references(() => regionTable.id, { onDelete: 'set null' }),
-	timezone: text('timezone').notNull().default('America/New_York')
+	timezone: text('timezone').notNull().default('America/New_York'),
+	completeAddress: text('complete_address'),
+	lat: decimal('lat'),
+	lon: decimal('lon'),
+	geom: geometry('geom')
 });
 
 export const staffRoleEnum = pgEnum('staff_roles', [
