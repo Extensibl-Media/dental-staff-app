@@ -84,29 +84,34 @@ export async function getPaginatedAdminUsers({
 		const query = sql.empty();
 
 		query.append(sql`
-      SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.avatar_url
-      FROM ${userTable} AS u
-      WHERE u.role = 'SUPERADMIN'
-    `);
+			SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.avatar_url
+			FROM ${userTable} AS u
+			WHERE u.role = 'SUPERADMIN'
+		`);
 
 		if (orderSelector && orderBy) {
 			query.append(sql`
-    ORDER BY ${
-			orderBy.direction === 'asc'
-				? sql`${sql.raw(orderSelector)} ASC`
-				: sql`${sql.raw(orderSelector)} DESC`
-		}
-  `);
+				ORDER BY
+				${
+					orderBy.direction === 'asc'
+						? sql`${sql.raw(orderSelector)}
+						ASC`
+						: sql`${sql.raw(orderSelector)}
+						DESC`
+				}
+			`);
 		} else {
 			query.append(sql`
-    ORDER BY u.created_at DESC
-  `);
+				ORDER BY u.created_at DESC
+			`);
 		}
 
 		query.append(sql`
-      LIMIT ${limit}
-      OFFSET ${offset}
-    `);
+			LIMIT
+			${limit}
+      OFFSET
+			${offset}
+		`);
 
 		const countResult = await db
 			.select({ value: count() })
@@ -124,9 +129,32 @@ export async function getPaginatedAdminUsers({
 	}
 }
 
-export async function getAdminUserById(id: string) {}
+export async function getAdminUserById(id: string) {
+	const [result] = await db
+		.select({
+			id: userTable.id,
+			firstName: userTable.firstName,
+			lastName: userTable.lastName,
+			email: userTable.email,
+			avatarUrl: userTable.avatarUrl,
+			role: userTable.role
+		})
+		.from(userTable)
+		.where(and(eq(userTable.id, id), eq(userTable.role, USER_ROLES.SUPERADMIN)));
 
-export async function updateAdminUserProfile(id: string, values: UpdateUser) {}
+	return result;
+}
+
+export async function updateAdminUserProfile(id: string, values: UpdateUser) {
+	const [result] = await db
+		.update(userTable)
+		.set({
+			...values,
+			updatedAt: new Date()
+		})
+		.where(and(eq(userTable.id, id), eq(userTable.role, USER_ROLES.SUPERADMIN)))
+		.returning();
+}
 
 export async function deleteAdminUser(id: string) {}
 
@@ -371,33 +399,56 @@ export async function getInvoicesDuePreview(limit: number): Promise<InvoiceWithR
 			invoice: invoiceTable,
 			candidateProfile: candidateProfileTable,
 			candidateUser: {
-				id: sql<string>`candidate_user.id`,
-				firstName: sql<string>`candidate_user.first_name`,
-				lastName: sql<string>`candidate_user.last_name`,
-				avatarUrl: sql<string>`candidate_user.avatar_url`
+				id: sql<string>`candidate_user
+				.
+				id`,
+				firstName: sql<string>`candidate_user
+				.
+				first_name`,
+				lastName: sql<string>`candidate_user
+				.
+				last_name`,
+				avatarUrl: sql<string>`candidate_user
+				.
+				avatar_url`
 			},
 			timesheet: timeSheetTable,
 			requisition: requisitionTable,
 			client: clientProfileTable,
 			clientCompany: clientCompanyTable,
 			clientUser: {
-				id: sql<string>`client_user.id`,
-				firstName: sql<string>`client_user.first_name`,
-				lastName: sql<string>`client_user.last_name`,
-				avatarUrl: sql<string>`client_user.avatar_url`
+				id: sql<string>`client_user
+				.
+				id`,
+				firstName: sql<string>`client_user
+				.
+				first_name`,
+				lastName: sql<string>`client_user
+				.
+				last_name`,
+				avatarUrl: sql<string>`client_user
+				.
+				avatar_url`
 			}
 		})
 		.from(invoiceTable)
 		.leftJoin(candidateProfileTable, eq(invoiceTable.candidateId, candidateProfileTable.id))
 		.leftJoin(
-			sql`${userTable} as candidate_user`,
-			sql`${candidateProfileTable.userId} = candidate_user.id`
+			sql`${userTable}
+			as candidate_user`,
+			sql`${candidateProfileTable.userId}
+			= candidate_user.id`
 		)
 		.leftJoin(timeSheetTable, eq(invoiceTable.timesheetId, timeSheetTable.id))
 		.leftJoin(requisitionTable, eq(invoiceTable.requisitionId, requisitionTable.id))
 		.innerJoin(clientProfileTable, eq(invoiceTable.clientId, clientProfileTable.id))
 		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
-		.innerJoin(sql`${userTable} as client_user`, sql`${clientProfileTable.userId} = client_user.id`)
+		.innerJoin(
+			sql`${userTable}
+			as client_user`,
+			sql`${clientProfileTable.userId}
+			= client_user.id`
+		)
 		.orderBy(desc(invoiceTable.createdAt))
 		.where(and(lt(invoiceTable.dueDate, new Date()), eq(invoiceTable.status, 'open')))
 		.limit(limit);
