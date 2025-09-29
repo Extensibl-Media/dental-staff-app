@@ -10,7 +10,7 @@
     // $: user = data.user;
     $: profile = data.profile
 
-    const {form, submitting, errors, enhance} = superForm(data.updateAdminForm, {
+    const {form, submitting, enhance} = superForm(data.updateAdminForm, {
         onSubmit: () => {
             console.log("Submitting form...")
             editing = false
@@ -59,7 +59,6 @@
                 <Label for="email">Email</Label>
                 <Input bind:value={$form.email} id="email" name="email" type="email" class="bg-white max-w-lg"/>
             </div>
-
             <Button type="submit" class="bg-green-500 hover:bg-green-600 mt-4">
                 {#if $submitting}
                     Saving...

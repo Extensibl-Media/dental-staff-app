@@ -1,9 +1,15 @@
 import type { Message } from 'postcss';
 import { z } from 'zod';
 import type { Conversation, ConversationParticipant } from '../database/schemas/messages';
+
 export { InboxService } from './service';
 
-export type ConversationType = 'INTERNAL' | 'APPLICATION' | 'ADMIN_CLIENT' | 'ADMIN_CANDIDATE';
+export type ConversationType =
+	| 'INTERNAL'
+	| 'APPLICATION'
+	| 'ADMIN_CLIENT'
+	| 'ADMIN_CANDIDATE'
+	| 'CLIENT_CANDIDATE';
 
 export type ParticipantType = 'SUPERADMIN' | 'CLIENT' | 'CLIENT_STAFF' | 'CANDIDATE';
 // // Additional useful types

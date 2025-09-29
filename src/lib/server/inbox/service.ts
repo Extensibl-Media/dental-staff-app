@@ -27,6 +27,9 @@ export class InboxService {
 		applicationId?: string;
 		initialMessage?: string;
 	}) {
+		console.log(
+			`Creating conversation with data: ${JSON.stringify({ type, participants, applicationId })}`
+		);
 		const conversationId = crypto.randomUUID();
 
 		await db.transaction(async (tx) => {
@@ -515,7 +518,18 @@ export class InboxService {
 			.where(
 				and(
 					inArray(messageTable.conversationId, conversationIds),
-					gt(messageTable.id, sql`ANY(ARRAY[${latestMessageIds.join(',')}]::int[])`)
+					gt(
+						messageTable.id,
+						sql`ANY(ARRAY[
+					${latestMessageIds.join(',')}
+					]
+					:
+					:
+					int
+					[
+					]
+					)`
+					)
 				)
 			);
 		return result[0]?.count ?? 0;
@@ -575,7 +589,11 @@ export class InboxService {
 			endDate?: Date;
 		} = {}
 	) {
-		const conditions = [sql`${messageTable.body} ILIKE ${`%${query}%`}`];
+		const conditions = [
+			sql`${messageTable.body}
+		ILIKE
+		${`%${query}%`}`
+		];
 
 		// Get conversations the user is part of
 		const userConversations = await db
@@ -584,23 +602,33 @@ export class InboxService {
 			.where(eq(conversationParticipantsTable.userId, userId));
 
 		conditions.push(
-			sql`${messageTable.conversationId} IN ${userConversations.map((c) => c.conversationId)}`
+			sql`${messageTable.conversationId}
+			IN
+			${userConversations.map((c) => c.conversationId)}`
 		);
 
 		if (options.conversationType) {
-			conditions.push(sql`${conversationTable.type} = ${options.conversationType}`);
+			conditions.push(sql`${conversationTable.type}
+			=
+			${options.conversationType}`);
 		}
 
 		if (options.participantId) {
-			conditions.push(sql`${messageTable.senderId} = ${options.participantId}`);
+			conditions.push(sql`${messageTable.senderId}
+			=
+			${options.participantId}`);
 		}
 
 		if (options.startDate) {
-			conditions.push(sql`${messageTable.createdAt} >= ${options.startDate}`);
+			conditions.push(sql`${messageTable.createdAt}
+			>=
+			${options.startDate}`);
 		}
 
 		if (options.endDate) {
-			conditions.push(sql`${messageTable.createdAt} <= ${options.endDate}`);
+			conditions.push(sql`${messageTable.createdAt}
+			<=
+			${options.endDate}`);
 		}
 
 		return await db

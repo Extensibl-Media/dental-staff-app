@@ -10,9 +10,16 @@ import {
 	getClientProfilebyUserId
 } from '$lib/server/database/queries/clients.js';
 import type { RequestEvent } from './$types.js';
-import { asc } from 'drizzle-orm';
+import { asc, eq, or } from 'drizzle-orm';
 import { superValidate } from 'sveltekit-superforms/server';
 import { z } from 'zod';
+import {
+	recurrenceDayTable,
+	requisitionApplicationTable,
+	requisitionTable,
+	workdayTable
+} from '$lib/server/database/schemas/requisition';
+import { candidateProfileTable } from '$lib/server/database/schemas/candidate';
 
 export const load = async (event: RequestEvent) => {
 	const user = event.locals.user;
@@ -50,8 +57,32 @@ export const load = async (event: RequestEvent) => {
 		}
 		const client = await getClientProfilebyUserId(user.id);
 		const company = await getClientCompanyByClientId(client.id);
+		const companyUsers = await getUsersInCompany(company.id);
+		const professionalMemberUsers = await db
+			.selectDistinct({
+				id: userTable.id,
+				email: userTable.email,
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				avatarUrl: userTable.avatarUrl
+			})
+			.from(userTable)
+			.innerJoin(candidateProfileTable, eq(candidateProfileTable.userId, userTable.id))
+			.leftJoin(
+				requisitionApplicationTable,
+				eq(requisitionApplicationTable.candidateId, candidateProfileTable.id)
+			)
+			.leftJoin(workdayTable, eq(workdayTable.candidateId, candidateProfileTable.id))
+			.innerJoin(
+				requisitionTable,
+				or(
+					eq(requisitionTable.id, requisitionApplicationTable.requisitionId),
+					eq(requisitionTable.id, workdayTable.requisitionId)
+				)
+			)
+			.where(eq(requisitionTable.companyId, company.id));
 
-		availableUsers = await getUsersInCompany(company.id);
+		availableUsers = [...availableUsers, ...professionalMemberUsers, ...companyUsers];
 	} else {
 		const client = await getClientProfileByStaffUserId(user.id);
 		if (!client) {
@@ -63,8 +94,33 @@ export const load = async (event: RequestEvent) => {
 			throw new Error('Company not found for the user');
 		}
 
+		const professionalMemberUsers = await db
+			.selectDistinct({
+				id: userTable.id,
+				email: userTable.email,
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				avatarUrl: userTable.avatarUrl
+			})
+			.from(userTable)
+			.innerJoin(candidateProfileTable, eq(candidateProfileTable.userId, userTable.id))
+			.leftJoin(
+				requisitionApplicationTable,
+				eq(requisitionApplicationTable.candidateId, candidateProfileTable.id)
+			)
+			.leftJoin(workdayTable, eq(workdayTable.candidateId, candidateProfileTable.id))
+			.innerJoin(
+				requisitionTable,
+				or(
+					eq(requisitionTable.id, requisitionApplicationTable.requisitionId),
+					eq(requisitionTable.id, workdayTable.requisitionId)
+				)
+			)
+			.where(eq(requisitionTable.companyId, company.id));
+
 		availableUsers = [
 			...(await getUsersInCompany(company.id)),
+			...professionalMemberUsers,
 			// merge client user to list
 			{
 				id: clientUser?.user.id,

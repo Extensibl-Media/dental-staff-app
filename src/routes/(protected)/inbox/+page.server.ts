@@ -58,8 +58,7 @@ export const actions = {
 				participants: participants
 			});
 
-			console.log([conversationId]);
-			return redirect(302, `/inbox/${conversationId}`);
+			redirect(302, `/inbox/${conversationId}`);
 		} catch (error) {
 			console.log(error);
 		}
