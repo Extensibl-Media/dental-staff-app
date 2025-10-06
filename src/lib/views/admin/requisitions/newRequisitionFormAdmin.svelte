@@ -1,17 +1,14 @@
 <script lang="ts">
 	import { Loader2 } from 'lucide-svelte';
-	import * as Form from '$lib/components/ui/form';
 	import { Button } from '$lib/components/ui/button';
-
 	import type { SuperValidated } from 'sveltekit-superforms';
 	import type { AdminRequisitionSchema } from '$lib/config/zod-schemas';
 	import { superForm } from 'sveltekit-superforms/client';
 	import { Label } from '$lib/components/ui/label';
 	import { Input } from '$lib/components/ui/input';
-	import { onDestroy } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 
 	export let form: SuperValidated<AdminRequisitionSchema>;
-	export let schema: AdminRequisitionSchema;
 	export let drawerExpanded: boolean;
 
 	let clients: any[] = [];
@@ -19,7 +16,6 @@
 	let disciplines: any[] = [];
 	let experienceLevels: any[] = [];
 	let selectedLocation = null;
-	let timezone = '';
 
 	const {
 		form: formObj,
@@ -36,13 +32,15 @@
 		if (!clients.length) {
 			const req = await fetch('api/admin/fetchAllClients', { method: 'GET' });
 			const clientsRes = await req.json();
-
 			clients = clientsRes;
 		}
 	};
 
 	const handleGetLocations = async (companyId: string) => {
-		if (!companyId?.length) return;
+		if (!companyId?.length) {
+			locations = [];
+			return;
+		}
 		const req = await fetch(`/api/admin/fetchCompanyLocations?companyId=${companyId}`, {
 			method: 'GET'
 		});
@@ -54,7 +52,6 @@
 		if (!disciplines.length) {
 			const req = await fetch('/api/disciplines/fetchAllDisciplines', { method: 'GET' });
 			const disciplinesRes = await req.json();
-
 			disciplines = disciplinesRes;
 		}
 	};
@@ -63,10 +60,16 @@
 		if (!experienceLevels.length) {
 			const req = await fetch('/api/experience/fetchAllExperienceLevels', { method: 'GET' });
 			const experienceRes = await req.json();
-
 			experienceLevels = experienceRes;
 		}
 	};
+
+	onMount(async () => {
+		await handleFetchClients();
+		await handleFetchDisciplines();
+		await handleFetchExperienceLevels();
+		window.addEventListener('beforeunload', handleBeforeUnload);
+	});
 
 	onDestroy(() => {
 		window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -74,6 +77,8 @@
 
 	function handleReset() {
 		reset();
+		locations = [];
+		selectedLocation = null;
 	}
 
 	function handleDrawerClose() {
@@ -92,189 +97,179 @@
 		handleReset();
 	}
 
-	$: {
-		console.log({ selectedLocation, timezone });
+	$: if ($formObj.locationId) {
+		selectedLocation = locations.find((location) => location.id === $formObj.locationId);
+		if (selectedLocation) {
+			$formObj.timezone = selectedLocation.timezone;
+		}
 	}
-
-	// $: if ($formObj.locationId) {
-	// 	const selectedLocation = locations.find((location) => location.id === $formObj.locationId);
-	// 	if (selectedLocation) {
-	// 		$formObj.timezone = selectedLocation.timezone;
-	// 	}
-	// }
 </script>
 
-<Form.Root
-	{form}
-	{schema}
-	class="grow flex flex-col h-full max-h-[calc(100vh_-_70px)]"
-	let:submitting
-	let:errors
-	method="POST"
-	action="/requisitions?/admin"
-	let:config
+<form
+		use:enhance
+		method="POST"
+		action="/requisitions?/admin"
+		class="grow flex flex-col h-full max-h-[calc(100vh_-_70px)]"
 >
-	<div class="grow p-4 overflow-y-auto">
-		<Form.Field {config} name="title">
-			<Form.Item>
-				<Form.Label>Title</Form.Label>
-				<Form.Input tabindex={drawerExpanded ? 0 : -1} />
-				<Form.Validation />
-			</Form.Item>
-		</Form.Field>
+	<input type="hidden" bind:value={$formObj.timezone} name="timezone" />
 
-		<Form.Field {config} name="clientId">
-			<Form.Item>
-				<Form.Label>Associated Client</Form.Label>
-				<Form.Select
-					onOpenChange={handleFetchClients}
-					onSelectedChange={(el) => handleGetLocations(String(el?.value))}
-				>
-					<Form.SelectTrigger tabindex={drawerExpanded ? 0 : -1} placeholder="Select Client"
-					></Form.SelectTrigger>
-					<Form.SelectContent class=" max-h-[170px] md:max-h-[300px] h-full overflow-y-auto">
-						{#await handleFetchClients}
-							<Form.SelectItem value={null} label={'Loading...'}>
-								<span>Loading</span>
-							</Form.SelectItem>
-						{:then value}
-							{#each clients as client}
-								<Form.SelectItem
-									value={client.company.id}
-									label={`${client.user.lastName}, ${client.user.firstName}`}
-									><span class="flex flex-col gap-1">
-										<span>{client.user.lastName}, {client.user.firstName}</span>
-										<span class="text-xs text-gray-400">{client.company.companyName}</span>
-									</span></Form.SelectItem
-								>
-							{/each}
-						{:catch error}
-							<!-- promise was rejected -->
-							<p>Something went wrong: {error.message}</p>
-						{/await}
-					</Form.SelectContent>
-				</Form.Select>
-				<Form.Validation />
-			</Form.Item>
-		</Form.Field>
-		<Form.Field {config} name="locationId">
-			<Form.Item>
-				<Form.Label>Location</Form.Label>
-				<Form.Select
-					onSelectedChange={(el) => {
-						selectedLocation = locations.find((location) => location.id === el?.value);
-						if (selectedLocation) {
-							timezone = selectedLocation.timezone;
-						}
-					}}
-				>
-					<Form.SelectTrigger tabindex={drawerExpanded ? 0 : -1} placeholder="Select Location"
-					></Form.SelectTrigger>
-					<Form.SelectContent class=" max-h-[170px] md:max-h-[300px] h-full overflow-y-auto">
-						{#await handleGetLocations}
-							<Form.SelectItem value={null} label={'Loading...'}>
-								<span>Loading</span>
-							</Form.SelectItem>
-						{:then _}
-							{#each locations as location}
-								<Form.SelectItem value={location.id} label={location.name}
-									>{location.name}</Form.SelectItem
-								>
-							{/each}
-						{:catch error}
-							<!-- promise was rejected -->
-							<p>Something went wrong: {error.message}</p>
-						{/await}
-					</Form.SelectContent>
-				</Form.Select>
-				<Form.Validation />
-			</Form.Item>
-		</Form.Field>
-		<Form.Field {config} name="disciplineId">
-			<Form.Item>
-				<Form.Label>Discipline</Form.Label>
-				<Form.Select onOpenChange={handleFetchDisciplines}>
-					<Form.SelectTrigger tabindex={drawerExpanded ? 0 : -1} placeholder="Select Discipline"
-					></Form.SelectTrigger>
-					<Form.SelectContent class=" max-h-[170px] md:max-h-[300px] h-full overflow-y-auto">
-						{#await handleFetchDisciplines}
-							<Form.SelectItem value={null} label={'Loading...'}>
-								<span>Loading</span>
-							</Form.SelectItem>
-						{:then value}
-							{#each disciplines as discipline}
-								<Form.SelectItem value={discipline.id} label={discipline.name}
-									>{discipline.name}</Form.SelectItem
-								>
-							{/each}
-						{:catch error}
-							<!-- promise was rejected -->
-							<p>Something went wrong: {error.message}</p>
-						{/await}
-					</Form.SelectContent>
-				</Form.Select>
-				<Form.Validation />
-			</Form.Item>
-		</Form.Field>
-		<Form.Field {config} name="experienceLevelId">
-			<Form.Item>
-				<Form.Label>Experience Level</Form.Label>
-				<Form.Select onOpenChange={handleFetchExperienceLevels}>
-					<Form.SelectTrigger tabindex={drawerExpanded ? 0 : -1} placeholder="Select Experience"
-					></Form.SelectTrigger>
-					<Form.SelectContent class=" max-h-[120px] md:max-h-[150px] h-full overflow-y-auto">
-						{#await handleFetchExperienceLevels}
-							<Form.SelectItem value={null} label={'Loading...'}>
-								<span>Loading</span>
-							</Form.SelectItem>
-						{:then value}
-							{#each experienceLevels as experienceLevel}
-								<Form.SelectItem value={experienceLevel.id} label={experienceLevel.value}
-									>{experienceLevel.value}</Form.SelectItem
-								>
-							{/each}
-						{:catch error}
-							<!-- promise was rejected -->
-							<p>Something went wrong: {error.message}</p>
-						{/await}
-					</Form.SelectContent>
-				</Form.Select>
-				<Form.Validation />
-			</Form.Item>
-		</Form.Field>
-		<Form.Field {config} name="jobDescription">
-			<Form.Item>
-				<Form.Label>Job Description</Form.Label>
-				<Form.Textarea tabindex={drawerExpanded ? 0 : -1} />
-				<Form.Validation />
-			</Form.Item>
-		</Form.Field>
-		<Form.Field {config} name="specialInstructions">
-			<Form.Item>
-				<Form.Label>Special Instructions</Form.Label>
-				<Form.Textarea tabindex={drawerExpanded ? 0 : -1} />
-				<Form.Validation />
-			</Form.Item>
-		</Form.Field>
+	<div class="grow p-4 overflow-y-auto">
+		<div class="mb-4">
+			<Label for="title">Title</Label>
+			<Input
+					type="text"
+					id="title"
+					name="title"
+					bind:value={$formObj.title}
+					tabindex={drawerExpanded ? 0 : -1}
+			/>
+		</div>
+
+		<div class="mb-4">
+			<Label for="clientId">Associated Client</Label>
+			<select
+					id="clientId"
+					name="clientId"
+					bind:value={$formObj.clientId}
+					on:change={(e) => handleGetLocations(e.currentTarget.value)}
+					class="w-full p-2 border rounded"
+					tabindex={drawerExpanded ? 0 : -1}
+					required
+			>
+				<option value="">Select Client</option>
+				{#each clients as client}
+					<option value={client.company.id}>
+						{client.user.lastName}, {client.user.firstName} - {client.company.companyName}
+					</option>
+				{/each}
+			</select>
+		</div>
+
+		<div class="mb-4">
+			<Label for="locationId">Location</Label>
+			<select
+					id="locationId"
+					name="locationId"
+					bind:value={$formObj.locationId}
+					class="w-full p-2 border rounded"
+					tabindex={drawerExpanded ? 0 : -1}
+					required
+					disabled={!locations.length}
+			>
+				<option value="">Select Location</option>
+				{#each locations as location}
+					<option value={location.id}>{location.name}</option>
+				{/each}
+			</select>
+		</div>
+
+		<div class="mb-4">
+			<Label for="disciplineId">Discipline</Label>
+			<select
+					id="disciplineId"
+					name="disciplineId"
+					bind:value={$formObj.disciplineId}
+					class="w-full p-2 border rounded"
+					tabindex={drawerExpanded ? 0 : -1}
+					required
+			>
+				<option value="">Select Discipline</option>
+				{#each disciplines as discipline}
+					<option value={discipline.id}>{discipline.name}</option>
+				{/each}
+			</select>
+		</div>
+
+		<div class="mb-4">
+			<Label for="experienceLevelId">Experience Level</Label>
+			<select
+					id="experienceLevelId"
+					name="experienceLevelId"
+					bind:value={$formObj.experienceLevelId}
+					class="w-full p-2 border rounded"
+					tabindex={drawerExpanded ? 0 : -1}
+					required
+			>
+				<option value="">Select Experience</option>
+				{#each experienceLevels as level}
+					<option value={level.id}>{level.value}</option>
+				{/each}
+			</select>
+		</div>
+
+		<div class="mb-4">
+			<Label for="permanentPosition">Requisition Type</Label>
+			<select
+					id="permanentPosition"
+					name="permanentPosition"
+					bind:value={$formObj.permanentPosition}
+					class="w-full p-2 border rounded"
+					tabindex={drawerExpanded ? 0 : -1}
+					required
+			>
+				<option value={false}>Temporary</option>
+				<option value={true}>Permanent</option>
+			</select>
+		</div>
+
+		<div class="mb-4">
+			<Label for="hourlyRate">Hourly Rate</Label>
+			<Input
+					type="number"
+					id="hourlyRate"
+					name="hourlyRate"
+					bind:value={$formObj.hourlyRate}
+					tabindex={drawerExpanded ? 0 : -1}
+			/>
+		</div>
+
+		<div class="mb-4">
+			<Label for="jobDescription">Job Description</Label>
+			<textarea
+					id="jobDescription"
+					name="jobDescription"
+					bind:value={$formObj.jobDescription}
+					class="w-full p-2 border rounded"
+					rows="4"
+					tabindex={drawerExpanded ? 0 : -1}
+					required
+			></textarea>
+		</div>
+
+		<div class="mb-4">
+			<Label for="specialInstructions">Special Instructions</Label>
+			<textarea
+					id="specialInstructions"
+					name="specialInstructions"
+					bind:value={$formObj.specialInstructions}
+					class="w-full p-2 border rounded"
+					rows="4"
+					tabindex={drawerExpanded ? 0 : -1}
+			></textarea>
+		</div>
 	</div>
-	<input name="timezone" type="hidden" bind:value={timezone} />
 
 	<div class="flex justify-end gap-4 p-4 border-t border-t-gray-200">
 		<Button
-			tabindex={drawerExpanded ? 0 : -1}
-			type="button"
-			on:click={handleDrawerClose}
-			class="bg-white hover:bg-red-500 hover:text-white border border-red-500 text-red-500 rounded-md"
+				tabindex={drawerExpanded ? 0 : -1}
+				type="button"
+				on:click={handleDrawerClose}
+				class="bg-white hover:bg-red-500 hover:text-white border border-red-500 text-red-500 rounded-md"
 		>
 			Cancel
 		</Button>
 		<Button
-			tabindex={drawerExpanded ? 0 : -1}
-			type="submit"
-			class="px-4 py-2 border border-green-400 bg-green-400 hover:bg-green-400 text-white rounded-md"
-			>{#if submitting}
-				<Loader2 class="mr-2 h-4 w-4 animate-spin" />
-				Please wait{:else}Create Requisition{/if}</Button
+				tabindex={drawerExpanded ? 0 : -1}
+				type="submit"
+				disabled={$submitting}
+				class="px-4 py-2 border border-green-400 bg-green-400 hover:bg-green-400 text-white rounded-md"
 		>
+			{#if $submitting}
+				<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+				Please wait
+			{:else}
+				Create Requisition
+			{/if}
+		</Button>
 	</div>
-</Form.Root>
+</form>

@@ -85,6 +85,7 @@ export const actions = {
 			return fail(403);
 		}
 		const formData = await event.request.formData();
+		console.log('formData', formData);
 
 		const title = formData.get('title') as string;
 		const companyId = formData.get('clientId') as string;
