@@ -41,6 +41,7 @@
 			city: string;
 			state: string;
 			zipcode: string;
+			completeAddress: string;
 			createdAt: Date;
 		};
 		user: {
@@ -106,16 +107,22 @@
 			}
 		},
 		{
-			header: 'Location',
-			id: 'location',
-			accessorFn: (row) => `${row.profile.city}, ${row.profile.state}`,
+			header: 'Address',
+			id: 'address',
+			accessorFn: (row) => row.profile.completeAddress,
 			enableSorting: true,
+			cell: ({ getValue }) => {
+				const location = getValue() as string;
+				const truncatedString = location?.length > 40
+					? location.substring(0, 40) + '...'
+					: location;
+				return truncatedString || 'N/A';
+			},
 			sortingFn: (rowA, rowB) => {
 				const locationA =
-					`${rowA.original.profile.city}, ${rowA.original.profile.state}`.toLowerCase();
-				const locationB =
-					`${rowB.original.profile.city}, ${rowB.original.profile.state}`.toLowerCase();
-				return locationA.localeCompare(locationB);
+					rowA.original.profile.completeAddress?.toLowerCase();
+				const locationB = rowB.original.profile.completeAddress?.toLowerCase();
+				return locationA?.localeCompare(locationB);
 			}
 		},
 		{

@@ -368,8 +368,7 @@
                                             <div>
                                                 <h3 class="text-sm font-medium text-muted-foreground">Address</h3>
                                                 <address class="mt-1 not-italic">
-                                                    {candidate.profile.address}<br/>
-                                                    {candidate.profile.city}, {candidate.profile.state}
+                                                    {candidate.profile.completeAddress || 'None specified'}
                                                 </address>
                                             </div>
                                         {/if}

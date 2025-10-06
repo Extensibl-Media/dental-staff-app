@@ -278,7 +278,7 @@
                         <div class="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
                             <div>
                                 <h1 class="text-3xl md:text-4xl font-bold">
-                                    {requisition.title}
+                                    {requisition.discipline.name}
                                 </h1>
                                 <p class="text-lg font-medium text-gray-700 mt-1">{company?.companyName}</p>
                             </div>
@@ -316,26 +316,6 @@
                                                         <button
                                                                 type="submit"
                                                                 name="status"
-                                                                value="FILLED"
-                                                                class="w-full text-left"
-                                                        >
-                                                            Filled
-                                                        </button>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem>
-                                                        <button
-                                                                type="submit"
-                                                                name="status"
-                                                                value="UNFULFILLED"
-                                                                class="w-full text-left"
-                                                        >
-                                                            Unfulfilled
-                                                        </button>
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem>
-                                                        <button
-                                                                type="submit"
-                                                                name="status"
                                                                 value="CANCELED"
                                                                 class="w-full text-left"
                                                         >
@@ -353,8 +333,6 @@
                                                 class={cn(
 												'h-3 w-3 rounded-full',
 												status === 'OPEN' && 'bg-blue-500',
-												status === 'FILLED' && 'bg-green-400',
-												status === 'UNFULFILLED' && 'bg-orange-400',
 												status === 'CANCELED' && 'bg-red-500'
 											)}
                                         ></span>
