@@ -7,6 +7,8 @@
 	import { page } from '$app/stores';
 	import type { PageData } from './$types';
 	import AdminSettingsView from '$lib/views/admin/adminSettingsView.svelte';
+	import {tick} from "svelte";
+	import {superForm} from "sveltekit-superforms/client";
 
 	export let data: PageData;
 	export let subscriptionForm;
@@ -22,6 +24,7 @@
 	$: user = data.user;
 	$: URLTab = $page.url.searchParams.get('tab');
 	$: URLRole = $page.url.searchParams.get('role');
+	$: company = data.company
 
 	$: console.log('URLTab:', URLTab);
 
@@ -33,6 +36,22 @@
 				: SETTINGS_MENU_OPTIONS.ADMIN.PROFILE;
 
 	$: selectedTab = URLTab && URLRole ? SETTINGS_MENU_OPTIONS[URLRole][URLTab] : defaultTab;
+
+	const avatarForm = superForm(data.avatarForm);
+	const { form: formAvatar, enhance: avatarEnhance, errors: avatarError } = avatarForm;
+
+	async function handleAvatarUpdated(url: string, isForUser: boolean = true) {
+		$formAvatar.url = url;
+		$formAvatar.isForUser = isForUser;
+
+		// Wait for Svelte to update the DOM
+		await tick();
+
+		const form = document.getElementById('avatar-url-form') as HTMLFormElement;
+		if (form) {
+			form.requestSubmit();
+		}
+	}
 </script>
 
 <section class="grow h-screen overflow-y-auto">
@@ -49,6 +68,9 @@
 				{billingInfo}
 				staffInviteForm={data.inviteForm}
 				{staff}
+				{user}
+				{company}
+				{handleAvatarUpdated}
 			/>
 		{:else if user?.role === USER_ROLES.CLIENT_STAFF}
 			<ClientStaffSettingsView
@@ -57,9 +79,21 @@
 				{passwordForm}
 				{companyForm}
 				{hasAdminPrivileges}
+				{user}
+				{handleAvatarUpdated}
 			/>
 		{:else if user?.role === USER_ROLES.SUPERADMIN}
-			<AdminSettingsView bind:selectedTab {userProfileForm} {passwordForm} />
+			<AdminSettingsView bind:selectedTab {userProfileForm} {passwordForm} {user} {handleAvatarUpdated} />
 		{/if}
 	</div>
+	<form
+			id="avatar-url-form"
+			method="POST"
+			action="?/avatarUpload"
+			use:avatarEnhance
+			class="hidden"
+	>
+		<input type="hidden" name="url" bind:value={$formAvatar.url} />
+		<input type="hidden" name="isForUser" bind:value={$formAvatar.isForUser} />
+	</form>
 </section>

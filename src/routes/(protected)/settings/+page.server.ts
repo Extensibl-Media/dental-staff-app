@@ -1,4 +1,4 @@
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, redirect, type RequestEvent } from '@sveltejs/kit';
 import { setError, superValidate, message } from 'sveltekit-superforms/server';
 import { setFlash } from 'sveltekit-flash-message/server';
 import { clientCompanySchema, userSchema, userUpdatePasswordSchema } from '$lib/config/zod-schemas';
@@ -12,7 +12,8 @@ import {
 	getClientStaffProfilebyClientId,
 	getClientStaffProfilebyUserId,
 	getPrimaryLocationForCompany,
-	inviteStaffUsersToAccount
+	inviteStaffUsersToAccount,
+	updateClientCompany
 } from '$lib/server/database/queries/clients.js';
 import { Argon2id } from 'oslo/password';
 import { getClientBillingInfo } from '$lib/server/database/queries/billing.js';
@@ -35,7 +36,7 @@ const newStaffInvitesSchema = z.object({
 		)
 		.min(1, 'Please add at least one staff member')
 });
-
+const avatarUrlSchema = z.object({ url: z.string(), isForUser: z.boolean().default(true) });
 const userProfileSchema = userSchema.pick({
 	firstName: true,
 	lastName: true,
@@ -50,10 +51,11 @@ export async function load(event) {
 			error: 'You must be signed in to view this page.'
 		});
 	}
-
+	console.log({ user });
 	if (user.role === USER_ROLES.SUPERADMIN) {
 		const userProfileForm = await superValidate(event, userProfileSchema);
 		const passwordForm = await superValidate(event, userUpdatePasswordSchema);
+		const avatarForm = await superValidate(event, avatarUrlSchema);
 
 		userProfileForm.data = {
 			firstName: user.firstName,
@@ -63,7 +65,8 @@ export async function load(event) {
 		return {
 			user,
 			passwordForm,
-			userProfileForm
+			userProfileForm,
+			avatarForm
 		};
 	}
 
@@ -86,6 +89,7 @@ export async function load(event) {
 
 		const staff = hasAdminRights ? await getAllClientStaffProfiles(clientCompany.id) : null;
 
+		const avatarForm = await superValidate(event, avatarUrlSchema);
 		const profileForm = null;
 		const companyForm = await superValidate(event, clientCompanySchema);
 		const userProfileForm = await superValidate(event, userProfileSchema);
@@ -120,12 +124,63 @@ export async function load(event) {
 			staffProfile,
 			hasAdminRights,
 			staff,
-			inviteForm
+			inviteForm,
+			avatarForm
 		};
 	}
 }
 
 export const actions = {
+	avatarUpload: async (event: RequestEvent) => {
+		const { locals } = event;
+		const { user } = locals;
+
+		if (!user) {
+			redirect(302, '/sign-in');
+		}
+
+		const form = await superValidate(event, avatarUrlSchema);
+
+		if (!form.valid) {
+			return fail(400, { form });
+		}
+
+		const url = form.data.url;
+		const isForUser = form.data.isForUser;
+		console.log({ urlOnServer: url, isForUser });
+
+		// update user profile or company logo based on isForUser flag
+
+		try {
+			if (isForUser) {
+				console.log('updating user avatar');
+				const result = await updateUser(user.id, { avatarUrl: url });
+				console.log({ result });
+			} else {
+				let clientId;
+
+				if (user.role === USER_ROLES.CLIENT) {
+					const clientProfile = await getClientProfilebyUserId(user.id);
+					clientId = clientProfile.id;
+				} else {
+					const staffProfile = await getClientStaffProfilebyUserId(user.id);
+					clientId = staffProfile.clientId;
+				}
+				const company = await getClientCompanyByClientId(clientId);
+				if (!company) {
+					throw new Error('Company not found for user');
+				}
+				// update company logo
+				await updateClientCompany(company.id, { companyLogo: url });
+			}
+			setFlash({ type: 'success', message: 'Avatar updated Successfully' }, event);
+			return message(form, 'Avatar updated Successfully');
+		} catch (err) {
+			console.error(err);
+			setFlash({ type: 'error', message: 'Failed to update profile.' }, event);
+			setError(form, 'Something went wrong');
+		}
+	},
 	updatePassword: async (event) => {
 		const user = event.locals.user;
 		const userData = await getUserByEmail(user?.email as string);

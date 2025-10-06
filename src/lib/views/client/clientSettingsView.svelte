@@ -44,6 +44,7 @@
     import * as Dialog from '$lib/components/ui/dialog';
     import {goto} from '$app/navigation';
     import {Select} from 'flowbite-svelte';
+    import AvatarUpload from "$lib/components/avatar-upload.svelte";
 
     type StaffProfileData = {
         profile: {
@@ -73,6 +74,9 @@
     export let staff;
     export let searchTerm = '';
     export let staffInviteForm;
+    export let user
+    export let handleAvatarUpdated
+    export let company
 
     $: confirmPasswordError = $passwordErrors.confirmPassword;
     $: localTimeZone = getLocalTimeZone();
@@ -363,6 +367,8 @@
         detailsDialogOpen = false;
         selectedProfile = null;
     };
+
+
 </script>
 
 <div class="bg-white border border-gray-200 rounded-lg p-6 grid grid-cols-5 md:grow">
@@ -423,6 +429,7 @@
     <div class="col-span-5 md:col-span-4 pl-4 space-y-4">
         {#if selectedTab === SETTINGS_MENU_OPTIONS.CLIENT.PROFILE}
             <h2 class="text-3xl font-semibold">Profile Details</h2>
+            <AvatarUpload {user} onAvatarUpdated={handleAvatarUpdated} isForUser={true}/>
             <form use:userFormEnhance method="POST" action="?/updateUser">
                 <div class="grid grid-cols-2 gap-6">
                     <div class="col-span-2 md:col-span-1">
@@ -445,6 +452,7 @@
         {/if}
         {#if selectedTab === SETTINGS_MENU_OPTIONS.CLIENT.COMPANY}
             <h2 class="text-3xl font-semibold">Company Details</h2>
+            <AvatarUpload {company} onAvatarUpdated={handleAvatarUpdated} isForUser={false}/>
             <form use:companyFormEnhance method="POST" action="?/updateCompany" class="space-y-8">
                 <div class="grid grid-cols-2 gap-6">
                     <div class="col-span-2 md:col-span-1">

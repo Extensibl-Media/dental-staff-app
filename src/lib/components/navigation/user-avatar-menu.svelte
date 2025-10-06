@@ -31,6 +31,11 @@
 	<DropdownMenu.Trigger asChild let:builder>
 		<Button variant="link" builders={[builder]} class="relative h-10 w-10">
 			<Avatar.Root class="h-8 w-8">
+				<Avatar.Image
+					class="aspect-square h-full w-full rounded-full"
+					src={user?.avatarUrl || ''}
+					alt={user ? `${user.firstName} ${user.lastName}` : 'User Avatar'}
+				/>
 				<Avatar.Fallback>{initials}</Avatar.Fallback>
 			</Avatar.Root>
 		</Button>

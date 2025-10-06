@@ -116,6 +116,7 @@
 					<DropdownMenuContent>
 						<DropdownMenuLabel>Workday Actions</DropdownMenuLabel>
 						<DropdownMenuSeparator />
+						<DropdownMenuItem>Edit Workday</DropdownMenuItem>
 						{#if workday?.timesheet}
 							<DropdownMenuItem
 								on:click={() => (window.location.href = '/timesheets/' + workday.timesheet?.id)}

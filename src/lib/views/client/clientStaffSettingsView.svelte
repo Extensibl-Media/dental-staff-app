@@ -11,11 +11,14 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Switch } from '$lib/components/ui/switch';
 	import { Textarea } from '$lib/components/ui/textarea';
+	import AvatarUpload from '$lib/components/avatar-upload.svelte';
 
 	export let userProfileForm;
 	export let passwordForm;
 	export let companyForm;
+	export let user;
 	export let hasAdminPrivileges = false;
+	export let handleAvatarUpdated
 	const { form: userFormObj, enhance: userFormEnhance } = superForm(userProfileForm);
 	const { form: companyFormObj, enhance: companyFormEnhance } = superForm(companyForm);
 	const {
@@ -74,6 +77,7 @@
 	<div class="col-span-5 md:col-span-4 pl-4 space-y-4">
 		{#if selectedTab === SETTINGS_MENU_OPTIONS.CLIENT_STAFF.PROFILE}
 			<h2 class="text-3xl font-semibold">Profile Details</h2>
+			<AvatarUpload {user} onAvatarUpdated={handleAvatarUpdated} isForUser={true}/>
 			<form use:userFormEnhance method="POST" action="?/updateUser">
 				<div class="grid grid-cols-2 gap-6">
 					<!-- {#if errors?._errors?.length}
@@ -100,6 +104,9 @@
 					<div class="col-span-2 md:col-span-1">
 						<Label for="email">Email Address</Label>
 						<Input name="email" bind:value={$userFormObj.email} />
+					</div>
+					<div class="col-span-2 md:col-span-1">
+						<AvatarUpload />
 					</div>
 				</div>
 				<div class="mt-8">

@@ -139,6 +139,16 @@ export async function updateClientProfile(clientId: string, values: UpdateClient
 	}
 }
 
+export async function updateClientCompany(companyId: string, values: Partial<ClientCompany>) {
+	const [result] = await db
+		.update(clientCompanyTable)
+		.set(values)
+		.where(eq(clientCompanyTable.id, companyId))
+		.returning();
+
+	return result;
+}
+
 // Keep this for backward compatibility if needed elsewhere
 export async function getClientProfilesCount() {
 	try {
