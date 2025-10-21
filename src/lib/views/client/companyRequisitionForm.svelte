@@ -103,11 +103,6 @@
 	<input type="hidden" bind:value={$formObj.timezone} name="timezone" />
 	<div class="grow p-4 overflow-y-auto">
 		<div class="mb-4">
-			<Label for="title">Title</Label>
-			<Input type="text" id="title" name="title" bind:value={$formObj.title} />
-		</div>
-
-		<div class="mb-4">
 			<Label for="locationId">Location</Label>
 			<select
 				id="locationId"
@@ -155,10 +150,6 @@
 			</select>
 		</div>
 
-		<div class="mb-4">
-			<Label for="hourlyRate">Hourly Rate</Label>
-			<Input type="number" id="hourlyRate" name="hourlyRate" bind:value={$formObj.hourlyRate} required/>
-		</div>
 
 		<div class="mb-4">
 			<Label for="permanentPosition">Requisition Type</Label>
@@ -172,6 +163,10 @@
 				<option value={false}>Temporary</option>
 				<option value={true}>Permanent</option>
 			</select>
+		</div>
+		<div class="mb-4">
+			<Label for="hourlyRate">Hourly Rate</Label>
+			<Input type="number" id="hourlyRate" name="hourlyRate" bind:value={$formObj.hourlyRate} required/>
 		</div>
 
 		<div class="mb-4">

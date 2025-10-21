@@ -115,17 +115,6 @@
 
 	<div class="grow p-4 overflow-y-auto">
 		<div class="mb-4">
-			<Label for="title">Title</Label>
-			<Input
-					type="text"
-					id="title"
-					name="title"
-					bind:value={$formObj.title}
-					tabindex={drawerExpanded ? 0 : -1}
-			/>
-		</div>
-
-		<div class="mb-4">
 			<Label for="clientId">Associated Client</Label>
 			<select
 					id="clientId"
