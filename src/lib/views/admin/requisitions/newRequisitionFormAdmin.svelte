@@ -220,6 +220,7 @@
 					name="hourlyRate"
 					bind:value={$formObj.hourlyRate}
 					tabindex={drawerExpanded ? 0 : -1}
+					required
 			/>
 		</div>
 

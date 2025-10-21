@@ -157,7 +157,7 @@
 
 		<div class="mb-4">
 			<Label for="hourlyRate">Hourly Rate</Label>
-			<Input type="number" id="hourlyRate" name="hourlyRate" bind:value={$formObj.hourlyRate} />
+			<Input type="number" id="hourlyRate" name="hourlyRate" bind:value={$formObj.hourlyRate} required/>
 		</div>
 
 		<div class="mb-4">
