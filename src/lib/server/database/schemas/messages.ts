@@ -10,7 +10,7 @@ import {
 	index
 } from 'drizzle-orm/pg-core';
 import { userRolesEnum, userTable } from './auth';
-import { sql } from 'drizzle-orm';
+import { desc, sql } from 'drizzle-orm';
 import { requisitionApplicationTable } from './requisition';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 
@@ -51,7 +51,7 @@ export const conversationTable = pgTable(
 	(table) => ({
 		typeIdx: index('conversation_type_idx').on(table.type),
 		applicationIdx: index('conversation_application_idx').on(table.applicationId),
-		updatedAtIdx: index('conversation_updated_at_idx').on(table.updatedAt).desc()
+		updatedAtIdx: index('conversation_updated_at_idx').on(desc(table.updatedAt))
 	})
 );
 
@@ -82,9 +82,10 @@ export const messageTable = pgTable(
 	},
 	(table) => ({
 		// Composite index for conversation messages ordered by timestamp
-		conversationTimestampIdx: index('message_conversation_timestamp_idx')
-			.on(table.conversationId, table.createdAt)
-			.desc(),
+		conversationTimestampIdx: index('message_conversation_timestamp_idx').on(
+			table.conversationId,
+			desc(table.createdAt)
+		),
 		senderIdx: index('message_sender_idx').on(table.senderId)
 	})
 );

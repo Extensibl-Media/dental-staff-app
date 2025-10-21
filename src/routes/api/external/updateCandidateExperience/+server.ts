@@ -42,7 +42,14 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		const parsedExperience = z
 			.object({
-				disciplines: z.array(z.object({ disciplineId: z.string(), experienceLevelId: z.string() }))
+				disciplines: z.array(
+					z.object({
+						disciplineId: z.string(),
+						experienceLevelId: z.string(),
+						preferredHourlyMin: z.number().int().min(0),
+						preferredHourlyMax: z.number().int().min(0)
+					})
+				)
 			})
 			.safeParse(body);
 
@@ -85,6 +92,8 @@ export const POST: RequestHandler = async ({ request }) => {
 						candidateId: existingProfile.id,
 						disciplineId: discipline.disciplineId,
 						experienceLevelId: discipline.experienceLevelId,
+						preferredHourlyMin: discipline.preferredHourlyMin,
+						preferredHourlyMax: discipline.preferredHourlyMax,
 						createdAt: new Date(),
 						updatedAt: new Date()
 					}))

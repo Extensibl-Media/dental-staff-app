@@ -56,15 +56,23 @@
     $: user = data.user;
     $: isAdmin = user?.role === USER_ROLES.SUPERADMIN;
     $: candidate = data.candidate as CandidateWithProfile | null;
-    $: supportTickets = data.supportTickets || [];
+    // $: supportTickets = data.supportTickets || [];
     $: workHistory = data.workHistory || [];
     $: documents = data.documents || [];
     $: disciplines = data.allDisciplines || [];
+
+    $: console.log(disciplines)
 
     // Edit state tracking
     let editingPersonal = false;
     let editingWork = false;
     let editingLocation = false;
+    let editingDisciplines = false;
+    let editableDisciplines = [];
+    let selectedNewDisciplineId = '';
+    let selectedNewExperienceLevelId = '';
+    let newDisciplineMinRate = 0;
+    let newDisciplineMaxRate = 0;
 
     function cancelEdit(section: string) {
         switch (section) {
@@ -87,6 +95,12 @@
     }
 
     const {form: statusForm, enhance: statusEnhance} = superForm(data.statusForm);
+    const {form: personalDetailsForm, enhance: detailsEnhance, submitting: detailsSubmitting} = superForm(data.personalDetailsForm, {onResult: ({result}) => {
+        if(result.type === 'success') {
+            editingPersonal = false;
+        }
+    }}
+    );
 
     function getFileIcon(filename: string) {
         const extension = filename?.split('.').pop()?.toLowerCase() || '';
@@ -101,6 +115,75 @@
             return 'generic';
         }
     }
+
+    const {
+        form: disciplinesFormData,
+        enhance: disciplinesEnhance,
+        errors: disciplinesErrors,
+        submitting: disciplinesSubmitting
+    } = superForm(data.disciplinesForm, {
+        dataType: 'json',  // Add this!
+        onResult: ({result}) => {
+            if(result.type === 'success') {
+                editingDisciplines = false;
+            }
+        }
+    });
+
+    $: availableDisciplinesFiltered = data.availableDisciplines?.filter(
+          d => !$disciplinesFormData.disciplines.some(ed => ed.disciplineId === d.id)
+      ) || [];
+
+      // Initialize editable disciplines when entering edit mode
+      function startEditingDisciplines() {
+          editingDisciplines = true;
+      }
+
+      function addNewDiscipline() {
+          if (!selectedNewDisciplineId || !selectedNewExperienceLevelId) {
+              return;
+          }
+
+          if (newDisciplineMaxRate < newDisciplineMinRate) {
+              alert('Maximum rate must be greater than or equal to minimum rate');
+              return;
+          }
+
+          $disciplinesFormData.disciplines = [...$disciplinesFormData.disciplines, {
+              disciplineId: selectedNewDisciplineId,
+              experienceLevelId: selectedNewExperienceLevelId,
+              preferredHourlyMin: newDisciplineMinRate,
+              preferredHourlyMax: newDisciplineMaxRate
+          }];
+
+          // Reset form
+          selectedNewDisciplineId = '';
+          selectedNewExperienceLevelId = '';
+          newDisciplineMinRate = 0;
+          newDisciplineMaxRate = 0;
+      }
+
+      function removeDisciplineFromEdit(disciplineId: string) {
+          $disciplinesFormData.disciplines = $disciplinesFormData.disciplines.filter(
+              d => d.disciplineId !== disciplineId
+          );
+      }
+
+      function cancelDisciplineEdit() {
+          editingDisciplines = false;
+          $disciplinesFormData.disciplines = [];
+      }
+
+      function getDisciplineName(disciplineId: string) {
+          const discipline = data.availableDisciplines?.find(d => d.id === disciplineId);
+          return discipline?.name || 'Unknown';
+      }
+
+      function getExperienceLevelName(experienceLevelId: string) {
+          const level = data.experienceLevels?.find(l => l.id === experienceLevelId);
+          return level?.value || 'Unknown';
+      }
+    $: disciplinesString = JSON.stringify(editableDisciplines);
 </script>
 
 {#if candidate}
@@ -213,17 +296,17 @@
                                         <User class="h-4 w-4"/>
                                         Personal Details
                                     </CardTitle>
-                                    <!-- {#if !editingPersonal && isAdmin}
+                                    {#if !editingPersonal && isAdmin}
                                         <Button variant="ghost" size="sm" on:click={() => (editingPersonal = true)}>
                                             <Edit class="h-4 w-4" />
                                         </Button>
-                                    {/if} -->
+                                    {/if}
                                 </div>
                             </CardHeader>
                             <CardContent class="pt-0">
                                 {#if editingPersonal}
                                     <!-- Personal Edit Form -->
-                                    <form method="POST" action="?/updatePersonalDetails" class="space-y-4">
+                                    <form use:detailsEnhance method="POST" action="?/updatePersonalDetails" class="space-y-4">
                                         <div class="grid grid-cols-2 gap-4">
                                             <div class="space-y-2">
                                                 <Label for="firstName">First Name</Label>
@@ -265,46 +348,6 @@
                                                     placeholder="Enter cell phone"
                                             />
                                         </div>
-
-                                        <div class="space-y-2">
-                                            <Label for="address">Address</Label>
-                                            <Input
-                                                    id="address"
-                                                    name="address"
-                                                    value={candidate.profile.address}
-                                                    placeholder="Enter street address"
-                                            />
-                                        </div>
-
-                                        <div class="grid grid-cols-2 gap-4">
-                                            <div class="space-y-2">
-                                                <Label for="city">City</Label>
-                                                <Input
-                                                        id="city"
-                                                        name="city"
-                                                        value={candidate.profile.city}
-                                                        placeholder="Enter city"
-                                                />
-                                            </div>
-                                            <div class="space-y-2">
-                                                <Label for="state">State</Label>
-                                                <Select.Root preventScroll={false}>
-                                                    <Select.Trigger>
-                                                        <Select.Value
-                                                                placeholder={candidate.profile.state || 'Select state'}/>
-                                                    </Select.Trigger>
-                                                    <Select.Content class="max-h-[150px] overflow-y-scroll">
-                                                        {#each STATES as state}
-                                                            <Select.Item value={state.abbreviation}>
-                                                                <span>{state.abbreviation}</span>
-                                                            </Select.Item>
-                                                        {/each}
-                                                    </Select.Content>
-                                                    <Input type="hidden" name="state" value={candidate.profile.state}/>
-                                                </Select.Root>
-                                            </div>
-                                        </div>
-
                                         <div class="space-y-2">
                                             <Label for="birthday">Date of Birth</Label>
                                             <Input
@@ -319,10 +362,15 @@
                                             <Button
                                                     type="submit"
                                                     size="sm"
+                                                    disabled={$detailsSubmitting}
                                                     class="gap-2 bg-green-500 hover:bg-green-600 text-white"
                                             >
                                                 <Save class="h-4 w-4"/>
-                                                Save Changes
+                                            {#if $detailsSubmitting}
+                                                Saving...
+                                            {:else}
+                                                Save changes
+                                            {/if}
                                             </Button>
                                             <Button
                                                     type="button"
@@ -390,65 +438,217 @@
                                         <Briefcase class="h-4 w-4"/>
                                         Work Details & Preferences
                                     </CardTitle>
-                                    <!-- {#if !editingWork && isAdmin}
-                                        <Button variant="ghost" size="sm" on:click={() => (editingWork = true)}>
+                                    {#if !editingDisciplines && isAdmin}
+                                        <Button variant="ghost" size="sm" on:click={startEditingDisciplines}>
                                             <Edit class="h-4 w-4" />
                                         </Button>
-                                    {/if} -->
+                                    {/if}
                                 </div>
                             </CardHeader>
                             <CardContent class="pt-0">
-                                {#if editingWork}
-                                    <!-- Work Preferences Edit Form -->
-                                    <form method="POST" action="?/updateWorkPreferences" class="space-y-4">
-                                        <!-- <div class="space-y-2">
-                                            <Label for="preferredPositions">Preferred Positions</Label>
-                                            <Input
-                                                id="preferredPositions"
-                                                name="preferredPositions"
-                                                value="Consultant, Dental Assistant, Dentist, Floater, Front Office, Hygienist"
-                                                placeholder="Enter preferred positions"
-                                            />
-                                        </div> -->
+                                {#if editingDisciplines}
+                                    <!-- Discipline Edit Form -->
+                                    <form method="POST" action="?/updateDisciplines" use:disciplinesEnhance class="space-y-4">
+                                        {#if $disciplinesErrors._errors?.length}
+                                            <Alert.Root variant="destructive">
+                                                <AlertCircle class="h-4 w-4" />
+                                                <Alert.Description>
+                                                    {$disciplinesErrors._errors[0]}
+                                                </Alert.Description>
+                                            </Alert.Root>
+                                        {/if}
 
-                                        <div class="grid grid-cols-2 gap-4">
-                                            <div class="space-y-2">
-                                                <Label for="hourlyRateMin">Min Hourly Rate</Label>
-                                                <Input
-                                                        id="hourlyRateMin"
-                                                        name="hourlyRateMin"
-                                                        type="number"
-                                                        value={candidate.profile.hourlyRateMin}
-                                                        placeholder="0"
-                                                />
+                                        <!-- Add New Discipline Section -->
+                                        <div class="border rounded-lg p-4 bg-gray-50">
+                                            <h4 class="text-sm font-medium mb-3">Add New Discipline</h4>
+
+                                            <div class="grid gap-3">
+                                                <div>
+                                                    <Label>Select Discipline</Label>
+                                                    <Select.Root
+                                                        selected={selectedNewDisciplineId ? {
+                                                            value: selectedNewDisciplineId,
+                                                            label: getDisciplineName(selectedNewDisciplineId)
+                                                        } : undefined}
+                                                        onSelectedChange={(value) => selectedNewDisciplineId = value?.value || ''}
+                                                    >
+                                                        <Select.Trigger class="mt-1.5">
+                                                            <Select.Value placeholder="Select a discipline" />
+                                                        </Select.Trigger>
+                                                        <Select.Content>
+                                                            {#each availableDisciplinesFiltered as discipline}
+                                                                <Select.Item value={discipline.id}>
+                                                                    {discipline.name}
+                                                                </Select.Item>
+                                                            {/each}
+                                                        </Select.Content>
+                                                    </Select.Root>
+                                                </div>
+
+                                                <div>
+                                                    <Label>Experience Level</Label>
+                                                    <Select.Root
+                                                        selected={selectedNewExperienceLevelId ? {
+                                                            value: selectedNewExperienceLevelId,
+                                                            label: getExperienceLevelName(selectedNewExperienceLevelId)
+                                                        } : undefined}
+                                                        onSelectedChange={(value) => selectedNewExperienceLevelId = value?.value || ''}
+                                                    >
+                                                        <Select.Trigger class="mt-1.5">
+                                                            <Select.Value placeholder="Select experience level" />
+                                                        </Select.Trigger>
+                                                        <Select.Content>
+                                                            {#each data.experienceLevels as level}
+                                                                <Select.Item value={level.id}>{level.value}</Select.Item>
+                                                            {/each}
+                                                        </Select.Content>
+                                                    </Select.Root>
+                                                </div>
+
+                                                <div class="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <Label>Min Rate ($/hr)</Label>
+                                                        <div class="relative mt-1.5">
+                                                            <DollarSign class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                                                            <Input
+                                                                type="number"
+                                                                min="0"
+                                                                bind:value={newDisciplineMinRate}
+                                                                class="pl-9"
+                                                                placeholder="0"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <Label>Max Rate ($/hr)</Label>
+                                                        <div class="relative mt-1.5">
+                                                            <DollarSign class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+                                                            <Input
+                                                                type="number"
+                                                                min="0"
+                                                                bind:value={newDisciplineMaxRate}
+                                                                class="pl-9"
+                                                                placeholder="0"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    on:click={addNewDiscipline}
+                                                    disabled={!selectedNewDisciplineId || !selectedNewExperienceLevelId}
+                                                >
+                                                    Add Discipline
+                                                </Button>
                                             </div>
-                                            <div class="space-y-2">
-                                                <Label for="hourlyRateMax">Max Hourly Rate</Label>
-                                                <Input
-                                                        id="hourlyRateMax"
-                                                        name="hourlyRateMax"
-                                                        type="number"
-                                                        value={candidate.profile.hourlyRateMax}
-                                                        placeholder="0"
-                                                />
-                                            </div>
+                                        </div>
+
+                                        <!-- Current Disciplines -->
+                                        <div>
+                                            <h4 class="text-sm font-medium mb-3">Current Disciplines ({$disciplinesFormData.disciplines.length})</h4>
+
+                                            {#if $disciplinesFormData.disciplines.length === 0}
+                                                <div class="border rounded-md p-8 text-center">
+                                                    <p class="text-sm text-gray-500">No disciplines added</p>
+                                                </div>
+                                            {:else}
+                                                <div class="space-y-3">
+                                                    {#each $disciplinesFormData.disciplines as discipline, index}
+                                                        <input type="hidden" name={`disciplines[${index}].disciplineId`} value={discipline.disciplineId} />
+                                                        <input type="hidden" name={`disciplines[${index}].experienceLevelId`} value={discipline.experienceLevelId} />
+                                                        <input type="hidden" name={`disciplines[${index}].preferredHourlyMin`} value={discipline.preferredHourlyMin} />
+                                                        <input type="hidden" name={`disciplines[${index}].preferredHourlyMax`} value={discipline.preferredHourlyMax} />
+
+                                                        <div class="border rounded-lg p-3 bg-white">
+                                                            <div class="flex items-start gap-3">
+                                                                <div class="flex-1 grid gap-3">
+                                                                    <div>
+                                                                        <p class="font-medium text-sm">{getDisciplineName(discipline.disciplineId)}</p>
+                                                                    </div>
+
+                                                                    <div class="grid md:grid-cols-3 gap-3">
+                                                                        <div>
+                                                                            <Label class="text-xs">Experience Level</Label>
+                                                                            <Select.Root
+                                                                                selected={{ value: discipline.experienceLevelId, label: getExperienceLevelName(discipline.experienceLevelId) }}
+                                                                                onSelectedChange={(value) => {
+                                                                                    if (value) {
+                                                                                        $disciplinesFormData.disciplines[index].experienceLevelId = value.value;
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                <Select.Trigger class="h-9 mt-1">
+                                                                                    <Select.Value />
+                                                                                </Select.Trigger>
+                                                                                <Select.Content>
+                                                                                    {#each data.experienceLevels as level}
+                                                                                        <Select.Item value={level.id}>{level.value}</Select.Item>
+                                                                                    {/each}
+                                                                                </Select.Content>
+                                                                            </Select.Root>
+                                                                        </div>
+
+                                                                        <div>
+                                                                            <Label class="text-xs">Min Rate</Label>
+                                                                            <Input
+                                                                                type="number"
+                                                                                min="0"
+                                                                                bind:value={discipline.preferredHourlyMin}
+                                                                                class="h-9 mt-1"
+                                                                            />
+                                                                        </div>
+
+                                                                        <div>
+                                                                            <Label class="text-xs">Max Rate</Label>
+                                                                            <Input
+                                                                                type="number"
+                                                                                min="0"
+                                                                                bind:value={discipline.preferredHourlyMax}
+                                                                                class="h-9 mt-1"
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    class="h-8 w-8 text-gray-400 hover:text-red-600"
+                                                                    on:click={() => removeDisciplineFromEdit(discipline.disciplineId)}
+                                                                >
+                                                                    <X class="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    {/each}
+                                                </div>
+                                            {/if}
                                         </div>
 
                                         <div class="flex gap-2 pt-4">
                                             <Button
-                                                    type="submit"
-                                                    size="sm"
-                                                    class="gap-2 bg-green-500 hover:bg-green-600 text-white"
+                                                type="submit"
+                                                size="sm"
+                                                disabled={$disciplinesSubmitting}
+                                                class="gap-2 bg-green-500 hover:bg-green-600 text-white"
                                             >
                                                 <Save class="h-4 w-4"/>
-                                                Save Changes
+                                                {#if $disciplinesSubmitting}
+                                                    Saving...
+                                                {:else}
+                                                    Save Changes
+                                                {/if}
                                             </Button>
                                             <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    on:click={() => cancelEdit('work')}
-                                                    class="gap-2 border-red-500 text-red-500 hover:bg-red-50 hover:text-red-500"
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                on:click={cancelDisciplineEdit}
+                                                class="gap-2 border-red-500 text-red-500 hover:bg-red-50 hover:text-red-500"
                                             >
                                                 <X class="h-4 w-4"/>
                                                 Cancel
@@ -456,30 +656,33 @@
                                         </div>
                                     </form>
                                 {:else}
-                                    <!-- Work Preferences Display -->
+                                    <!-- Work Preferences Display (keep existing) -->
                                     <div class="space-y-4">
                                         <div>
-                                            <h3 class="text-sm font-medium text-muted-foreground">Experience</h3>
-                                            <div class="flex flex-col gap-2 mt-2">
+                                            <h3 class="text-sm font-medium text-muted-foreground mb-3">Experience & Rates</h3>
+                                            <div class="flex flex-col gap-3">
                                                 {#each disciplines as discipline}
-                                                    <spa
-                                                            class="grow-0 w-fit bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded"
-                                                    >
-                                                        {discipline.discipline.name}
-                                                        - {discipline.experience.experienceLevel}
-                                                    </spa>
+                                                    <div class="border rounded-lg p-3 bg-gray-50">
+                                                        <div class="flex items-start justify-between gap-4">
+                                                            <div class="flex-1">
+                                                                <p class="font-medium text-sm text-gray-900">
+                                                                    {discipline.discipline.name}
+                                                                </p>
+                                                                <p class="text-xs text-gray-600 mt-1">
+                                                                    {discipline.experience.experienceLevel}
+                                                                </p>
+                                                            </div>
+                                                            <div class="text-right flex-shrink-0">
+                                                                <div class="flex items-center gap-1 text-sm font-medium text-gray-900">
+                                                                    <DollarSign class="h-4 w-4 text-gray-500"/>
+                                                                    <span>
+                                                                        {discipline.salaryRange.min || 0} - {discipline.salaryRange.max || 0}/hr
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 {/each}
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <h3 class="text-sm font-medium text-muted-foreground">Rate of Pay</h3>
-                                            <div class="mt-1 flex items-center gap-2">
-                                                <DollarSign class="h-4 w-4 text-gray-500"/>
-                                                <span class="text-sm font-medium">
-													${candidate.profile.hourlyRateMin || 'Not Specified'} - ${candidate
-                                                    .profile.hourlyRateMax || 'Not Specified'} /hr
-												</span>
                                             </div>
                                         </div>
                                     </div>

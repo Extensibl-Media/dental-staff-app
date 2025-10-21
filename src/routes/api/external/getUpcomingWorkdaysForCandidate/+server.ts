@@ -53,6 +53,7 @@ export const GET: RequestHandler = async ({ request }) => {
 	const workdays = await db
 		.select({
 			workday: { ...workdayTable },
+			company: { ...clientCompanyTable },
 			recurrenceDay: { ...recurrenceDayTable },
 			requisition: {
 				...requisitionTable,

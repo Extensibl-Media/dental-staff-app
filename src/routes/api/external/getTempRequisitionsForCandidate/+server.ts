@@ -1,5 +1,8 @@
 import db from '$lib/server/database/drizzle';
-import { candidateProfileTable } from '$lib/server/database/schemas/candidate';
+import {
+	candidateProfileTable,
+	candidateDisciplineExperienceTable
+} from '$lib/server/database/schemas/candidate';
 import {
 	clientCompanyTable,
 	companyOfficeLocationTable
@@ -11,8 +14,9 @@ import {
 } from '$lib/server/database/schemas/requisition';
 import { authenticateUser } from '$lib/server/serverUtils';
 import { type RequestHandler, error, json } from '@sveltejs/kit';
-import { eq, and, inArray, notInArray, or, isNull, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, inArray, notInArray, or, isNull, isNotNull, sql, gte, lte } from 'drizzle-orm';
 import { METERS_PER_MILE, RADIUS_METERS, RADIUS_MILES } from '$lib/config/constants';
+import { disciplineTable, experienceLevelTable } from '$lib/server/database/schemas/skill';
 
 export const GET: RequestHandler = async ({ request }) => {
 	const user = await authenticateUser(request);
@@ -37,6 +41,35 @@ export const GET: RequestHandler = async ({ request }) => {
 			);
 		}
 
+		// Fetch candidate's disciplines with their preferred rates
+		const candidateDisciplines = await db
+			.select({
+				disciplineId: candidateDisciplineExperienceTable.disciplineId,
+				experienceLevelId: candidateDisciplineExperienceTable.experienceLevelId,
+				preferredHourlyMin: candidateDisciplineExperienceTable.preferredHourlyMin,
+				preferredHourlyMax: candidateDisciplineExperienceTable.preferredHourlyMax
+			})
+			.from(candidateDisciplineExperienceTable)
+			.where(eq(candidateDisciplineExperienceTable.candidateId, candidateProfile.id));
+
+		if (candidateDisciplines.length === 0) {
+			return json({
+				candidateLocation: {
+					lat: candidateProfile.lat,
+					lon: candidateProfile.lon,
+					address: candidateProfile.completeAddress
+				},
+				recurrenceDays: [],
+				searchRadius: RADIUS_MILES,
+				totalFound: 0,
+				message: 'Please add your work experience and disciplines to see available shifts.'
+			});
+		}
+
+		// Extract discipline IDs and experience level IDs
+		const disciplineIds = candidateDisciplines.map((d) => d.disciplineId);
+		const experienceLevelIds = candidateDisciplines.map((d) => d.experienceLevelId);
+
 		// Fetch office locations within the radius using PostGIS
 		const nearbyOfficeLocations = await db
 			.select({
@@ -50,7 +83,6 @@ export const GET: RequestHandler = async ({ request }) => {
 			.where(
 				and(
 					isNotNull(companyOfficeLocationTable.geom),
-					// Filter by distance using ST_DWithin for performance
 					sql`ST_DWithin(
 						geom::geography,
 						ST_SetSRID(ST_MakePoint(${candidateProfile.lon}::float, ${candidateProfile.lat}::float), 4326)::geography,
@@ -76,7 +108,6 @@ export const GET: RequestHandler = async ({ request }) => {
 		}
 
 		// First, fetch the dates this candidate already has accepted workdays for
-		// to avoid showing other opportunities on the same days
 		const acceptedWorkdays = await db
 			.select({
 				date: recurrenceDayTable.date
@@ -85,30 +116,20 @@ export const GET: RequestHandler = async ({ request }) => {
 			.innerJoin(recurrenceDayTable, eq(workdayTable.recurrenceDayId, recurrenceDayTable.id))
 			.where(eq(workdayTable.candidateId, candidateProfile.id));
 
-		// Create an array of dates the candidate is already working
 		const bookedDates = acceptedWorkdays.map((day) => day.date);
 
-		// Prepare filter conditions based on whether bookedDates is empty or not
+		// Prepare date condition
 		let dateCondition;
 		if (bookedDates.length === 0) {
-			// If no booked dates, don't use notInArray condition
-			dateCondition = or(
-				// Either all recurrence days (since none are booked)
-				isNotNull(recurrenceDayTable.id),
-				// OR it's a workday they have already claimed (redundant but matches the logic)
-				isNotNull(workdayTable.id)
-			);
+			dateCondition = isNotNull(recurrenceDayTable.id);
 		} else {
-			// If there are booked dates, use the original condition
 			dateCondition = or(
-				// Either the recurrence day is not on a date they're already booked
 				notInArray(recurrenceDayTable.date, bookedDates),
-				// OR it's a workday they have already claimed (so we still show their bookings)
-				isNotNull(workdayTable.id)
+				and(isNotNull(workdayTable.id), eq(workdayTable.candidateId, candidateProfile.id))
 			);
 		}
 
-		// Fetch recurrence days with requisition and workday information
+		// Fetch recurrence days with filtering
 		const recurrenceDays = await db
 			.select({
 				recurrenceDay: {
@@ -126,7 +147,9 @@ export const GET: RequestHandler = async ({ request }) => {
 					hourlyRate: requisitionTable.hourlyRate,
 					disciplineId: requisitionTable.disciplineId,
 					experienceLevelId: requisitionTable.experienceLevelId,
-					permanentPosition: requisitionTable.permanentPosition
+					permanentPosition: requisitionTable.permanentPosition,
+					disciplineName: disciplineTable.name, // Add this
+					experienceLevelName: experienceLevelTable.value // Add this
 				},
 				company: {
 					id: clientCompanyTable.id,
@@ -142,13 +165,11 @@ export const GET: RequestHandler = async ({ request }) => {
 					zip: companyOfficeLocationTable.zipcode,
 					lat: companyOfficeLocationTable.lat,
 					lon: companyOfficeLocationTable.lon,
-					// Include distance to this specific location
 					distanceMiles: sql<number>`ST_Distance(
 						${companyOfficeLocationTable.geom}::geography,
 						ST_SetSRID(ST_MakePoint(${candidateProfile.lon}::float, ${candidateProfile.lat}::float), 4326)::geography
 					) / ${METERS_PER_MILE}`
 				},
-				// Only get workdays for this candidate
 				workday: {
 					id: workdayTable.id,
 					candidateId: workdayTable.candidateId
@@ -161,34 +182,29 @@ export const GET: RequestHandler = async ({ request }) => {
 				companyOfficeLocationTable,
 				eq(requisitionTable.locationId, companyOfficeLocationTable.id)
 			)
-			.leftJoin(
-				workdayTable,
-				and(
-					eq(workdayTable.recurrenceDayId, recurrenceDayTable.id),
-					eq(workdayTable.candidateId, candidateProfile.id) // Only this candidate's workdays
-				)
+			.innerJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id)) // Add this join
+			.innerJoin(
+				experienceLevelTable,
+				eq(requisitionTable.experienceLevelId, experienceLevelTable.id)
 			)
+			.leftJoin(workdayTable, eq(workdayTable.recurrenceDayId, recurrenceDayTable.id))
 			.where(
 				and(
 					inArray(requisitionTable.locationId, officeLocationIds),
-					// eq(requisitionTable.status, 'OPEN'),
 					notInArray(recurrenceDayTable.status, ['CANCELED']),
 					eq(requisitionTable.archived, false),
 					eq(requisitionTable.permanentPosition, false),
-					// Add this condition to only include recurrence days that:
-					// 1. Have no workday assigned (are available) OR
-					// 2. Have a workday assigned to the current candidate
-					or(
-						// Check if no workday record exists (no candidate claimed it)
-						isNull(workdayTable.id),
-						// Or check if the workday is for the current candidate
-						eq(workdayTable.candidateId, candidateProfile.id)
-					),
-					// KEY CHANGE: We use the prepared condition that handles empty bookedDates
+					// Filter by candidate's disciplines
+					inArray(requisitionTable.disciplineId, disciplineIds),
+					// Filter by candidate's experience levels
+					inArray(requisitionTable.experienceLevelId, experienceLevelIds),
+					// Only show shifts that:
+					// 1. Have no workday assigned (available to claim) OR
+					// 2. Are already assigned to THIS candidate (their bookings)
+					or(isNull(workdayTable.id), eq(workdayTable.candidateId, candidateProfile.id)),
 					dateCondition
 				)
 			)
-			// Order by distance (closest first), then by date
 			.orderBy(
 				sql`ST_Distance(
 					${companyOfficeLocationTable.geom}::geography,
@@ -197,15 +213,36 @@ export const GET: RequestHandler = async ({ request }) => {
 				recurrenceDayTable.date
 			);
 
+		// Filter by hourly rate in-memory (since rate requirements vary by discipline)
+		const filteredRecurrenceDays = recurrenceDays.filter((shift) => {
+			// Find the candidate's discipline experience that matches this shift
+			const matchingDiscipline = candidateDisciplines.find(
+				(d) =>
+					d.disciplineId === shift.requisition.disciplineId &&
+					d.experienceLevelId === shift.requisition.experienceLevelId
+			);
+
+			if (!matchingDiscipline) {
+				return false;
+			}
+
+			// Check if the shift's hourly rate falls within the candidate's preferred range
+			const shiftRate = shift.requisition.hourlyRate || 0;
+			return (
+				shiftRate >= matchingDiscipline.preferredHourlyMin &&
+				shiftRate <= matchingDiscipline.preferredHourlyMax
+			);
+		});
+
 		return json({
 			candidateLocation: {
 				lat: candidateProfile.lat,
 				lon: candidateProfile.lon,
 				address: candidateProfile.completeAddress
 			},
-			recurrenceDays,
+			recurrenceDays: filteredRecurrenceDays,
 			searchRadius: RADIUS_MILES,
-			totalFound: recurrenceDays.length,
+			totalFound: filteredRecurrenceDays.length,
 			nearbyOfficeCount: officeLocationIds.length
 		});
 	} catch (err) {

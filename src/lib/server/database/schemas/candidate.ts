@@ -128,7 +128,9 @@ export const candidateDisciplineExperienceTable = pgTable(
 			.references(() => experienceLevelTable.id, { onDelete: 'cascade' }),
 		disciplineId: text('discipline_id')
 			.notNull()
-			.references(() => disciplineTable.id, { onDelete: 'cascade' })
+			.references(() => disciplineTable.id, { onDelete: 'cascade' }),
+		preferredHourlyMin: smallint('preferred_hourly_min').notNull().default(0),
+		preferredHourlyMax: smallint('preferred_hourly_max').notNull().default(0)
 	},
 	(t) => ({ pk: primaryKey({ columns: [t.candidateId, t.disciplineId] }) })
 );

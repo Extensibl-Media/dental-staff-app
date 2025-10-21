@@ -46,7 +46,12 @@ export const GET: RequestHandler = async ({ request }) => {
 			);
 		}
 		const disciplines = await db
-			.select({ disciplineId: disciplineTable.id, experienceLevelId: experienceLevelTable.id })
+			.select({
+				disciplineId: disciplineTable.id,
+				experienceLevelId: experienceLevelTable.id,
+				preferredHourlyMin: candidateDisciplineExperienceTable.preferredHourlyMin,
+				preferredHourlyMax: candidateDisciplineExperienceTable.preferredHourlyMax
+			})
 			.from(candidateDisciplineExperienceTable)
 			.innerJoin(candidateProfileTable, eq(candidateProfileTable.userId, user.id))
 			.innerJoin(

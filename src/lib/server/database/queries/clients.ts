@@ -355,10 +355,12 @@ export async function getAllClientStaffProfiles(companyId: string, searchTerm?: 
 	// Add search conditions if searchTerm is provided
 	if (searchTerm) {
 		whereConditions.push(
-			or(
-				ilike(userTable.firstName, `%${searchTerm}%`),
-				ilike(userTable.lastName, `%${searchTerm}%`),
-				ilike(userTable.email, `%${searchTerm}%`)
+			<SQL<unknown>>(
+				or(
+					ilike(userTable.firstName, `%${searchTerm}%`),
+					ilike(userTable.lastName, `%${searchTerm}%`),
+					ilike(userTable.email, `%${searchTerm}%`)
+				)
 			)
 		);
 	}
@@ -565,7 +567,7 @@ export async function getPaginatedLocationsByCompanyId(
 	}
 }
 
-export async function getClientStaffLocations(userId: string) {}
+// export async function getClientStaffLocations(userId: string) {}
 
 export async function getClientSubscription(clientId: string | undefined) {
 	if (!clientId) throw error(400, 'Client ID is required');

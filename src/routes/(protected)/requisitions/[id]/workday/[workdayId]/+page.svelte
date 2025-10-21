@@ -16,7 +16,7 @@
 		DialogFooter,
 		DialogHeader,
 		DialogTitle,
-		DialogTrigger
+		// DialogTrigger
 	} from '$lib/components/ui/dialog';
 	import {
 		AlertDialog,
@@ -27,7 +27,7 @@
 		AlertDialogFooter,
 		AlertDialogHeader,
 		AlertDialogTitle,
-		AlertDialogTrigger
+		// AlertDialogTrigger
 	} from '$lib/components/ui/alert-dialog';
 	import { Avatar, AvatarFallback, AvatarImage } from '$lib/components/ui/avatar';
 	import { Calendar } from '$lib/components/ui/calendar';

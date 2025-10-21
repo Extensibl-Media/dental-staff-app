@@ -152,6 +152,10 @@ export async function getCandidateProfileById(candidateId: string) {
 			experience: {
 				...candidateDisciplineExperienceTable,
 				experienceLevel: experienceLevelTable.value
+			},
+			salaryRange: {
+				min: candidateDisciplineExperienceTable.preferredHourlyMin,
+				max: candidateDisciplineExperienceTable.preferredHourlyMax
 			}
 		})
 		.from(candidateDisciplineExperienceTable)

@@ -23,6 +23,7 @@ export const OPTIONS: RequestHandler = async () => {
 };
 
 export const POST: RequestHandler = async ({ request }) => {
+	console.log('Add candidate disciplines endpoint called');
 	try {
 		const user = await authenticateUser(request);
 		if (!user) {
@@ -42,7 +43,18 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		const parsedExperience = z
 			.object({
-				disciplines: z.array(z.object({ disciplineId: z.string(), experienceLevelId: z.string() }))
+				disciplines: z.array(
+					z
+						.object({
+							disciplineId: z.string(),
+							experienceLevelId: z.string(),
+							preferredHourlyMin: z.number().int().min(0),
+							preferredHourlyMax: z.number().int().min(0)
+						})
+						.refine((data) => data.preferredHourlyMax >= data.preferredHourlyMin, {
+							message: 'Maximum rate must be greater than or equal to minimum rate'
+						})
+				)
 			})
 			.safeParse(body);
 
@@ -76,6 +88,8 @@ export const POST: RequestHandler = async ({ request }) => {
 				candidateId: existingProfile.id,
 				disciplineId: discipline.disciplineId,
 				experienceLevelId: discipline.experienceLevelId,
+				preferredHourlyMin: discipline.preferredHourlyMin,
+				preferredHourlyMax: discipline.preferredHourlyMax,
 				createdAt: new Date(),
 				updatedAt: new Date()
 			});

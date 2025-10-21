@@ -265,10 +265,25 @@ export const newCandidateProfileSchema = z.object({
 	birthday: z.string().optional(),
 	completeAddress: z.string().optional(),
 	lat: z.string().optional(),
-	lon: z.string().optional(),
-	regionId: z.string().optional()
+	lon: z.string().optional()
 });
 export type NewCandidateProfileSchema = typeof newCandidateProfileSchema;
+
+export const updateCandidateProfileSchema = z.object({
+	firstName: z.string().optional(),
+	lastName: z.string().optional(),
+	email: z.string().email('Invalid email address').optional(),
+	hourlyRateMin: z.number().optional(),
+	hourlyRateMax: z.number().optional(),
+	cellPhone: z.string().optional(),
+	citizenship: z.string().optional(),
+	birthday: z.string().optional(),
+	completeAddress: z.string().optional(),
+	lat: z.string().optional(),
+	lon: z.string().optional()
+});
+
+export type UpdateCandidateProfileSchema = typeof updateCandidateProfileSchema;
 
 export const fileUploadSchema = z.object({
 	file: z.instanceof(File, { message: 'Please upload a file.' })
@@ -339,3 +354,21 @@ export const ClientLocationDetailsSchema = NewAddressSchema.merge(ContactSchema)
 	})
 );
 export const CandidateStatusSchema = z.object({ status: z.string().min(1), id: z.string().min(1) });
+
+export const updateCandidateDisciplinesSchema = z.object({
+	disciplines: z
+		.array(
+			z
+				.object({
+					disciplineId: z.string().min(1, 'Discipline is required'),
+					experienceLevelId: z.string().min(1, 'Experience level is required'),
+					preferredHourlyMin: z.coerce.number().min(0, 'Minimum rate must be at least 0').int(),
+					preferredHourlyMax: z.coerce.number().min(0, 'Maximum rate must be at least 0').int()
+				})
+				.refine((data) => data.preferredHourlyMax >= data.preferredHourlyMin, {
+					message: 'Maximum rate must be greater than or equal to minimum rate',
+					path: ['preferredHourlyMax']
+				})
+		)
+		.min(1, 'Please select at least one discipline')
+});
