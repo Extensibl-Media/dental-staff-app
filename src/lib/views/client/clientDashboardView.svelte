@@ -145,7 +145,7 @@
 		</div>
 
 		<!-- Invoices table -->
-		<div class="col-span-12 lg:col-span-8">
+		<div class="col-span-12 xl:col-span-6">
 			<Card.Root>
 				<Card.Header class="flex flex-row justify-between items-center flex-wrap">
 					<Card.Title class="text-xl md:text-2xl">Recent Invoices</Card.Title>
@@ -233,7 +233,7 @@
 		</div>
 
 		<!-- Requisitions table (moved to adjust layout) -->
-		<div class="col-span-12 lg:col-span-4">
+		<div class="col-span-12 xl:col-span-6">
 			<Card.Root>
 				<Card.Header class="flex flex-row justify-between items-center flex-wrap">
 					<Card.Title class="text-xl md:text-2xl">Recent Requisitions</Card.Title>
@@ -249,35 +249,35 @@
 					<Table.Root>
 						<Table.Header>
 							<Table.Row>
-								<Table.Head>Title</Table.Head>
+								<Table.Head>Position</Table.Head>
 								<Table.Head>Status</Table.Head>
 								<Table.Head class="text-right">Rate</Table.Head>
 							</Table.Row>
 						</Table.Header>
 						<Table.Body>
-							{#each requisitions.slice(0, 5) as req, i (req.id)}
-								<Table.Row class="cursor-pointer" on:click={() => goto(`/requisitions/${req.id}`)}>
+							{#each requisitions.slice(0, 5) as req, i (req.requisition.id)}
+								<Table.Row class="cursor-pointer" on:click={() => goto(`/requisitions/${req.requisition.id}`)}>
 									<Table.Cell>
 										<div class="flex flex-col">
-											<span class="font-medium truncate max-w-[150px]">{req.title}</span>
-											<span class="text-xs text-gray-500">{formatDate(req.createdAt)}</span>
+											<span class="font-medium truncate max-w-[250px]">{req.requisition.disciplineName} <span class="text-xs text-muted-foreground"> - Req# {req.requisition.id}</span></span>
+											<span class="text-xs text-gray-500">{formatDate(req.requisition.createdAt)}</span>
 										</div>
 									</Table.Cell>
 									<Table.Cell>
 										<Badge
 											variant="secondary"
-											value={req.status}
+											value={req.requisition.status}
 											class={cn(
-												req.status === 'PENDING' && 'bg-yellow-300 hover:bg-yellow-400',
-												req.status === 'OPEN' && 'bg-blue-500 hover:bg-blue-600',
-												req.status === 'FILLED' && 'bg-green-400 hover:bg-bg-green-500',
-												req.status === 'UNFULFILLED' && 'bg-orange-400 hover:bg-orange-500',
-												req.status === 'CANCELED' && 'bg-red-500 hover:bg-red-600',
+												req.requisition.status === 'PENDING' && 'bg-yellow-300 hover:bg-yellow-400',
+												req.requisition.status === 'OPEN' && 'bg-blue-500 hover:bg-blue-600',
+												req.requisition.status === 'FILLED' && 'bg-green-400 hover:bg-bg-green-500',
+												req.requisition.status === 'UNFULFILLED' && 'bg-orange-400 hover:bg-orange-500',
+												req.requisition.status === 'CANCELED' && 'bg-red-500 hover:bg-red-600',
 												'text-white'
 											)}
 										/>
 									</Table.Cell>
-									<Table.Cell class="text-right">{formatCurrency(req.hourlyRate)}</Table.Cell>
+									<Table.Cell class="text-right">{formatCurrency(req.requisition.hourlyRate)}</Table.Cell>
 								</Table.Row>
 							{/each}
 						</Table.Body>

@@ -26,6 +26,7 @@ import {
 import { get } from 'svelte/store';
 import type Stripe from 'stripe';
 import { error } from '@sveltejs/kit';
+import { disciplineTable } from '../schemas/skill';
 
 export type ActionType = 'CREATE' | 'UPDATE' | 'DELETE';
 
@@ -281,7 +282,7 @@ export async function getSupportTicketsPreview(limit: number) {
 export async function getRequisitionsPreviewAdmin(limit: number) {
 	const result = await db
 		.select({
-			requisition: { ...requisitionTable },
+			requisition: { ...requisitionTable, disciplineName: disciplineTable.name },
 			client: { ...clientProfileTable },
 			company: { ...clientCompanyTable },
 			user: {
@@ -293,6 +294,7 @@ export async function getRequisitionsPreviewAdmin(limit: number) {
 			}
 		})
 		.from(requisitionTable)
+		.innerJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id))
 		.leftJoin(clientCompanyTable, eq(requisitionTable.companyId, clientCompanyTable.id))
 		.leftJoin(clientProfileTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
 		.leftJoin(userTable, eq(clientProfileTable.userId, userTable.id))

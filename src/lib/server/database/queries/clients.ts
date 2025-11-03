@@ -36,6 +36,7 @@ import {
 import type { PaginateOptions } from '$lib/types';
 import { EmailService } from '$lib/server/email/emailService';
 import { DEFAULT_MAX_RECORD_LIMIT } from '$lib/config/constants';
+import { disciplineTable } from '../schemas/skill';
 
 export type ClientWithCompanyRaw = {
 	birthday: string | null;
@@ -767,8 +768,9 @@ export async function getRequisitionsForClientWithLimit(clientId: string, count:
 	try {
 		const company = await getClientCompanyByClientId(clientId);
 		const result = await db
-			.select()
+			.select({ requisition: { ...requisitionTable, disciplineName: disciplineTable.name } })
 			.from(requisitionTable)
+			.innerJoin(disciplineTable, eq(disciplineTable.id, requisitionTable.disciplineId))
 			.where(
 				and(eq(requisitionTable.companyId, company.id), ne(requisitionTable.status, 'PENDING'))
 			)

@@ -81,8 +81,8 @@
 				}
 			},
 			{
-				header: 'Title',
-				accessorKey: 'title',
+				header: 'Discipline',
+				accessorKey: 'disciplineName',
 				cell: ({ getValue, row }) => {
 					return getValue() as string;
 				}
@@ -102,10 +102,6 @@
 				header: 'Office',
 				accessorKey: 'locationName'
 			},
-			{
-				header: 'Region',
-				accessorKey: 'regionAbbreviation'
-			}
 		);
 
 		if (!isAdmin) {
@@ -145,48 +141,44 @@
 
 	// Table options for each status
 	const openOptions = writable<TableOptions<RequisitionData>>(createTableOptions([]));
-	const filledOptions = writable<TableOptions<RequisitionData>>(createTableOptions([]));
-	const unfulfilledOptions = writable<TableOptions<RequisitionData>>(createTableOptions([]));
+	// const filledOptions = writable<TableOptions<RequisitionData>>(createTableOptions([]));
+	// const unfulfilledOptions = writable<TableOptions<RequisitionData>>(createTableOptions([]));
 	const canceledOptions = writable<TableOptions<RequisitionData>>(createTableOptions([]));
 
 	// Create table instances
 	const openTable = createSvelteTable(openOptions);
-	const filledTable = createSvelteTable(filledOptions);
-	const unfulfilledTable = createSvelteTable(unfulfilledOptions);
+	// const filledTable = createSvelteTable(filledOptions);
+	// const unfulfilledTable = createSvelteTable(unfulfilledOptions);
 	const canceledTable = createSvelteTable(canceledOptions);
 
 	// Get current active table
 	$: currentTable =
 		activeTab === 'open'
 			? openTable
-			: activeTab === 'filled'
-				? filledTable
-				: activeTab === 'unfulfilled'
-					? unfulfilledTable
-					: canceledTable;
+			: canceledTable;
 
 	// Update table data when requisitions change
 	$: {
 		const openData = filterByStatus(requisitions, 'open');
-		const filledData = filterByStatus(requisitions, 'filled');
-		const unfulfilledData = filterByStatus(requisitions, 'unfulfilled');
+		// const filledData = filterByStatus(requisitions, 'filled');
+		// const unfulfilledData = filterByStatus(requisitions, 'unfulfilled');
 		const canceledData = filterByStatus(requisitions, 'canceled');
 
 		openOptions.update((opts) => ({ ...opts, data: openData, columns }));
-		filledOptions.update((opts) => ({ ...opts, data: filledData, columns }));
-		unfulfilledOptions.update((opts) => ({ ...opts, data: unfulfilledData, columns }));
+		// filledOptions.update((opts) => ({ ...opts, data: filledData, columns }));
+		// unfulfilledOptions.update((opts) => ({ ...opts, data: unfulfilledData, columns }));
 		canceledOptions.update((opts) => ({ ...opts, data: canceledData, columns }));
 	}
 
 	onMount(() => {
 		const openData = filterByStatus(requisitions, 'open');
-		const filledData = filterByStatus(requisitions, 'filled');
-		const unfulfilledData = filterByStatus(requisitions, 'unfulfilled');
+		// const filledData = filterByStatus(requisitions, 'filled');
+		// const unfulfilledData = filterByStatus(requisitions, 'unfulfilled');
 		const canceledData = filterByStatus(requisitions, 'canceled');
 
 		openOptions.update((opts) => ({ ...opts, data: openData, columns }));
-		filledOptions.update((opts) => ({ ...opts, data: filledData, columns }));
-		unfulfilledOptions.update((opts) => ({ ...opts, data: unfulfilledData, columns }));
+		// filledOptions.update((opts) => ({ ...opts, data: filledData, columns }));
+		// unfulfilledOptions.update((opts) => ({ ...opts, data: unfulfilledData, columns }));
 		canceledOptions.update((opts) => ({ ...opts, data: canceledData, columns }));
 	});
 
@@ -247,7 +239,7 @@
 					></Badge>
 				{/if}
 			</Tabs.Trigger>
-			<Tabs.Trigger value="filled" class="relative">
+			<!-- <Tabs.Trigger value="filled" class="relative">
 				Filled
 				{#if tabCounts.filled > 0}
 					<Badge variant="secondary" class="ml-2 h-5 min-w-5 text-xs" value={tabCounts.filled}
@@ -261,7 +253,7 @@
 						{tabCounts.unfulfilled}
 					</Badge>
 				{/if}
-			</Tabs.Trigger>
+			</Tabs.Trigger> -->
 			<Tabs.Trigger value="canceled" class="relative">
 				Canceled
 				{#if tabCounts.canceled > 0}
@@ -273,7 +265,7 @@
 		</Tabs.List>
 
 		<!-- Tab Contents -->
-		{#each ['open', 'filled', 'unfulfilled', 'canceled'] as tabValue}
+		{#each ['open',  'canceled'] as tabValue}
 			<Tabs.Content value={tabValue} class="">
 				{#if activeTab === tabValue}
 					<div class="bg-white rounded-lg shadow-sm">

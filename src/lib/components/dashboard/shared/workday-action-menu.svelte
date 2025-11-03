@@ -4,10 +4,10 @@
 </script>
 
 <ActionMenuButton>
-	<DropdownMenu.Item>
-		<a href="">Edit</a>
+	<DropdownMenu.Item on:click={() => alert('edit action triggered')}>
+		<span>Edit</span>
 	</DropdownMenu.Item>
-	<DropdownMenu.Item>
-		<a href="">Delete</a>
+	<DropdownMenu.Item on:click={() => alert('Delete action triggered')} class="text-destructive">
+		<span>Delete</span>
 	</DropdownMenu.Item>
 </ActionMenuButton>

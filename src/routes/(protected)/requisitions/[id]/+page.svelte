@@ -278,7 +278,7 @@
                         <div class="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
                             <div>
                                 <h1 class="text-3xl md:text-4xl font-bold">
-                                    {requisition.discipline.name}
+                                    {requisition.discipline.name} <span class="text-sm text-muted-foreground font-normal"> - Req# {requisition.id}</span>
                                 </h1>
                                 <p class="text-lg font-medium text-gray-700 mt-1">{company?.companyName}</p>
                             </div>
@@ -475,7 +475,7 @@
                 <TabsContent value="details" class="mt-6">
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <!-- Job Description -->
-                        <div class="col-span-2 space-y-6">
+                        <div class="col-span-3 space-y-6">
                             <Card class="max-w-none">
                                 <CardHeader>
                                     <CardTitle>Job Description</CardTitle>
@@ -506,8 +506,8 @@
                         </div>
 
                         <!-- Details Sidebar -->
-                        <div class="col-span-1 space-y-6">
-                            <!-- Location Details -->
+                        <!-- <div class="col-span-1 space-y-6">
+
                             <Card class="max-w-none">
                                 <CardHeader class="pb-3">
                                     <CardTitle class="text-lg flex items-center gap-2">
@@ -524,7 +524,6 @@
                                 </CardContent>
                             </Card>
 
-                            <!-- Position Details -->
                             <Card class="max-w-none">
                                 <CardHeader class="pb-3">
                                     <CardTitle class="text-lg flex items-center gap-2">
@@ -566,7 +565,7 @@
                                     </div>
                                 </CardContent>
                             </Card>
-                        </div>
+                        </div> -->
                     </div>
                 </TabsContent>
 
