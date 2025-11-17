@@ -43,6 +43,20 @@
       "when": 1760500569217,
       "tag": "0005_clever_the_renegades",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1762403809320,
+      "tag": "0006_fearless_gabe_jones",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1762404000078,
+      "tag": "0007_bitter_maggott",
+      "breakpoints": true
     }
   ]
 }

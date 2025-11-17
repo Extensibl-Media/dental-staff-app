@@ -21,6 +21,7 @@
 		toUTCDateString,
 		formatTimezoneName
 	} from '$lib/_helpers/UTCTimezoneUtils';
+	import { Plus, PlusIcon } from 'lucide-svelte';
 
 	// Props
 	export let requisition: Requisition;
@@ -234,7 +235,8 @@
 <Sheet.Root>
 	<Sheet.Trigger asChild let:builder>
 		<Button builders={[builder]} class="bg-blue-800 hover:bg-blue-900 mb-4">
-			Add Recurrence Days
+		<PlusIcon class="w-4 h-4 mr-2" />
+			Add Shifts
 		</Button>
 	</Sheet.Trigger>
 

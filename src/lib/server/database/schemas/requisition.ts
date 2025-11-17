@@ -275,6 +275,7 @@ export const workdayTable = pgTable('workdays', {
 });
 
 export const timesheetStatusEnum = pgEnum('timesheet_status', [
+	'DRAFT',
 	'PENDING',
 	'APPROVED',
 	'DISCREPANCY',
@@ -304,24 +305,22 @@ export const timeSheetTable = pgTable(
 		totalHoursWorked: decimal('total_hours_worked'),
 		totalHoursBilled: decimal('total_hours_billed'),
 		awaitingClientSignature: boolean('awaiting_client_signature').default(true),
-		candidateRateBase: decimal('candidate_rate_base'),
-		candidateRateOT: decimal('candidate_rate_overtime'),
 		requisitionId: integer('requisition_id').references(() => requisitionTable.id, {
 			onDelete: 'set null'
 		}),
 		workdayId: text('workday_id')
 			.references(() => workdayTable.id)
 			.notNull(),
-		weekBeginDate: date('week_begin_date').notNull().notNull(),
-		hoursRaw: json('hours_raw').$type<RawTimesheetHours[]>().notNull().default([]),
-		status: timesheetStatusEnum('status').default('PENDING').notNull()
+		weekBeginDate: date('week_begin_date').notNull(),
+		hoursRaw: json('hours_raw').$type<RawTimesheetHours[]>().default([]),
+		status: timesheetStatusEnum('status').default('DRAFT').notNull()
 	},
-	(table) => ({
-		candidateIdx: index('timesheet_candidate_idx').on(table.associatedCandidateId),
-		clientIdx: index('timesheet_client_idx').on(table.associatedClientId),
-		weekBeginIdx: index('timesheet_week_begin_idx').on(table.weekBeginDate),
-		requisitionIdx: index('timesheet_requisition_idx').on(table.requisitionId)
-	})
+	(table) => [
+		index('timesheet_candidate_idx').on(table.associatedCandidateId),
+		index('timesheet_client_idx').on(table.associatedClientId),
+		index('timesheet_week_begin_idx').on(table.weekBeginDate),
+		index('timesheet_requisition_idx').on(table.requisitionId)
+	]
 );
 
 export const requisitionApplicationStatusEnum = pgEnum('requisition_application_status', [

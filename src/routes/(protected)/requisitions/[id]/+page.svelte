@@ -68,20 +68,35 @@
     $: applications = data.applications;
     $: status = requisition?.status;
     $: hasRequisitionRights = data.hasRequisitionRights;
-    $: {
-        applicationTableData = (applications as ApplicationResults[]) || [];
-        applicationsOptions.update((o) => ({...o, data: applicationTableData}));
-        recurrenceDaysTableData = (recurrenceDays as RecurrenceDaySelect[]) ?? [];
-        recurrenceDaysOptions.update((o) => ({...o, data: recurrenceDaysTableData}));
-    }
 
     let applicationTableData: ApplicationResults[] = [];
     let recurrenceDaysTableData: RecurrenceDaySelect[] = [];
     let timesheetTableData: TimeSheetResults[] = [];
+    let selectedWorkDayStatus: 'OPEN' | 'FILLED' | 'UNFULFILLED' | 'CANCELLED' = 'OPEN';
 
     export let changeStatusForm: SuperValidated<ChangeStatusSchema>;
     export let recurrenceDayForm: SuperValidated<NewRecurrenceDaySchema>;
     // export let deleteRecurrenceDayForm: SuperValidated<DeleteRecurrenceDaySchema>;
+
+    // Filter recurrence days by status
+    $: filteredRecurrenceDays = recurrenceDaysTableData.filter(
+        (day) => day.status === selectedWorkDayStatus
+    );
+
+    // Update table data when source data changes
+    $: {
+        applicationTableData = (applications as ApplicationResults[]) || [];
+        applicationsOptions.update((o) => ({...o, data: applicationTableData}));
+    }
+
+    $: {
+        recurrenceDaysTableData = (recurrenceDays as RecurrenceDaySelect[]) ?? [];
+    }
+
+    // Update recurrence days table when filtered data changes
+    $: {
+        recurrenceDaysOptions.update((o) => ({...o, data: filteredRecurrenceDays}));
+    }
 
     const recurrenceDaysColumns: ColumnDef<RecurrenceDaySelect>[] = [
         {
@@ -223,7 +238,7 @@
         getSortedRowModel: getSortedRowModel()
     });
     const recurrenceDaysOptions = writable<TableOptions<RecurrenceDaySelect>>({
-        data: recurrenceDaysTableData,
+        data: filteredRecurrenceDays,
         columns: recurrenceDaysColumns,
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel()
@@ -239,7 +254,7 @@
         applicationTableData = (applications as ApplicationResults[]) ?? [];
         applicationsOptions.update((o) => ({...o, data: applicationTableData}));
         recurrenceDaysTableData = (recurrenceDays as RecurrenceDaySelect[]) ?? [];
-        recurrenceDaysOptions.update((o) => ({...o, data: recurrenceDaysTableData}));
+        recurrenceDaysOptions.update((o) => ({...o, data: filteredRecurrenceDays}));
         timesheetTableData = (data.timesheets as TimeSheetResults[]) ?? [];
         timesheetOptions.update((o) => ({...o, data: timesheetTableData}));
     });
@@ -504,68 +519,6 @@
                                 </Card>
                             {/if}
                         </div>
-
-                        <!-- Details Sidebar -->
-                        <!-- <div class="col-span-1 space-y-6">
-
-                            <Card class="max-w-none">
-                                <CardHeader class="pb-3">
-                                    <CardTitle class="text-lg flex items-center gap-2">
-                                        <MapPin class="h-5 w-5 text-gray-500"/>
-                                        Location Details
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p>Address:</p>
-                                    <address class="not-italic text-sm">
-                                        {requisition.location.completeAddress}
-                                    </address>
-
-                                </CardContent>
-                            </Card>
-
-                            <Card class="max-w-none">
-                                <CardHeader class="pb-3">
-                                    <CardTitle class="text-lg flex items-center gap-2">
-                                        <Briefcase class="h-5 w-5 text-gray-500"/>
-                                        Position Details
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent class="space-y-3">
-                                    <div class="flex justify-between items-center border-b pb-2">
-                                        <span class="text-gray-600">Position Type</span>
-                                        <span class="font-medium"
-                                        >{requisition.permanentPosition ? 'Permanent' : 'Temporary'}</span
-                                        >
-                                    </div>
-                                    <div class="flex justify-between items-center border-b pb-2">
-                                        <span class="text-gray-600">Discipline</span>
-                                        <span class="font-medium">{requisition.discipline.name}</span>
-                                    </div>
-                                    <div class="flex justify-between items-center border-b pb-2">
-                                        <span class="text-gray-600">Experience Level</span>
-                                        <span class="font-medium">{requisition.experienceLevel?.value}</span>
-                                    </div>
-                                    <div class="flex justify-between items-center border-b pb-2">
-                                        <span class="text-gray-600">Hourly Rate</span>
-                                        <span class="font-medium">${requisition.hourlyRate}/hr</span>
-                                    </div>
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-gray-600">Status</span>
-                                        <Badge
-                                                class={cn(
-												status === 'OPEN' && 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-												status === 'FILLED' && 'bg-green-100 text-green-800 hover:bg-green-100',
-												status === 'UNFULFILLED' &&
-													'bg-orange-100 text-orange-800 hover:bg-orange-100',
-												status === 'CANCELED' && 'bg-red-100 text-red-800 hover:bg-red-100'
-											)}
-                                                value={requisition.status}
-                                        />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div> -->
                     </div>
                 </TabsContent>
 
@@ -641,7 +594,7 @@
                             </CardHeader>
                             <CardContent>
                                 {#if recurrenceDaysTableData.length === 0}
-                                    <div class="text-center">
+                                    <div class="text-center py-10">
                                         <CalendarClock class="h-12 w-12 mx-auto text-gray-300"/>
                                         <h3 class="mt-4 text-lg font-medium">No Work Days</h3>
                                         <p class="mt-2 text-sm text-gray-500">
@@ -649,39 +602,93 @@
                                         </p>
                                     </div>
                                 {:else}
-                                    <div class="rounded-md border">
-                                        <Table.Root>
-                                            <TableHeader>
-                                                {#each $recurrenceDaysTable.getHeaderGroups() as headerGroup}
-                                                    <TableRow>
-                                                        {#each headerGroup.headers as header}
-                                                            <TableHead>
-                                                                <svelte:component
-                                                                        this={flexRender(
-																		header.column.columnDef.header,
-																		header.getContext()
-																	)}
-                                                                />
-                                                            </TableHead>
-                                                        {/each}
-                                                    </TableRow>
-                                                {/each}
-                                            </TableHeader>
-                                            <TableBody>
-                                                {#each $recurrenceDaysTable.getRowModel().rows as row}
-                                                    <TableRow>
-                                                        {#each row.getVisibleCells() as cell}
-                                                            <TableCell>
-                                                                <svelte:component
-                                                                        this={flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                                                />
-                                                            </TableCell>
-                                                        {/each}
-                                                    </TableRow>
-                                                {/each}
-                                            </TableBody>
-                                        </Table.Root>
+                                    <!-- Status Filter Buttons -->
+                                    <div class="mb-4 flex flex-wrap gap-2">
+                                        <Button
+                                                variant={selectedWorkDayStatus === 'OPEN' ? 'default' : 'outline'}
+                                                size="sm"
+                                                on:click={() => selectedWorkDayStatus = 'OPEN'}
+                                                class={cn(
+                                                    selectedWorkDayStatus === 'OPEN' && 'bg-blue-500 hover:bg-blue-600'
+                                                )}
+                                        >
+                                            Open
+                                        </Button>
+                                        <Button
+                                                variant={selectedWorkDayStatus === 'FILLED' ? 'default' : 'outline'}
+                                                size="sm"
+                                                on:click={() => selectedWorkDayStatus = 'FILLED'}
+                                                class={cn(
+                                                    selectedWorkDayStatus === 'FILLED' && 'bg-green-500 hover:bg-green-600'
+                                                )}
+                                        >
+                                            Filled
+                                        </Button>
+                                        <Button
+                                                variant={selectedWorkDayStatus === 'UNFULFILLED' ? 'default' : 'outline'}
+                                                size="sm"
+                                                on:click={() => selectedWorkDayStatus = 'UNFULFILLED'}
+                                                class={cn(
+                                                    selectedWorkDayStatus === 'UNFULFILLED' && 'bg-orange-500 hover:bg-orange-600'
+                                                )}
+                                        >
+                                            Unfulfilled
+                                        </Button>
+                                        <Button
+                                                variant={selectedWorkDayStatus === 'CANCELLED' ? 'default' : 'outline'}
+                                                size="sm"
+                                                on:click={() => selectedWorkDayStatus = 'CANCELLED'}
+                                                class={cn(
+                                                    selectedWorkDayStatus === 'CANCELLED' && 'bg-red-500 hover:bg-red-600'
+                                                )}
+                                        >
+                                            Cancelled
+                                        </Button>
                                     </div>
+
+                                    {#if filteredRecurrenceDays.length === 0}
+                                        <div class="text-center py-10 border rounded-md">
+                                            <CalendarClock class="h-12 w-12 mx-auto text-gray-300"/>
+                                            <h3 class="mt-4 text-lg font-medium">No {selectedWorkDayStatus.toLowerCase()} work days</h3>
+                                            <p class="mt-2 text-sm text-gray-500">
+                                                There are no work days with {selectedWorkDayStatus.toLowerCase()} status.
+                                            </p>
+                                        </div>
+                                    {:else}
+                                        <div class="rounded-md border">
+                                            <Table.Root>
+                                                <TableHeader>
+                                                    {#each $recurrenceDaysTable.getHeaderGroups() as headerGroup}
+                                                        <TableRow>
+                                                            {#each headerGroup.headers as header}
+                                                                <TableHead>
+                                                                    <svelte:component
+                                                                            this={flexRender(
+																			header.column.columnDef.header,
+																			header.getContext()
+																		)}
+                                                                    />
+                                                                </TableHead>
+                                                            {/each}
+                                                        </TableRow>
+                                                    {/each}
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {#each $recurrenceDaysTable.getRowModel().rows as row}
+                                                        <TableRow>
+                                                            {#each row.getVisibleCells() as cell}
+                                                                <TableCell>
+                                                                    <svelte:component
+                                                                            this={flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                                    />
+                                                                </TableCell>
+                                                            {/each}
+                                                        </TableRow>
+                                                    {/each}
+                                                </TableBody>
+                                            </Table.Root>
+                                        </div>
+                                    {/if}
                                 {/if}
                             </CardContent>
                         </Card>

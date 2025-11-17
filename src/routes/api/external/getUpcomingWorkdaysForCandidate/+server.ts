@@ -14,6 +14,7 @@ import {
 	clientCompanyTable,
 	companyOfficeLocationTable
 } from '$lib/server/database/schemas/client';
+import { disciplineTable } from '$lib/server/database/schemas/skill';
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': env.CANDIDATE_APP_DOMAIN,
@@ -57,7 +58,8 @@ export const GET: RequestHandler = async ({ request }) => {
 			recurrenceDay: { ...recurrenceDayTable },
 			requisition: {
 				...requisitionTable,
-				companyName: clientCompanyTable.companyName
+				companyName: clientCompanyTable.companyName,
+				discipline: disciplineTable.name
 			},
 			location: {
 				name: companyOfficeLocationTable.name,
@@ -72,6 +74,7 @@ export const GET: RequestHandler = async ({ request }) => {
 		.from(workdayTable)
 		.innerJoin(recurrenceDayTable, eq(recurrenceDayTable.id, workdayTable.recurrenceDayId))
 		.innerJoin(requisitionTable, eq(requisitionTable.id, workdayTable.requisitionId))
+		.innerJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id))
 		.innerJoin(
 			companyOfficeLocationTable,
 			eq(requisitionTable.locationId, companyOfficeLocationTable.id)

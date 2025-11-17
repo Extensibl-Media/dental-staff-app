@@ -10,6 +10,8 @@ import {
 	getRequisitionDetailsById,
 	getWorkdayDetails
 } from '$lib/server/database/queries/requisitions';
+import { USER_ROLES } from '$lib/config/constants';
+import { getClientProfileByIdAdmin } from '$lib/server/database/queries/admin';
 
 export async function load({ locals, params }: RequestEvent) {
 	const user = locals.user;
@@ -20,8 +22,21 @@ export async function load({ locals, params }: RequestEvent) {
 	const recurrenceDayId = params.workdayId;
 	const requisitionId = Number(params.id);
 
-	if (user.role === 'SUPERADMIN') {
-		redirect(302, `/dashboard`);
+	if (user.role === USER_ROLES.SUPERADMIN) {
+		const requisition = await getRequisitionDetailsById(requisitionId);
+		const client = await getClientProfileByIdAdmin(requisition.requisition.company.clientId);
+		const company = await getClientCompanyByClientId(client.id);
+		const recurrenceDay = await getRecurrenceDayDetails(recurrenceDayId, company.id);
+		const workday = await getWorkdayDetails(recurrenceDayId, company.id);
+
+		return {
+			user,
+			recurrenceDay,
+			workday,
+			client,
+			company,
+			requisition
+		};
 	}
 
 	if (user.role === 'CLIENT') {
@@ -33,7 +48,7 @@ export async function load({ locals, params }: RequestEvent) {
 		const recurrenceDay = await getRecurrenceDayDetails(recurrenceDayId, company.id);
 		const workday = await getWorkdayDetails(recurrenceDayId, company.id);
 		const requisition = await getRequisitionDetailsById(requisitionId);
-		console.log({ workday, requisition, recurrenceDay });
+
 		return {
 			user,
 			recurrenceDay,

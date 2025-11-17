@@ -21,7 +21,6 @@ import {
 	getLocationByIdForCompany
 } from '$lib/server/database/queries/clients';
 import { format } from 'date-fns';
-import { disciplineTable } from '$lib/server/database/schemas/skill';
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': env.CANDIDATE_APP_DOMAIN,
@@ -49,7 +48,6 @@ export const POST: RequestHandler = async ({ request }) => {
 
 		// Authenticate user
 		const user = await authenticateUser(request);
-		// console.log('User attempting to claim shift:', { userId: user.id });
 		if (!user) {
 			return json(
 				{ success: false, message: 'Unauthorized' },
@@ -168,12 +166,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				.set({ status: 'FILLED' })
 				.where(eq(recurrenceDayTable.id, recurrenceDayId));
 
-			// TODO Notify the client of a claimed workday
-			console.log('Recurrence day claimed:', {
-				recurrenceDayId,
-				workdayId: newWorkday.id,
-				candidateId: candidateProfile.id
-			});
+			// Send email to client contact
 			await emailService.sendRecurrenceDayClaimedEmail(
 				location.email || client.user.email,
 				{

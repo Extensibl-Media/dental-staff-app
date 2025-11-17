@@ -17,7 +17,6 @@
 		'Record Management': [
 			{ name: 'Support Tickets', link: '/support' },
 			{ name: 'Record History', link: '/admin/menu/record-history' },
-			{ name: 'Regions', link: '/admin/menu/regions' },
 			{ name: 'Documents', link: '/admin/menu/documents' },
 			{ name: 'Application Settings', link: '/admin/menu/application-settings' }
 		]

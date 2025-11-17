@@ -508,3 +508,12 @@ export async function getAdminDashboardData() {
 		requisitions
 	};
 }
+
+export async function getClientProfileByIdAdmin(clientId: string) {
+	const [result] = await db
+		.select()
+		.from(clientProfileTable)
+		.where(eq(clientProfileTable.id, clientId));
+
+	return result || null;
+}

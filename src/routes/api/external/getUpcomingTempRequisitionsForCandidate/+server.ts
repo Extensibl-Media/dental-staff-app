@@ -191,7 +191,7 @@ export const GET: RequestHandler = async ({ request }) => {
 			.where(
 				and(
 					inArray(requisitionTable.locationId, officeLocationIds),
-					notInArray(recurrenceDayTable.status, ['CANCELED']),
+					notInArray(recurrenceDayTable.status, ['CANCELED', 'UNFULFILLED', 'FILLED']),
 					eq(requisitionTable.archived, false),
 					eq(requisitionTable.permanentPosition, false),
 					// Filter by candidate's disciplines
@@ -202,7 +202,8 @@ export const GET: RequestHandler = async ({ request }) => {
 					// 1. Have no workday assigned (available to claim) OR
 					// 2. Are already assigned to THIS candidate (their bookings)
 					or(isNull(workdayTable.id), eq(workdayTable.candidateId, candidateProfile.id)),
-					dateCondition
+					dateCondition,
+					gte(recurrenceDayTable.date, new Date().toISOString())
 				)
 			)
 			.orderBy(
