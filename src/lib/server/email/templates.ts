@@ -38,7 +38,7 @@ export const EMAIL_TEMPLATES: Record<
 		const textEmail = `
             Please visit the link below to change your password for ${APP_NAME}:
             ${updatePasswordURL}
-            
+
             If you did not request to change your password, you can disregard this email.
         `.trim();
 
@@ -91,14 +91,14 @@ export const EMAIL_TEMPLATES: Record<
 
 		const textEmail = `
             You have been invited by your employer to join ${companyName}'s workspace in ${APP_NAME}.
-            
+
             Click the link below to accept the invitation and set up your account:
             ${verifyEmailURL}
-            
+
             This invitation will expire in 7 days.
-            
+
             If you weren't expecting this invitation, you can safely ignore this email.
-            
+
             Best regards,
             The ${APP_NAME} Team
         `.trim();
@@ -107,22 +107,22 @@ export const EMAIL_TEMPLATES: Record<
             <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
                     <h2>Welcome to ${APP_NAME}</h2>
                     <p>You have been invited by your employer to join ${companyName}'s workspace in ${APP_NAME}.</p>
-                    
+
                     <p style="margin: 24px 0;">
-                            <a href="${verifyEmailURL}" 
-                                 style="background-color: #4F46E5; color: white; padding: 12px 24px; 
+                            <a href="${verifyEmailURL}"
+                                 style="background-color: #4F46E5; color: white; padding: 12px 24px;
                                                 text-decoration: none; border-radius: 4px; display: inline-block;">
                                     Accept Invitation
                             </a>
                     </p>
-                    
+
                     <p>Or copy and paste this link into your browser:</p>
                     <p style="background-color: #F3F4F6; padding: 12px; border-radius: 4px; word-break: break-all;">
                             ${verifyEmailURL}
                     </p>
-                    
+
                     <p style="color: #6B7280; font-size: 14px;">This invitation will expire in 7 days.</p>
-                    
+
                     <p style="color: #6B7280; font-size: 14px; margin-top: 24px;">
                             If you weren't expecting this invitation, you can safely ignore this email.
                     </p>
@@ -139,9 +139,9 @@ export const EMAIL_TEMPLATES: Record<
             You have been invited to join ${APP_NAME} as an admin user.
             Click the link below to accept the invitation and set up your account:
             ${verifyEmailURL}
-            
+
             This invitation will expire in 7 days.
-            
+
             If you weren't expecting this invitation, you can safely ignore this email.
         `.trim();
 		const htmlEmail = `
@@ -170,12 +170,7 @@ export const EMAIL_TEMPLATES: Record<
 	},
 	workdayReminderEmail: (workdayDetails: {
 		companyName: string;
-		location: {
-			address: string;
-			city: string;
-			state: string;
-			zip: string;
-		};
+		location: string;
 		date: string;
 		workdayStart: string;
 		workdayEnd: string;
@@ -183,14 +178,14 @@ export const EMAIL_TEMPLATES: Record<
 		const { companyName, location, date, workdayStart, workdayEnd } = workdayDetails;
 		const textEmail = `
             Reminder: Your shift at ${companyName} is scheduled for ${date}.
-            Location: ${location.address}, ${location.city}, ${location.state} ${location.zip}
+            Location: ${location}
             Shift Start: ${workdayStart}
             Shift End: ${workdayEnd}
         `.trim();
 
 		const htmlEmail = `
             <p>Reminder: Your shift at <strong>${companyName}</strong> is scheduled for <strong>${date}</strong>.</p>
-            <p>Location: <strong>${location.address}, ${location.city}, ${location.state} ${location.zip}</strong></p>
+            <p>Location: <strong>${location}</strong></p>
             <p>Shift Start: <strong>${workdayStart}</strong></p>
             <p>Shift End: <strong>${workdayEnd}</strong></p>
         `.trim();
@@ -204,7 +199,7 @@ export const EMAIL_TEMPLATES: Record<
             This is a reminder that your invoice is due on ${format(invoiceDetails.dueDate!, 'PPp')}.
             Please visit the link below to view and pay your invoice:
             ${invoiceDetails.stripeHostedUrl}
-            
+
             If you have any questions, please contact us.
         `.trim();
 		const htmlEmail = `
@@ -221,7 +216,7 @@ export const EMAIL_TEMPLATES: Record<
             Thank you for your payment! Your invoice has been successfully paid on ${paymentDate}.
             You can view your invoice at the link below:
             ${invoiceLink}
-            
+
             If you have any questions, please contact us.
         `.trim();
 		const htmlEmail = `
@@ -237,12 +232,7 @@ export const EMAIL_TEMPLATES: Record<
 		workdayDetails: {
 			url: string;
 			companyName: string;
-			location: {
-				address: string;
-				city: string;
-				state: string;
-				zip: string;
-			};
+			location: string;
 			date: string;
 			workdayStart: string;
 			workdayEnd: string;
@@ -258,7 +248,7 @@ export const EMAIL_TEMPLATES: Record<
 		const textEmail = `
             Your workday shift on ${date} has been filled by: ${firstName} ${lastName} for the following position:\n
             ${workdayDetails.discipline}\n
-            Location: ${location.address}, ${location.city}, ${location.state} ${location.zip}\n
+            Location: ${location}\n
             Shift Start: ${workdayStart}\n
             Shift End: ${workdayEnd}\n
             You can view the details of your workday at the link below:\n
@@ -268,7 +258,7 @@ export const EMAIL_TEMPLATES: Record<
 		const htmlEmail = `
             <p>Your workday shift on ${date} has been filled by: <strong>${firstName} ${lastName}</strong> for the following position:</p>
             <p><strong>${workdayDetails.discipline}</strong></p>
-            <p>Location: <strong>${location.address}, ${location.city}, ${location.state} ${location.zip}</strong></p>
+            <p>Location: <strong>${location}</strong></p>
             <p>Shift Start: <strong>${workdayStart}</strong></p>
             <p>Shift End: <strong>${workdayEnd}</strong></p>
             <p>You can view the details of your workday at the link below:</p>
@@ -280,12 +270,7 @@ export const EMAIL_TEMPLATES: Record<
 	},
 	workdayCancelledEmail: (workdayDetails: {
 		companyName: string;
-		location: {
-			address: string;
-			city: string;
-			state: string;
-			zip: string;
-		};
+		location: string;
 		date: string;
 		workdayStart: string;
 		workdayEnd: string;
@@ -293,14 +278,14 @@ export const EMAIL_TEMPLATES: Record<
 		return {
 			textEmail: `
             Your workday at ${workdayDetails.companyName} scheduled for ${workdayDetails.date} has been cancelled.\n
-            Location: ${workdayDetails.location.address}, ${workdayDetails.location.city}, ${workdayDetails.location.state} ${workdayDetails.location.zip}\n
+            Location: ${workdayDetails.location}\n
             Shift Start: ${workdayDetails.workdayStart}\n
             Shift End: ${workdayDetails.workdayEnd}\n
             If you have any questions, please contact us.
         `.trim(),
 			htmlEmail: `
             <p>Your workday at <strong>${workdayDetails.companyName}</strong> scheduled for <strong>${workdayDetails.date}</strong> has been cancelled.</p>
-            <p>Location: <strong>${workdayDetails.location.address}, ${workdayDetails.location.city}, ${workdayDetails.location.state} ${workdayDetails.location.zip}</strong></p>
+            <p>Location: <strong>${workdayDetails.location}</strong></p>
             <p>Shift Start: <strong>${workdayDetails.workdayStart}</strong></p>
             <p>Shift End: <strong>${workdayDetails.workdayEnd}</strong></p>
             <p>If you have any questions, please contact us.</p>

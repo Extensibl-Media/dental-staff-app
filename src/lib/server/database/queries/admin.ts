@@ -317,8 +317,7 @@ export async function getDiscrepanciesForAdminDashboard() {
 			clientCompanyName: clientCompanyTable.companyName,
 			validated: timeSheetTable.validated,
 			awaitingClientSignature: timeSheetTable.awaitingClientSignature,
-			candidateRateBase: timeSheetTable.candidateRateBase,
-			candidateRateOT: timeSheetTable.candidateRateOT,
+			hourlyRate: requisitionTable.hourlyRate,
 			hoursRaw: timeSheetTable.hoursRaw,
 			workdayId: timeSheetTable.workdayId,
 			status: timeSheetTable.status,
@@ -472,7 +471,6 @@ export async function getInvoicesDuePreview(limit: number): Promise<InvoiceWithR
 		company: row.clientCompany
 	}));
 }
-
 export async function getAdminDashboardData() {
 	const [
 		timesheetsDueCount,
@@ -485,15 +483,42 @@ export async function getAdminDashboardData() {
 		invoicesDue,
 		requisitions
 	] = await Promise.all([
-		await getTimesheetsDueCount(),
-		await getSupportTicketsPreview(10),
-		await getOpenSupportTicketsCount(),
-		await getDiscrepanciesForAdminDashboard(),
-		await getNewCandidateSignupsPreview(10),
-		await getNewClientSignupsPreview(10),
-		await getInvoicesDueCount(),
-		await getInvoicesDuePreview(10),
-		await getRequisitionsPreviewAdmin(10)
+		getTimesheetsDueCount().catch((e) => {
+			console.error('❌ getTimesheetsDueCount failed:', e.message);
+			throw e;
+		}),
+		getSupportTicketsPreview(10).catch((e) => {
+			console.error('❌ getSupportTicketsPreview failed:', e.message);
+			throw e;
+		}),
+		getOpenSupportTicketsCount().catch((e) => {
+			console.error('❌ getOpenSupportTicketsCount failed:', e.message);
+			throw e;
+		}),
+		getDiscrepanciesForAdminDashboard().catch((e) => {
+			console.error('❌ getDiscrepanciesForAdminDashboard failed:', e.message);
+			throw e;
+		}),
+		getNewCandidateSignupsPreview(10).catch((e) => {
+			console.error('❌ getNewCandidateSignupsPreview failed:', e.message);
+			throw e;
+		}),
+		getNewClientSignupsPreview(10).catch((e) => {
+			console.error('❌ getNewClientSignupsPreview failed:', e.message);
+			throw e;
+		}),
+		getInvoicesDueCount().catch((e) => {
+			console.error('❌ getInvoicesDueCount failed:', e.message);
+			throw e;
+		}),
+		getInvoicesDuePreview(10).catch((e) => {
+			console.error('❌ getInvoicesDuePreview failed:', e.message);
+			throw e;
+		}),
+		getRequisitionsPreviewAdmin(10).catch((e) => {
+			console.error('❌ getRequisitionsPreviewAdmin failed:', e.message);
+			throw e;
+		})
 	]);
 
 	return {

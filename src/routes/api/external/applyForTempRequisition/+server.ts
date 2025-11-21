@@ -8,7 +8,8 @@ import {
 import {
 	requisitionTable,
 	workdayTable,
-	recurrenceDayTable
+	recurrenceDayTable,
+	timeSheetTable
 } from '$lib/server/database/schemas/requisition';
 import { authenticateUser } from '$lib/server/serverUtils';
 import { and, eq } from 'drizzle-orm';
@@ -110,7 +111,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			);
 
 			// TODO CHeck if workday exists for this candidate and this recurrence day/requisition
-			const [existingWorkday] = await db
+			const [existingWorkday] = await tx
 				.select()
 				.from(workdayTable)
 				.where(
@@ -129,7 +130,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				);
 			}
 
-			const disciplines = await db
+			const disciplines = await tx
 				.select()
 				.from(candidateDisciplineExperienceTable)
 				.where(eq(candidateDisciplineExperienceTable.candidateId, candidateProfile.id));
@@ -148,7 +149,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 
 			// Create a Workday for this temp requisition for this recurrence day
-			const [newWorkday] = await db
+			const [newWorkday] = await tx
 				.insert(workdayTable)
 				.values({
 					id: crypto.randomUUID(),
@@ -160,8 +161,46 @@ export const POST: RequestHandler = async ({ request }) => {
 				})
 				.returning();
 
+			const weekStart = new Date(recurrenceDay.recurrenceDay.date);
+			// Set to beginning of week (Sunday)
+			const dayOfWeek = weekStart.getDay();
+			weekStart.setDate(weekStart.getDate() - dayOfWeek);
+			const weekStartStr = weekStart.toISOString().split('T')[0];
+
+			// Check if a draft timesheet already exists for this week
+			const [existingTimesheet] = await tx
+				.select()
+				.from(timeSheetTable)
+				.where(
+					and(
+						eq(timeSheetTable.associatedCandidateId, candidateProfile.id),
+						eq(timeSheetTable.weekBeginDate, weekStartStr),
+						eq(timeSheetTable.requisitionId, recurrenceDay.requisition.id)
+					)
+				)
+				.limit(1);
+
+			if (!existingTimesheet) {
+				// Create a new DRAFT timesheet for this week
+				await tx.insert(timeSheetTable).values({
+					id: crypto.randomUUID(),
+					createdAt: new Date(),
+					updatedAt: new Date(),
+					workdayId: newWorkday.id,
+					associatedCandidateId: candidateProfile.id,
+					associatedClientId: clientId,
+					requisitionId: recurrenceDay.requisition.id,
+					weekBeginDate: weekStartStr,
+					totalHoursWorked: '0',
+					hoursRaw: [],
+					status: 'DRAFT', // ✅ Set to DRAFT
+					validated: false,
+					awaitingClientSignature: false
+				});
+			}
+
 			// Change Status of the recurrence day
-			await db
+			await tx
 				.update(recurrenceDayTable)
 				.set({ status: 'FILLED' })
 				.where(eq(recurrenceDayTable.id, recurrenceDayId));
@@ -172,12 +211,7 @@ export const POST: RequestHandler = async ({ request }) => {
 				{
 					url: `${env.BASE_URL}/requisitions/${recurrenceDay.requisition.id}/workday/${recurrenceDayId}`,
 					companyName: company.companyName as string,
-					location: {
-						address: location.streetOne + (location.streetTwo ? `, ${location.streetTwo}` : ''),
-						city: location.city as string,
-						state: location.state as string,
-						zip: location.zipcode as string
-					},
+					location: location.completeAddress || 'Not Specified',
 					date: recurrenceDay.recurrenceDay.date,
 					workdayStart: format(recurrenceDay.recurrenceDay.dayStart, 'hh:mm a'),
 					workdayEnd: format(recurrenceDay.recurrenceDay.dayEnd, 'hh:mm a'),

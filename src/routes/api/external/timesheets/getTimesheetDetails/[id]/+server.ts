@@ -46,8 +46,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
 					awaitingClientSignature: timeSheetTable.awaitingClientSignature,
 					weekBeginDate: timeSheetTable.weekBeginDate,
 					hoursRaw: timeSheetTable.hoursRaw,
-					candidateRateBase: timeSheetTable.candidateRateBase,
-					candidateRateOT: timeSheetTable.candidateRateOT,
+					hourlyRate: requisitionTable.hourlyRate,
 					status: timeSheetTable.status
 				},
 				requisition: {

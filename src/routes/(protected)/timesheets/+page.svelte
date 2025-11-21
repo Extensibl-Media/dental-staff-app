@@ -43,31 +43,46 @@
 	$: timesheets = (data.timesheets as TimesheetWithRelations[]) || [];
 	$: isAdmin = user?.role === USER_ROLES.SUPERADMIN;
 
-	// Helper function to validate timesheet and check for discrepancies
-	function hasDiscrepancies(timesheet: TimesheetWithRelations): boolean {
-		// Status-based discrepancy
-		if (timesheet.timesheet.status === 'DISCREPANCY') {
-			return true;
-		}
-
-		// Check if validation has already been done in page.server.ts
-		if ('hasValidationIssues' in timesheet) {
-			return timesheet.hasValidationIssues;
-		}
-
-		return false;
+	$: {
+		console.log('Timesheets data:', timesheets.map(ts => ({
+			id: ts.timesheet.id,
+			status: ts.timesheet.status,
+			hasValidationIssues: ts.hasValidationIssues,
+			discrepanciesCount: ts.discrepancies?.length || 0,
+			hasDiscrepanciesResult: hasDiscrepancies(ts)
+		})));
 	}
 
-	// Filter timesheets by discrepancy status
-	const filterByDiscrepancy = (timesheets: TimesheetWithRelations[], hasDiscrepancy: boolean) => {
-		if (hasDiscrepancy) {
-			return timesheets
-				.filter((ts) => hasDiscrepancies(ts))
-				.filter((ts) => ts.timesheet.status !== 'APPROVED');
-		} else {
-			return timesheets.filter((ts) => ts.timesheet.status !== 'DISCREPANCY');
+	// Helper function to validate timesheet and check for discrepancies
+	function hasDiscrepancies(timesheet: any): boolean {
+			// First check the status
+			if (timesheet.timesheet.status === 'DISCREPANCY') {
+				return true;
+			}
+
+			// Then check validation issues flag
+			if (timesheet.hasValidationIssues === true) {
+				return true;
+			}
+
+			// Check if there are actual discrepancies array
+			if (timesheet.discrepancies && Array.isArray(timesheet.discrepancies) && timesheet.discrepancies.length > 0) {
+				return true;
+			}
+
+			return false;
 		}
-	};
+
+		// ✅ Filter timesheets by discrepancy status
+		const filterByDiscrepancy = (timesheets: any[], hasDiscrepancy: boolean) => {
+			if (hasDiscrepancy) {
+				// Show only timesheets with discrepancies
+				return timesheets.filter((ts) => hasDiscrepancies(ts));
+			} else {
+				// Show only timesheets without discrepancies and not in DISCREPANCY status
+				return timesheets.filter((ts) => !hasDiscrepancies(ts));
+			}
+		};
 
 	// Column definitions
 	const columns: ColumnDef<TimesheetWithRelations>[] = [

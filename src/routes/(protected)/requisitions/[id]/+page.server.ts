@@ -182,10 +182,18 @@ export const actions = {
 		const idAsNum = Number(id);
 		if (!user) return fail(403);
 
+		console.log('Processing addRecurrenceDays action for requisition ID:', idAsNum);
+
 		const form = await superValidate(event, newRecurrenceDaySchema);
-		if (!form.valid) return fail(400, { form });
+		console.log(form);
+		if (!form.valid) {
+			console.log(form);
+			return fail(400, { form });
+		}
 
 		const requisition = await getRequisitionDetailsById(idAsNum);
+
+		console.log('Fetched requisition details:', requisition);
 
 		try {
 			const daysToAdd = form.data.recurrenceDays;

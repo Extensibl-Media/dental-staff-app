@@ -10,7 +10,7 @@ import {
 import { requisitionTable } from '$lib/server/database/schemas/requisition';
 import { workdayTable } from '$lib/server/database/schemas/requisition';
 import { authenticateUser } from '$lib/server/serverUtils';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { env } from '$env/dynamic/private';
 import { getClientIdByCompanyId } from '$lib/server/database/queries/clients';
 import { getCandidateProfileByUserId } from '$lib/server/database/queries/candidates';
@@ -85,6 +85,8 @@ export const POST: RequestHandler = async ({ request }) => {
 				{ status: 400, headers: corsHeaders }
 			);
 		}
+
+		console.log('Parsed body:', parsedBody.data);
 		const { userId, companyId, weekStartDate, entries } = parsedBody.data;
 
 		const candidateProfile = await getCandidateProfileByUserId(userId);
@@ -109,22 +111,74 @@ export const POST: RequestHandler = async ({ request }) => {
 			endTime: createUTCDateTime(entry.date, entry.endTime, requisition!.referenceTimezone)
 		}));
 
-		const timesheetData = {
-			id: crypto.randomUUID(),
-			createdAt: new Date(),
-			updatedAt: new Date(),
-			workdayId,
-			associatedCandidateId: candidateProfile.id,
-			associatedClientId: clientId,
-			requisitionId: requisition?.id,
-			weekBeginDate: new Date(weekStartDate).toISOString().split('T')[0],
-			totalHoursWorked: parsedBody.data.totalHours.toString(),
-			hoursRaw: formattedEntries,
-			candidateRateBase: candidateProfile.hourlyRateMin.toString(),
-			candidateRateOT: (candidateProfile.hourlyRateMin * 1.5).toString()
-		};
+		console.log('Formatted Entries:', formattedEntries);
 
-		const [result] = await db.insert(timeSheetTable).values(timesheetData).returning();
+		// Check for existing DRAFT/DISCREPANCY timesheet
+		const [existingTimesheet] = await db
+			.select()
+			.from(timeSheetTable)
+			.where(
+				and(
+					eq(timeSheetTable.associatedCandidateId, candidateProfile.id),
+					eq(timeSheetTable.weekBeginDate, weekStart),
+					eq(timeSheetTable.requisitionId, requisition?.id),
+					inArray(timeSheetTable.status, ['DRAFT', 'DISCREPANCY'])
+				)
+			)
+			.limit(1);
+
+		let result;
+
+		if (existingTimesheet) {
+			console.log('Existing Timesheet:', existingTimesheet);
+			// ✅ UPDATE EXISTING DRAFT TIMESHEET
+			[result] = await db
+				.update(timeSheetTable)
+				.set({
+					totalHoursWorked: parsedBody.data.totalHours.toString(),
+					hoursRaw: formattedEntries,
+					status: 'PENDING', // ✅ Change from DRAFT to PENDING
+					updatedAt: new Date()
+				})
+				.where(eq(timeSheetTable.id, existingTimesheet.id))
+				.returning();
+
+			await writeActionHistory({
+				action: 'UPDATE',
+				userId: user.id,
+				entityId: result.id,
+				table: 'TIMESHEETS',
+				beforeState: existingTimesheet,
+				afterState: result
+			});
+		} else {
+			console.log('No existing timesheet found, creating new one.');
+			// ✅ FALLBACK: Create new timesheet if draft doesn't exist
+			const timesheetData = {
+				id: crypto.randomUUID(),
+				createdAt: new Date(),
+				updatedAt: new Date(),
+				workdayId,
+				associatedCandidateId: candidateProfile.id,
+				associatedClientId: clientId,
+				requisitionId: requisition?.id,
+				weekBeginDate: weekStart,
+				totalHoursWorked: parsedBody.data.totalHours.toString(),
+				hoursRaw: formattedEntries,
+				status: 'PENDING' as const
+			};
+
+			[result] = await db.insert(timeSheetTable).values(timesheetData).returning();
+
+			await writeActionHistory({
+				action: 'CREATE',
+				userId: user.id,
+				entityId: result.id,
+				table: 'TIMESHEETS',
+				beforeState: {},
+				afterState: result
+			});
+		}
 
 		await writeActionHistory({
 			action: 'CREATE',

@@ -13,11 +13,12 @@ import {
 } from '$lib/server/database/queries/requisitions';
 import { redirect } from '@sveltejs/kit';
 
+// In your +page.server.ts
 export const load = async (event) => {
 	const { locals, url } = event;
 	const searchTerm = url.searchParams.get('search') || '';
-
 	const { user } = locals;
+
 	if (!user) {
 		redirect(302, '/auth/sign-in');
 	}
@@ -39,20 +40,31 @@ export const load = async (event) => {
 		timesheets = await getAllTimesheetsForClient(client?.id, searchTerm);
 	}
 
-	// Enhance timesheets with validation data and discrepancy checking
 	const enhancedTimesheets = await Promise.all(
 		(timesheets || []).map(async (timesheet) => {
 			try {
-				// Fetch validation data for this timesheet's requisition
-				const recurrenceDays = await getRecurrenceDaysForRequisition(timesheet.requisition.id);
-				const recurrenceDayIds = recurrenceDays?.map((rd) => rd.id);
+				// Skip validation for DRAFT or already APPROVED timesheets
+				if (timesheet.timesheet.status === 'DRAFT' || timesheet.timesheet.status === 'APPROVED') {
+					return {
+						...timesheet,
+						recurrenceDays: [],
+						workdays: [],
+						discrepancies: [],
+						hasValidationIssues: false
+					};
+				}
+
+				const recurrenceDays = await getRecurrenceDaysForRequisition(timesheet.requisition?.id);
+				const recurrenceDayIds = recurrenceDays?.map((rd) => rd.id) || [];
 				const workdays =
 					recurrenceDayIds.length > 0 ? await getWorkdaysForRecurrenceDays(recurrenceDayIds) : [];
 
-				// Run validation
-				const discrepancies = validateTimesheet(timesheet.timesheet, recurrenceDays, workdays);
+				// ✅ Now timesheet.timesheet already has hourlyRate from the query!
+				let discrepancies = [];
+				if (recurrenceDays && recurrenceDays.length > 0) {
+					discrepancies = validateTimesheet(timesheet.timesheet, recurrenceDays, workdays);
+				}
 
-				// Return enhanced timesheet with validation data
 				return {
 					...timesheet,
 					recurrenceDays,
@@ -62,7 +74,6 @@ export const load = async (event) => {
 				};
 			} catch (error) {
 				console.error(`Error validating timesheet ${timesheet.timesheet.id}:`, error);
-				// Return timesheet without validation data if error occurs
 				return {
 					...timesheet,
 					recurrenceDays: [],

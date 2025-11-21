@@ -158,11 +158,13 @@ export const actions = {
 			const requisition = timesheet.requisitionId
 				? await getRequisitionById(timesheet.requisitionId)
 				: null;
-
+			if (!requisition) {
+				throw new Error('Requisition not found for timesheet');
+			}
 			const amountInCents = convertToStripeAmount(
 				timesheet.totalHoursWorked || 0,
-				requisition?.hourlyRate || timesheet.candidateRateBase,
-				requisition?.hourlyRate ? requisition.hourlyRate * 1.5 : timesheet.candidateRateOT
+				requisition!.hourlyRate,
+				requisition!.hourlyRate && requisition.hourlyRate * 1.5
 			);
 
 			const adminFee = adminConfig.adminPaymentFee;
@@ -248,12 +250,17 @@ export const actions = {
 			const requisition = overridden.requisitionId
 				? await getRequisitionById(overridden.requisitionId)
 				: null;
+
+			if (!requisition) {
+				throw new Error('Requisition not found for timesheet');
+			}
+
 			const [adminConfig] = await db.select().from(adminConfigTable).limit(1);
 
 			const amountInCents = convertToStripeAmount(
-				overridden.totalHoursWorked || 0,
-				requisition?.hourlyRate || overridden.candidateRateBase,
-				requisition?.hourlyRate ? requisition.hourlyRate * 1.5 : overridden.candidateRateOT
+				timesheet.totalHoursWorked || 0,
+				requisition!.hourlyRate,
+				requisition!.hourlyRate && requisition.hourlyRate * 1.5
 			);
 
 			const adminFee = adminConfig.adminPaymentFee;

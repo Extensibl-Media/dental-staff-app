@@ -255,7 +255,7 @@ export function createUTCISOString(
 	localTimezone: string
 ): string {
 	if (!localDateString || !localTimeString || !localTimezone) {
-		return '';
+		throw new Error('Missing required parameters for createUTCISOString');
 	}
 
 	try {
@@ -267,17 +267,17 @@ export function createUTCISOString(
 		);
 
 		if (!isValid(localDate)) {
-			return '';
+			throw new Error('Invalid date/time values');
 		}
 
-		// Convert to UTC - fromZonedTime converts to UTC time
+		// Convert to UTC - fromZonedTime treats the input as being IN the specified timezone
 		const utcDate = fromZonedTime(localDate, localTimezone);
 
-		// Format as ISO string
+		// Return ISO string
 		return utcDate.toISOString();
 	} catch (error) {
 		console.error('Error creating UTC ISO string:', error);
-		return '';
+		throw error;
 	}
 }
 
@@ -341,10 +341,11 @@ export function convertRecurrenceDayToUTC(day: Record<string, any>, userTimezone
 
 /**
  * Create a JavaScript Date object in UTC from local date and time
+ * ✅ FIXED VERSION - Properly converts local timezone to UTC
  *
  * @param localDateStr The local date string (YYYY-MM-DD)
  * @param localTimeStr The local time string (HH:MM)
- * @param timezone The local timezone
+ * @param timezone The local timezone (e.g., 'America/Denver')
  * @returns JavaScript Date object in UTC
  */
 export function createUTCDateTime(
@@ -352,28 +353,37 @@ export function createUTCDateTime(
 	localTimeStr: string,
 	timezone: string
 ): Date {
+	if (!localDateStr || !localTimeStr || !timezone) {
+		throw new Error('Missing required parameters for createUTCDateTime');
+	}
+
 	try {
-		// Try using the utility function if available
-		const utcIsoString = createUTCISOString(localDateStr, localTimeStr, timezone);
-		return new Date(utcIsoString);
+		// Parse local date and time string
+		const localDateTime = parse(`${localDateStr} ${localTimeStr}`, 'yyyy-MM-dd HH:mm', new Date());
+
+		if (!isValid(localDateTime)) {
+			throw new Error(`Invalid date/time values: ${localDateStr} ${localTimeStr}`);
+		}
+
+		// Convert from zoned time to UTC
+		// fromZonedTime interprets the date as being in the specified timezone
+		// and returns the equivalent UTC time
+		const utcDate = fromZonedTime(localDateTime, timezone);
+
+		console.log('createUTCDateTime conversion:', {
+			input: { localDateStr, localTimeStr, timezone },
+			localDateTime: localDateTime.toISOString(),
+			utcDate: utcDate.toISOString()
+		});
+
+		return utcDate;
 	} catch (error) {
-		// Fallback to manual conversion
-		const [year, month, day] = localDateStr.split('-').map(Number);
-		const [hours, minutes] = localTimeStr.split(':').map(Number);
-
-		// Create a Date object in local timezone
-		const localDate = new Date(year, month - 1, day, hours, minutes);
-
-		// Get the UTC equivalent
-		return new Date(
-			Date.UTC(
-				localDate.getFullYear(),
-				localDate.getMonth(),
-				localDate.getDate(),
-				localDate.getHours(),
-				localDate.getMinutes()
-			)
-		);
+		console.error('Error creating UTC DateTime:', error, {
+			localDateStr,
+			localTimeStr,
+			timezone
+		});
+		throw error;
 	}
 }
 

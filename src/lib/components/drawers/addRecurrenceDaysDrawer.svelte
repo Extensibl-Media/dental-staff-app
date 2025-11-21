@@ -1,4 +1,3 @@
-<!-- RecurrenceDrawer.svelte -->
 <script lang="ts">
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
@@ -13,7 +12,6 @@
 	import type { RecurrenceDay, Requisition } from '$lib/server/database/schemas/requisition';
 	import { superForm } from 'sveltekit-superforms/client';
 
-	// Import the UTC utility functions with verification
 	import {
 		getUserTimezone,
 		localTimeToUTC,
@@ -28,23 +26,13 @@
 	export let company;
 	export let form; // From parent
 
-	const { enhance } = superForm(form, {
+	const { enhance, submitting } = superForm(form, {
 		onSubmit(input) {
 			console.log('Submitting form with:', input);
 		},
 		onUpdate({ form }) {
-			// Reset form state after successful submission
 			if (form.message === 'success') {
-				multipleDays = false;
-				useSameTimeForAllDates = false;
-				selectedRawDate = undefined;
-				selectedRawDateRange = undefined;
-				sharedTimes = {
-					dayStartTime: '',
-					dayEndTime: '',
-					lunchStartTime: '',
-					lunchEndTime: ''
-				};
+				resetForm();
 			}
 		},
 		onError(err) {
@@ -57,12 +45,11 @@
 	let useSameTimeForAllDates = false;
 	let selectedRawDate: DateValue | undefined;
 	let selectedRawDateRange: DateRange | undefined;
-	let userTimezone = getUserTimezone(); // Using the utility function
-
-	// Display for user notification
+	let userTimezone = getUserTimezone();
 	let userTimezoneDisplay = formatTimezoneName(userTimezone);
+	let isOpen = false; // ✅ Track sheet state
 
-	// Times in local timezone (what the user inputs)
+	// Times in local timezone
 	let sharedTimes = {
 		dayStartTime: '',
 		dayEndTime: '',
@@ -72,53 +59,64 @@
 
 	const df = new DateFormatter('en-US', { dateStyle: 'full' });
 
-	// Alternative manual conversion method as fallback
-	function manualTimeToUTC(timeString: string, dateString: string, timezone: string): string {
-		if (!timeString || !dateString || !timezone) {
-			return timeString;
-		}
-
-		try {
-			// Create a Date object in the specified timezone
-			const [year, month, day] = dateString.split('-').map(Number);
-			const [hours, minutes] = timeString.split(':').map(Number);
-
-			// Create date in UTC
-			const date = new Date(Date.UTC(year, month - 1, day, hours, minutes));
-
-			// Adjust for timezone offset
-			const tzOffset = new Date().getTimezoneOffset();
-			date.setMinutes(date.getMinutes() - tzOffset);
-
-			// Format as HH:MM
-			const utcHours = date.getUTCHours().toString().padStart(2, '0');
-			const utcMinutes = date.getUTCMinutes().toString().padStart(2, '0');
-
-			return `${utcHours}:${utcMinutes}`;
-		} catch (error) {
-			console.error('Error in manual UTC conversion:', error);
-			return timeString;
-		}
+	// ✅ Helper to reset form
+	function resetForm() {
+		multipleDays = false;
+		useSameTimeForAllDates = false;
+		selectedRawDate = undefined;
+		selectedRawDateRange = undefined;
+		sharedTimes = {
+			dayStartTime: '',
+			dayEndTime: '',
+			lunchStartTime: '',
+			lunchEndTime: ''
+		};
+		isOpen = false;
 	}
 
 	// Derived values
-	$: operatingHours = company.operatingHours;
+	$: operatingHours = company?.operatingHours || {};
 
-	$: formattedDateRange =
-		multipleDays && selectedRawDateRange?.start && selectedRawDateRange?.end
-			? getDatesInRange(
-					new Date(df.format(selectedRawDateRange.start.toDate(getLocalTimeZone()))),
-					new Date(df.format(selectedRawDateRange.end.toDate(getLocalTimeZone())))
-				)
-			: selectedRawDate
-				? [new Date(df.format(selectedRawDate.toDate(getLocalTimeZone())))]
-				: [];
+	$: console.log(operatingHours)
 
-	$: filteredDates = formattedDateRange.filter((date) => !operatingHours[date.getDay()].isClosed);
 
-	// Prepare local date times for display and user input
+	// ✅ Let's see what formattedDateRange is producing
+	$: formattedDateRange = (() => {
+		if (multipleDays && selectedRawDateRange?.start && selectedRawDateRange?.end) {
+			const start = new Date(df.format(selectedRawDateRange.start.toDate(getLocalTimeZone())));
+			const end = new Date(df.format(selectedRawDateRange.end.toDate(getLocalTimeZone())));
+			console.log('Multiple days - start:', start, 'end:', end);
+			return getDatesInRange(start, end);
+		} else if (selectedRawDate) {
+			const dateStr = df.format(selectedRawDate.toDate(getLocalTimeZone()));
+			const date = new Date(dateStr);
+			console.log('Single date - formatted string:', dateStr, 'parsed date:', date);
+			return [date];
+		} else {
+			console.log('No date selected');
+			return [];
+		}
+	})();
+
+	$: filteredDates = formattedDateRange.filter((date) => {
+		// If no operating hours, include all dates
+		if (!operatingHours || Object.keys(operatingHours).length === 0) {
+			return true;
+		}
+
+		const dayOfWeek = date.getDay();
+		const dayData = operatingHours[dayOfWeek];
+
+		// If this specific day has no data, include it
+		if (!dayData) {
+			return true;
+		}
+
+		// Otherwise, filter based on isClosed
+		return !dayData.isClosed;
+	});
+
 	$: selectedDateTimes = filteredDates.map((date) => {
-		// Convert date to UTC date string format
 		const utcDateString = toUTCDateString(date);
 
 		return {
@@ -135,80 +133,108 @@
 		};
 	});
 
-	// Convert the user input (local times) to UTC times for database storage
+	// Convert local times to UTC
 	function convertToUTCTimes(entry) {
-		// For each date, convert the local time inputs to UTC
 		const utcDateString = entry.date;
-
-		// In single-day mode, use sharedTimes directly
 		const localTimes = !multipleDays && selectedRawDate ? sharedTimes : entry.times;
 
-		// Ensure we have values to convert and use empty string as fallback
+		// ✅ Validate that we have times before converting
+		if (!localTimes.dayStartTime || !localTimes.dayEndTime) {
+			console.warn('Missing required times for date:', entry.date);
+			return null;
+		}
+
 		const dayStartTime = localTimes.dayStartTime || '';
 		const dayEndTime = localTimes.dayEndTime || '';
 		const lunchStartTime = localTimes.lunchStartTime || '';
 		const lunchEndTime = localTimes.lunchEndTime || '';
 
-		// Try to use our imported function first, fall back to manual method if it fails
-		let utcStartTime = '';
-		let utcEndTime = '';
-		let utcLunchStart = '';
-		let utcLunchEnd = '';
-
 		try {
-			if (dayStartTime) {
-				utcStartTime =
-					typeof localTimeToUTC === 'function'
-						? localTimeToUTC(dayStartTime, utcDateString, userTimezone)
-						: manualTimeToUTC(dayStartTime, utcDateString, userTimezone);
-			}
+			const utcStartTime = localTimeToUTC(dayStartTime, utcDateString, userTimezone);
+			const utcEndTime = localTimeToUTC(dayEndTime, utcDateString, userTimezone);
+			const utcLunchStart = lunchStartTime
+				? localTimeToUTC(lunchStartTime, utcDateString, userTimezone)
+				: '';
+			const utcLunchEnd = lunchEndTime
+				? localTimeToUTC(lunchEndTime, utcDateString, userTimezone)
+				: '';
 
-			if (dayEndTime) {
-				utcEndTime =
-					typeof localTimeToUTC === 'function'
-						? localTimeToUTC(dayEndTime, utcDateString, userTimezone)
-						: manualTimeToUTC(dayEndTime, utcDateString, userTimezone);
-			}
-
-			if (lunchStartTime) {
-				utcLunchStart =
-					typeof localTimeToUTC === 'function'
-						? localTimeToUTC(lunchStartTime, utcDateString, userTimezone)
-						: manualTimeToUTC(lunchStartTime, utcDateString, userTimezone);
-			}
-
-			if (lunchEndTime) {
-				utcLunchEnd =
-					typeof localTimeToUTC === 'function'
-						? localTimeToUTC(lunchEndTime, utcDateString, userTimezone)
-						: manualTimeToUTC(lunchEndTime, utcDateString, userTimezone);
-			}
+			return {
+				date: utcDateString,
+				dayStartTime: utcStartTime,
+				dayEndTime: utcEndTime,
+				lunchStartTime: utcLunchStart,
+				lunchEndTime: utcLunchEnd,
+				requisitionId: requisition.id
+			};
 		} catch (err) {
 			console.error('Error converting times to UTC:', err);
-			// If conversion fails, use the local times
-			utcStartTime = dayStartTime;
-			utcEndTime = dayEndTime;
-			utcLunchStart = lunchStartTime;
-			utcLunchEnd = lunchEndTime;
+			return null;
 		}
-
-		// Create the result object with our converted times
-		return {
-			date: utcDateString,
-			dayStartTime: utcStartTime || dayStartTime,
-			dayEndTime: utcEndTime || dayEndTime,
-			lunchStartTime: utcLunchStart || lunchStartTime,
-			lunchEndTime: utcLunchEnd || lunchEndTime,
-			requisitionId: requisition.id
-		};
 	}
 
-	// Final value with UTC times for database storage
-	$: finalDateValue = multipleDays
-		? selectedDateTimes.map(convertToUTCTimes)
-		: selectedDateTimes[0]
-			? convertToUTCTimes(selectedDateTimes[0])
-			: null;
+	// ✅ Improved final value calculation
+	$: finalDateValue = (() => {
+		if (multipleDays) {
+			const converted = selectedDateTimes.map(convertToUTCTimes).filter(Boolean);
+			return converted.length > 0 ? converted : null;
+		} else {
+			if (selectedDateTimes[0]) {
+				const converted = convertToUTCTimes(selectedDateTimes[0]);
+				return converted;
+			}
+			return null;
+		}
+	})();
+
+	// ✅ Form submission validation
+	$: isFormValid = (() => {
+		if (!finalDateValue) {
+  		  console.log('Form invalid: finalDateValue is null');
+          return false;
+		};
+
+		// Check if we have at least one valid entry
+		if (Array.isArray(finalDateValue)) {
+			return finalDateValue.length > 0 && finalDateValue.every(entry =>
+				entry && entry.dayStartTime && entry.dayEndTime
+			);
+		} else {
+			return finalDateValue.dayStartTime && finalDateValue.dayEndTime;
+		}
+	})();
+
+	// ✅ Debug logging
+	$: {
+		console.log('Form validation state:', {
+			multipleDays,
+			selectedRawDate: selectedRawDate?.toString(),
+			selectedRawDateRange: selectedRawDateRange?.start?.toString(),
+			filteredDates: filteredDates.length,
+			selectedDateTimes: selectedDateTimes.length,
+			sharedTimes,
+			finalDateValue,
+			isFormValid
+		});
+	}
+
+	$: {
+			console.log('=== DATE SELECTION DEBUG ===');
+			console.log('1. multipleDays:', multipleDays);
+			console.log('2. selectedRawDate:', selectedRawDate);
+			console.log('3. selectedRawDate toString:', selectedRawDate?.toString());
+
+			if (selectedRawDate) {
+				const localDate = selectedRawDate.toDate(getLocalTimeZone());
+				console.log('4. selectedRawDate.toDate():', localDate);
+				console.log('5. df.format():', df.format(localDate));
+			}
+
+			console.log('6. formattedDateRange:', formattedDateRange);
+			console.log('7. filteredDates:', filteredDates);
+			console.log('8. selectedDateTimes:', selectedDateTimes);
+			console.log('========================');
+		}
 
 	// Helper functions
 	function getDatesInRange(start: Date, end: Date): Date[] {
@@ -221,7 +247,6 @@
 		return dates;
 	}
 
-	// For debugging - add some time placeholders
 	function addDummyTimes() {
 		sharedTimes = {
 			dayStartTime: '09:00',
@@ -232,10 +257,10 @@
 	}
 </script>
 
-<Sheet.Root>
+<Sheet.Root bind:open={isOpen}>
 	<Sheet.Trigger asChild let:builder>
 		<Button builders={[builder]} class="bg-blue-800 hover:bg-blue-900 mb-4">
-		<PlusIcon class="w-4 h-4 mr-2" />
+			<PlusIcon class="w-4 h-4 mr-2" />
 			Add Shifts
 		</Button>
 	</Sheet.Trigger>
@@ -253,16 +278,16 @@
 		</Sheet.Header>
 
 		<div class="flex flex-col flex-1 mt-4 h-full">
-			<div>
-				<Checkbox bind:checked={multipleDays} name="multipleDays" />
+			<div class="flex items-center gap-2 mb-4">
+				<Checkbox bind:checked={multipleDays} id="multipleDays" />
 				<Label for="multipleDays">Multiple Days?</Label>
 			</div>
 
 			{#if multipleDays}
 				<RangeCalendar bind:value={selectedRawDateRange} class="rounded-md border w-fit" />
 				{#if filteredDates.length}
-					<div class="mt-4">
-						<Checkbox bind:checked={useSameTimeForAllDates} name="useSameTime" />
+					<div class="mt-4 flex items-center gap-2">
+						<Checkbox bind:checked={useSameTimeForAllDates} id="useSameTime" />
 						<Label for="useSameTime">Use same schedule for all days</Label>
 					</div>
 
@@ -271,12 +296,22 @@
 
 						<div class="grid grid-cols-2 gap-4">
 							<div class="space-y-2">
-								<Label for="shared-day-start">Day Start</Label>
-								<Input id="shared-day-start" type="time" bind:value={sharedTimes.dayStartTime} />
+								<Label for="shared-day-start">Day Start *</Label>
+								<Input
+									id="shared-day-start"
+									type="time"
+									bind:value={sharedTimes.dayStartTime}
+									required
+								/>
 							</div>
 							<div class="space-y-2">
-								<Label for="shared-day-end">Day End</Label>
-								<Input id="shared-day-end" type="time" bind:value={sharedTimes.dayEndTime} />
+								<Label for="shared-day-end">Day End *</Label>
+								<Input
+									id="shared-day-end"
+									type="time"
+									bind:value={sharedTimes.dayEndTime}
+									required
+								/>
 							</div>
 							<div class="space-y-2">
 								<Label for="shared-lunch-start">Lunch Start</Label>
@@ -297,19 +332,21 @@
 								<p class="font-semibold">Date: {dateEntry.localDate.toLocaleDateString()}</p>
 								<div class="grid grid-cols-2 gap-4">
 									<div class="space-y-2">
-										<Label for={`day-start-${dateEntry.date}`}>Day Start</Label>
+										<Label for={`day-start-${dateEntry.date}`}>Day Start *</Label>
 										<Input
 											id={`day-start-${dateEntry.date}`}
 											type="time"
 											bind:value={dateEntry.times.dayStartTime}
+											required
 										/>
 									</div>
 									<div class="space-y-2">
-										<Label for={`day-end-${dateEntry.date}`}>Day End</Label>
+										<Label for={`day-end-${dateEntry.date}`}>Day End *</Label>
 										<Input
 											id={`day-end-${dateEntry.date}`}
 											type="time"
 											bind:value={dateEntry.times.dayEndTime}
+											required
 										/>
 									</div>
 									<div class="space-y-2">
@@ -338,12 +375,22 @@
 				{#if selectedRawDate}
 					<div class="grid grid-cols-2 gap-4 mt-4">
 						<div class="space-y-2">
-							<Label for="single-day-start">Day Start</Label>
-							<Input id="single-day-start" type="time" bind:value={sharedTimes.dayStartTime} />
+							<Label for="single-day-start">Day Start *</Label>
+							<Input
+								id="single-day-start"
+								type="time"
+								bind:value={sharedTimes.dayStartTime}
+								required
+							/>
 						</div>
 						<div class="space-y-2">
-							<Label for="single-day-end">Day End</Label>
-							<Input id="single-day-end" type="time" bind:value={sharedTimes.dayEndTime} />
+							<Label for="single-day-end">Day End *</Label>
+							<Input
+								id="single-day-end"
+								type="time"
+								bind:value={sharedTimes.dayEndTime}
+								required
+							/>
 						</div>
 						<div class="space-y-2">
 							<Label for="single-lunch-start">Lunch Start</Label>
@@ -355,7 +402,6 @@
 						</div>
 					</div>
 
-					<!-- Optional debug helper button -->
 					<div class="mt-4">
 						<Button type="button" on:click={addDummyTimes} variant="secondary" size="sm">
 							Add Default Times (9-5 with 12-1 lunch)
@@ -364,32 +410,38 @@
 				{/if}
 			{/if}
 
-			<form use:enhance method="POST" action="?/addRecurrenceDays" class="mt-12 pb-4">
+			<!-- ✅ Show validation error -->
+			{#if finalDateValue && !isFormValid}
+				<div class="mt-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+					Please fill in all required fields (Day Start and Day End times)
+				</div>
+			{/if}
+
+			<form use:enhance method="POST" action="?/addRecurrenceDays" class="mt-auto pb-4">
 				<input type="hidden" name="recurrenceDays" value={JSON.stringify(finalDateValue)} />
 
-				<Sheet.Footer>
+				<Sheet.Footer class="mt-4">
 					<Sheet.Close asChild let:builder>
 						<Button
 							builders={[builder]}
-							variant="destructive"
+							variant="outline"
 							type="button"
-							on:click={() => {
-								multipleDays = false;
-								useSameTimeForAllDates = false;
-								selectedRawDate = undefined;
-								selectedRawDateRange = undefined;
-								sharedTimes = {
-									dayStartTime: '',
-									dayEndTime: '',
-									lunchStartTime: '',
-									lunchEndTime: ''
-								};
-							}}
+							on:click={resetForm}
 						>
 							Cancel
 						</Button>
 					</Sheet.Close>
-					<Button type="submit">Add Days</Button>
+					<Button
+						type="submit"
+						disabled={!isFormValid || $submitting}
+						class="bg-blue-800 hover:bg-blue-900"
+					>
+						{#if $submitting}
+							Adding...
+						{:else}
+							Add Days
+						{/if}
+					</Button>
 				</Sheet.Footer>
 			</form>
 		</div>

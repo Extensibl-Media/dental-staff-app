@@ -382,12 +382,7 @@ export class EmailService {
 		email: string,
 		workdayDetails: {
 			companyName: string;
-			location: {
-				address: string;
-				city: string;
-				state: string;
-				zip: string;
-			};
+			location: string;
 			date: string;
 			workdayStart: string;
 			workdayEnd: string;
@@ -419,12 +414,7 @@ export class EmailService {
 		workdayDetails: {
 			url: string;
 			companyName: string;
-			location: {
-				address: string;
-				city: string;
-				state: string;
-				zip: string;
-			};
+			location: string;
 			date: string;
 			workdayStart: string;
 			workdayEnd: string;

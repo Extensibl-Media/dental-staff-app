@@ -102,8 +102,7 @@ export interface Timesheet {
 	clientCompanyName: string | null;
 	validated: boolean | null;
 	awaitingClientSignature: boolean | null;
-	candidateRateBase: string | null;
-	candidateRateOT: string | null;
+	hourlyRate: number | null;
 	hoursRaw: { date: string; startTime: string; endTime: string; hours: number }[];
 	workdayId: string | null;
 	status: string;
@@ -129,6 +128,7 @@ export type RequisitionDetailsRaw = {
 	job_description: string;
 	special_instructions: string | null;
 	experience_level_id: string | null;
+	hourly_rate: number | null;
 	company_id: string;
 	location_name: string;
 	company_name: string;
@@ -1004,7 +1004,10 @@ export async function getAllTimesheetsAdmin(searchTerm?: string) {
 	try {
 		const result = await db
 			.select({
-				timesheet: { ...timeSheetTable },
+				timesheet: {
+					...timeSheetTable,
+					hourlyRate: requisitionTable.hourlyRate // ✅ Add this
+				},
 				requisition: { ...requisitionTable },
 				clientCompany: { ...clientCompanyTable },
 				candidate: {
@@ -1046,7 +1049,10 @@ export async function getAllTimesheetsForClient(clientId: string | undefined, se
 	try {
 		const result = await db
 			.select({
-				timesheet: { ...timeSheetTable },
+				timesheet: {
+					...timeSheetTable,
+					hourlyRate: requisitionTable.hourlyRate // ✅ Add this
+				},
 				requisition: { ...requisitionTable },
 				candidate: {
 					...candidateProfileTable,
@@ -1079,7 +1085,7 @@ export async function getAllTimesheetsForClient(clientId: string | undefined, se
 		return result;
 	} catch (err) {
 		console.log(err);
-		return error(500, 'Error feching timesheets');
+		return error(500, 'Error fetching timesheets');
 	}
 }
 
@@ -1114,8 +1120,7 @@ export async function getAllTimesheetDiscrepancies(): Promise<TimesheetDiscrepan
 			clientCompanyName: clientCompanyTable.companyName,
 			validated: timeSheetTable.validated,
 			awaitingClientSignature: timeSheetTable.awaitingClientSignature,
-			candidateRateBase: timeSheetTable.candidateRateBase,
-			candidateRateOT: timeSheetTable.candidateRateOT,
+			hourlyRate: requisitionTable.hourlyRate, // ✅ This is correct
 			hoursRaw: timeSheetTable.hoursRaw,
 			workdayId: timeSheetTable.workdayId,
 			status: timeSheetTable.status,
@@ -1165,8 +1170,7 @@ export async function getClientCompanyTimesheetDiscrepancies(
 			clientCompanyName: clientCompanyTable.companyName,
 			validated: timeSheetTable.validated,
 			awaitingClientSignature: timeSheetTable.awaitingClientSignature,
-			candidateRateBase: timeSheetTable.candidateRateBase,
-			candidateRateOT: timeSheetTable.candidateRateOT,
+			hourlyRate: requisitionTable.hourlyRate, // ✅ This is correct
 			hoursRaw: timeSheetTable.hoursRaw,
 			workdayId: timeSheetTable.workdayId,
 			status: timeSheetTable.status,
@@ -1198,7 +1202,7 @@ export async function getClientCompanyTimesheetDiscrepancies(
 		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
 		allDiscrepancies.push(...discrepancies);
 	}
-	// console.log({ allDiscrepancies });
+
 	return allDiscrepancies;
 }
 
@@ -1275,8 +1279,7 @@ export async function getTimesheetDetailsAdmin(timesheetId: string) {
 			clientCompanyName: clientCompanyTable.companyName,
 			validated: timeSheetTable.validated,
 			awaitingClientSignature: timeSheetTable.awaitingClientSignature,
-			candidateRateBase: timeSheetTable.candidateRateBase,
-			candidateRateOT: timeSheetTable.candidateRateOT,
+			hourlyRate: requisitionTable.hourlyRate, // ✅ This is correct
 			hoursRaw: timeSheetTable.hoursRaw,
 			workdayId: timeSheetTable.workdayId,
 			status: timeSheetTable.status,
@@ -1358,8 +1361,7 @@ export async function getTimesheetDetails(timesheetId: string, clientId: string 
 			clientCompanyName: clientCompanyTable.companyName,
 			validated: timeSheetTable.validated,
 			awaitingClientSignature: timeSheetTable.awaitingClientSignature,
-			candidateRateBase: timeSheetTable.candidateRateBase,
-			candidateRateOT: timeSheetTable.candidateRateOT,
+			hourlyRate: requisitionTable.hourlyRate, // ✅ This is correct
 			hoursRaw: timeSheetTable.hoursRaw,
 			workdayId: timeSheetTable.workdayId,
 			status: timeSheetTable.status,
@@ -1635,11 +1637,11 @@ export function validateTimesheet(
 
 function validateBasicTimesheet(timesheet: Timesheet, discrepancies: TimesheetDiscrepancy[]): void {
 	// Check for missing rates
-	if (!timesheet.candidateRateBase || !timesheet.candidateRateOT) {
+	if (!timesheet.hourlyRate) {
 		discrepancies.push({
 			...createBaseDiscrepancy(timesheet),
 			discrepancyType: TimesheetDiscrepancyType.MISSING_RATE,
-			details: 'Missing base rate or overtime rate'
+			details: 'Missing hourly rate on requisition'
 		});
 	}
 

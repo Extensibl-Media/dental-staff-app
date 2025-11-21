@@ -75,12 +75,7 @@ export const GET: RequestHandler = async ({ request }) => {
 
 			await emailService.sendWorkdayReminderEmail(workday.user.email, {
 				companyName: workday.company.companyName as string,
-				location: {
-					address: `${workday.location.streetOne} ${workday.location.streetTwo || ''}`.trim(),
-					city: workday.location.city!,
-					state: workday.location.state!,
-					zip: workday.location.zipcode!
-				},
+				location: workday.location.completeAddress || 'Not Specified',
 				date: workday.recurrenceDay.date,
 				workdayStart: format(workday.recurrenceDay?.dayStart, 'h:mm a'),
 				workdayEnd: format(workday.recurrenceDay?.dayEnd, 'h:mm a')

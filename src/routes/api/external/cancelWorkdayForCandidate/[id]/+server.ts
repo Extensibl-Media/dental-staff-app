@@ -5,7 +5,8 @@ import { candidateProfileTable } from '$lib/server/database/schemas/candidate';
 import {
 	requisitionTable,
 	workdayTable,
-	recurrenceDayTable
+	recurrenceDayTable,
+	timeSheetTable
 } from '$lib/server/database/schemas/requisition';
 import { authenticateUser } from '$lib/server/serverUtils';
 import { and, eq } from 'drizzle-orm';
@@ -50,27 +51,30 @@ export const POST: RequestHandler = async ({ request, params }) => {
 		const { id } = params;
 
 		return await db.transaction(async (tx) => {
-			const [existingWorkday] = await db
+			const [existingWorkday] = await tx
 				.select()
 				.from(workdayTable)
 				.where(eq(workdayTable.id, id))
 				.limit(1);
-			console.log('Existing workday:', { existingWorkday });
+
 			if (!existingWorkday) {
 				return json(
 					{ success: false, message: 'Application not found for this workday' },
 					{ status: 409, headers: corsHeaders }
 				);
 			}
-			await db.delete(workdayTable).where(eq(workdayTable.id, existingWorkday.id));
+			await tx.delete(workdayTable).where(eq(workdayTable.id, existingWorkday.id));
+
+			await tx
+				.delete(timeSheetTable)
+				.where(and(eq(timeSheetTable.workdayId, id), eq(timeSheetTable.status, 'DRAFT')));
 
 			// Change Status of the recurrence day
-			const [updatedRecurrenceDay] = await db
+			const [updatedRecurrenceDay] = await tx
 				.update(recurrenceDayTable)
 				.set({ status: 'OPEN' })
 				.where(eq(recurrenceDayTable.id, existingWorkday.recurrenceDayId as string))
 				.returning();
-			console.log('Updated recurrence day:', { updatedRecurrenceDay });
 
 			// TODO Update any relevant data for the candidate
 			// TODO Notify the client of a cancelled workday

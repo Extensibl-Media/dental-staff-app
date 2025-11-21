@@ -98,7 +98,7 @@
 	}
 
 	function getCostEstimate() {
-		const hourlyRate = data?.timesheet?.candidateRateBase || 0;
+		const hourlyRate = data?.timesheet?.hourlyRate || 0;
 		const hours = parseFloat(data?.timesheet?.totalHoursWorked || '0');
 		return (Number(hourlyRate) * hours).toFixed(2);
 	}
@@ -269,17 +269,14 @@
 							</div>
 							<div class="p-3 bg-gray-50 rounded-lg">
 								<p class="text-sm text-gray-600">Regular Rate</p>
-								<p class="text-xl font-bold">${data?.timesheet?.candidateRateBase}</p>
+								<p class="text-xl font-bold">${data?.timesheet?.hourlyRate}</p>
 							</div>
-							<div class="p-3 bg-gray-50 rounded-lg">
-								<p class="text-sm text-gray-600">Overtime Rate</p>
-								<p class="text-xl font-bold">${data?.timesheet?.candidateRateOT || 'N/A'}</p>
-							</div>
+
 							<div class="p-3 bg-gray-50 rounded-lg">
 								<p class="text-sm text-gray-600">Est. Cost</p>
 								<p class="text-xl font-bold">
 									${(
-										Number(data?.timesheet?.candidateRateBase) *
+										Number(data?.timesheet?.hourlyRate) *
 										parseFloat(
 											bulkEditMode ? editedTotalHours : data?.timesheet?.totalHoursWorked || '0'
 										)
@@ -802,7 +799,7 @@
 							</div>
 							<div class="p-3 bg-gray-50 rounded-lg">
 								<p class="text-sm text-gray-600">Hourly Rate</p>
-								<p class="text-xl font-bold">${data?.timesheet?.candidateRateBase}</p>
+								<p class="text-xl font-bold">${data?.timesheet?.hourlyRate}</p>
 							</div>
 							<div class="p-3 bg-gray-50 rounded-lg">
 								<p class="text-sm text-gray-600">Est. Cost</p>
