@@ -192,6 +192,7 @@ export const GET: RequestHandler = async ({ request }) => {
 				and(
 					inArray(requisitionTable.locationId, officeLocationIds),
 					notInArray(recurrenceDayTable.status, ['CANCELED', 'UNFULFILLED', 'FILLED']),
+					eq(requisitionTable.status, 'OPEN'),
 					eq(requisitionTable.archived, false),
 					eq(requisitionTable.permanentPosition, false),
 					// Filter by candidate's disciplines

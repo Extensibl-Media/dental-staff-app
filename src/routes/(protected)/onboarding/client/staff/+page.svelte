@@ -7,6 +7,7 @@
 	import { Select } from 'flowbite-svelte';
 	import { Loader2, AlertCircle, TrashIcon } from 'lucide-svelte';
 	import { superForm } from 'sveltekit-superforms/client';
+	import { enhance } from '$app/forms';
 
 	type StaffInvite = {
 		email: string;
@@ -33,7 +34,7 @@
 	let submitting = false;
 	export let data;
 
-	const { form, errors, enhance } = superForm(data.form, {
+	const { form, errors, enhance: inviteEnhance } = superForm(data.form, {
 		resetForm: false,
 		onSubmit: ({ formData }) => {
 			// Log what's being sent
@@ -101,11 +102,16 @@
 			$form.invitees = [...$form.invitees];
 		}
 	};
+
+ function handleSkip() {
+        const skipForm = document.getElementById('skipForm');
+        skipForm?.requestSubmit();
+    }
 </script>
 
 <section class="flex flex-col items-center justify-center min-h-screen">
 	<div class="p-6 flex gap-2 w-full max-w-5xl mx-auto">
-		<form class="w-full" method="POST" use:enhance>
+		<form class="w-full" method="POST" action="?/sendInvites" use:inviteEnhance>
 			<Card.Root class="w-full">
 				<Card.Header>
 					<Card.Title class="text-2xl">Invite Staff</Card.Title>
@@ -178,8 +184,10 @@
 							Send Invites
 						{/if}
 					</Button>
+					<Button type="button" variant="link" on:click={handleSkip}>Skip for now</Button>
 				</Card.Footer>
 			</Card.Root>
 		</form>
+		<form id="skipForm" method="POST" action="?/skipInviting" use:enhance style="display: none;"></form>
 	</div>
 </section>

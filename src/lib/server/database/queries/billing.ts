@@ -178,6 +178,7 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
 	}
 
 	const user = await getUserByEmail(customerData.email);
+	console.log('Updating subscription for user:', user?.id, JSON.stringify(subscription, null, 2));
 
 	await db
 		.update(clientSubscriptionTable)

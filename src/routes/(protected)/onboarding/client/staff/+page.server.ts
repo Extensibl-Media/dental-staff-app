@@ -57,7 +57,7 @@ export const load = async (event) => {
 };
 
 export const actions = {
-	default: async (event) => {
+	sendInvites: async (event) => {
 		// Log the raw form data first
 		const formData = await event.request.formData();
 		console.log('Raw form data:', Object.fromEntries(formData));
@@ -151,6 +151,40 @@ export const actions = {
 		}
 
 		// Only redirect if at least one invite was successful
+		redirect(302, '/dashboard');
+	},
+	skipInviting: async (event) => {
+		const user = event.locals.user;
+		if (!user) {
+			return fail(401);
+		}
+
+		console.log('User opted to skip inviting staff members.');
+		try {
+			// complete onboarding
+			await updateUser(user.id, { completedOnboarding: true });
+			setFlash(
+				{
+					type: 'success',
+					message: 'You can invite staff members later from your account settings or staff page.'
+				},
+				event
+			);
+		} catch (error) {
+			console.error('Error skipping staff invites:', error);
+			setFlash(
+				{
+					type: 'error',
+					message: 'There was a problem updating your onboarding status. Please try again.'
+				},
+				event
+			);
+
+			return fail(500, {
+				error: 'Failed to update onboarding status'
+			});
+		}
+
 		redirect(302, '/dashboard');
 	}
 };

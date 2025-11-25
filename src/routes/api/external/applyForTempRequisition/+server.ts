@@ -22,6 +22,7 @@ import {
 	getLocationByIdForCompany
 } from '$lib/server/database/queries/clients';
 import { format } from 'date-fns';
+import { disciplineTable } from '$lib/server/database/schemas/skill';
 
 const corsHeaders = {
 	'Access-Control-Allow-Origin': env.CANDIDATE_APP_DOMAIN,
@@ -84,6 +85,9 @@ export const POST: RequestHandler = async ({ request }) => {
 				);
 			}
 
+			console.log(recurrenceDayId);
+
+			console.log('Candidate Profile:', candidateProfile.userId);
 			// Verify requisition exists and is active
 			const [recurrenceDay] = await tx
 				.select({
@@ -92,8 +96,11 @@ export const POST: RequestHandler = async ({ request }) => {
 				})
 				.from(recurrenceDayTable)
 				.innerJoin(requisitionTable, eq(recurrenceDayTable.requisitionId, requisitionTable.id))
+				// .innerJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id))
 				.where(and(eq(recurrenceDayTable.id, recurrenceDayId), eq(requisitionTable.status, 'OPEN')))
 				.limit(1);
+
+			console.log('Recurrence Day:', recurrenceDay);
 
 			if (!recurrenceDay) {
 				return json(
@@ -161,6 +168,8 @@ export const POST: RequestHandler = async ({ request }) => {
 				})
 				.returning();
 
+			console.log('New Workday Created:', newWorkday.id);
+
 			const weekStart = new Date(recurrenceDay.recurrenceDay.date);
 			// Set to beginning of week (Sunday)
 			const dayOfWeek = weekStart.getDay();
@@ -179,6 +188,8 @@ export const POST: RequestHandler = async ({ request }) => {
 					)
 				)
 				.limit(1);
+
+			console.log('Existing Timesheet:', existingTimesheet?.id);
 
 			if (!existingTimesheet) {
 				// Create a new DRAFT timesheet for this week
@@ -200,10 +211,13 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 
 			// Change Status of the recurrence day
-			await tx
+			const [status] = await tx
 				.update(recurrenceDayTable)
 				.set({ status: 'FILLED' })
-				.where(eq(recurrenceDayTable.id, recurrenceDayId));
+				.where(eq(recurrenceDayTable.id, recurrenceDayId))
+				.returning();
+
+			console.log('Recurrence Day Status Updated:', status.id);
 
 			// Send email to client contact
 			await emailService.sendRecurrenceDayClaimedEmail(
@@ -215,7 +229,7 @@ export const POST: RequestHandler = async ({ request }) => {
 					date: recurrenceDay.recurrenceDay.date,
 					workdayStart: format(recurrenceDay.recurrenceDay.dayStart, 'hh:mm a'),
 					workdayEnd: format(recurrenceDay.recurrenceDay.dayEnd, 'hh:mm a'),
-					discipline: recurrenceDay.requisition.title
+					discipline: recurrenceDay.requisition.disciplineName
 				},
 				{
 					firstName: user.firstName,

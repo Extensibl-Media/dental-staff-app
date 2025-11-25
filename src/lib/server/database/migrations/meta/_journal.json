@@ -57,6 +57,13 @@
       "when": 1762404000078,
       "tag": "0007_bitter_maggott",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1764045841586,
+      "tag": "0008_regular_sinister_six",
+      "breakpoints": true
     }
   ]
 }

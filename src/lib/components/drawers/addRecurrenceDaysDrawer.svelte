@@ -27,6 +27,12 @@
 	export let form; // From parent
 
 	const { enhance, submitting } = superForm(form, {
+   	    onResult({result}) {
+          console.log('Form submission result received');
+          if(result.type === "success"){
+            isOpen = false;
+          }
+        },
 		onSubmit(input) {
 			console.log('Submitting form with:', input);
 		},

@@ -32,7 +32,8 @@ const newTimesheetSchema = z.object({
 			date: z.string().min(1, 'Date is required')
 		})
 	),
-	totalHours: z.number().min(1, 'Total hours is required')
+	totalHours: z.number().min(1, 'Total hours is required'),
+	timesheetId: z.string().optional()
 });
 
 const corsHeaders = {
@@ -87,7 +88,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		console.log('Parsed body:', parsedBody.data);
-		const { userId, companyId, weekStartDate, entries } = parsedBody.data;
+		const { userId, companyId, weekStartDate, entries, timesheetId } = parsedBody.data;
 
 		const candidateProfile = await getCandidateProfileByUserId(userId);
 		const clientId = await getClientIdByCompanyId(companyId);
@@ -122,7 +123,8 @@ export const POST: RequestHandler = async ({ request }) => {
 					eq(timeSheetTable.associatedCandidateId, candidateProfile.id),
 					eq(timeSheetTable.weekBeginDate, weekStart),
 					eq(timeSheetTable.requisitionId, requisition?.id),
-					inArray(timeSheetTable.status, ['DRAFT', 'DISCREPANCY'])
+					inArray(timeSheetTable.status, ['DRAFT', 'DISCREPANCY']),
+					timesheetId ? eq(timeSheetTable.id, timesheetId) : undefined
 				)
 			)
 			.limit(1);

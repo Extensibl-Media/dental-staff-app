@@ -71,7 +71,7 @@ export const requisitionTable = pgTable('requisitions', {
 		mode: 'date'
 	}).notNull(),
 	status: requisitionStatusEnum('status').default('PENDING').notNull(),
-	title: text('name').notNull(),
+	title: text('name'),
 	companyId: text('client_id')
 		.notNull()
 		.references(() => clientCompanyTable.id),
