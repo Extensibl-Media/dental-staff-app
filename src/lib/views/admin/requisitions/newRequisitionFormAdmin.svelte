@@ -17,6 +17,21 @@
 	let experienceLevels: any[] = [];
 	let selectedLocation = null;
 
+	$: sortedExperienceLevels = [...experienceLevels].sort((a, b) => {
+		const priorityMap = {
+			'0-2 Years': 1,
+			'2-5 Years': 2,
+			'5-7 Years': 3,
+			'7-10 Years': 4,
+			'10+ years': 5
+		};
+
+		const priorityA = priorityMap[a.value] || 999;
+		const priorityB = priorityMap[b.value] || 999;
+
+		return priorityA - priorityB;
+	});
+
 	const {
 		form: formObj,
 		enhance,
@@ -180,7 +195,7 @@
 					required
 			>
 				<option value="">Select Experience</option>
-				{#each experienceLevels as level}
+				{#each sortedExperienceLevels as level}
 					<option value={level.id}>{level.value}</option>
 				{/each}
 			</select>

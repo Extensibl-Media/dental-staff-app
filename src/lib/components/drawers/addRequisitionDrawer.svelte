@@ -30,7 +30,7 @@
 	</div>
 	{#if drawerExpanded}
 		{#if user?.role === USER_ROLES.SUPERADMIN && adminForm}
-			<AdminRequisitionForm form={adminForm} schema={adminRequisitionSchema} bind:drawerExpanded />
+			<AdminRequisitionForm form={adminForm} bind:drawerExpanded />
 		{/if}
 		{#if (user?.role === USER_ROLES.CLIENT && clientForm) || (user?.role === USER_ROLES.CLIENT_STAFF && clientForm)}
 			<CompanyRequisitionForm {location} form={clientForm} bind:drawerExpanded />
