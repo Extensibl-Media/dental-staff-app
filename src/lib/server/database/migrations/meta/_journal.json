@@ -64,6 +64,20 @@
       "when": 1764045841586,
       "tag": "0008_regular_sinister_six",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1765409654409,
+      "tag": "0009_next_prodigy",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1765410604369,
+      "tag": "0010_powerful_metal_master",
+      "breakpoints": true
     }
   ]
 }

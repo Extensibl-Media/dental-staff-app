@@ -39,8 +39,8 @@ export const candidateProfileTable = pgTable('candidate_profiles', {
 		.notNull()
 		.default(new Date()),
 	address: text('address'),
-	hourlyRateMin: smallint('hourly_rate_min').notNull(),
-	hourlyRateMax: smallint('hourly_rate_max').notNull(),
+	hourlyRateMin: smallint('hourly_rate_min'),
+	hourlyRateMax: smallint('hourly_rate_max'),
 	status: candidateStatusEnum('candidate_status').default('PENDING'),
 	city: text('city'),
 	state: text('state'),

@@ -315,14 +315,19 @@ export function convertRecurrenceDayToUTC(day: Record<string, any>, userTimezone
 		requisitionId
 	} = day;
 
+	console.log(day);
 	// Convert each time to a full UTC Date object if time exists
 	const dayStart = createUTCDateTime(localDate, localStartTime, userTimezone);
 
 	const dayEnd = createUTCDateTime(localDate, localEndTime, userTimezone);
 
-	const lunchStart = createUTCDateTime(localDate, localLunchStart, userTimezone);
+	const lunchStart = localLunchStart.length
+		? createUTCDateTime(localDate, localLunchStart, userTimezone)
+		: null;
 
-	const lunchEnd = createUTCDateTime(localDate, localLunchEnd, userTimezone);
+	const lunchEnd = localLunchEnd.length
+		? createUTCDateTime(localDate, localLunchEnd, userTimezone)
+		: null;
 
 	// Extract the UTC date for the 'date' field (using the day start to determine UTC date)
 	const utcDateStr = dayStart ? dayStart.toISOString().split('T')[0] : localDate;

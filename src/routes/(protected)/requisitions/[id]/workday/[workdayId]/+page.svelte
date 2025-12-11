@@ -209,7 +209,7 @@
 			<!-- Placeholder for unclaimed days -->
 			<Card>
 				<CardHeader>
-					<CardTitle>Candidate Details</CardTitle>
+					<CardTitle>Professional Details</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<div class="flex flex-col items-center justify-center h-40 text-center">
@@ -237,7 +237,7 @@
 							{:else if recurrenceDay?.recurrenceDay?.status === 'CANCELED'}
 								This day has been canceled
 							{:else}
-								No candidate assigned
+								No professional assigned
 							{/if}
 						</p>
 					</div>
@@ -271,12 +271,14 @@
 
 					<div class="bg-muted p-3 rounded-md">
 						<h3 class="font-semibold mb-2">Lunch Break</h3>
-						<p>
-							{format(recurrenceDay?.recurrenceDay?.lunchStart, 'h:mm a')} - {format(
-								recurrenceDay?.recurrenceDay?.lunchEnd,
-								'h:mm a'
-							)}
-						</p>
+						{#if recurrenceDay?.recurrenceDay?.lunchStart && recurrenceDay?.recurrenceDay?.lunchEnd}
+                            <p>
+                                {format(recurrenceDay.recurrenceDay.lunchStart, 'h:mm a')} -{' '}
+                                {format(recurrenceDay.recurrenceDay.lunchEnd, 'h:mm a')}
+                            </p>
+                        {:else}
+                            <p>No lunch break scheduled</p>
+                        {/if}
 					</div>
 
 					<div class="flex items-center justify-between mt-4">
@@ -299,7 +301,7 @@
 			<CardContent>
 				<div class="space-y-4">
 					<div>
-						<h3 class="text-lg font-bold">{recurrenceDay?.requisition.title}</h3>
+						<h3 class="text-lg font-bold">{recurrenceDay?.requisition.disciplineName}</h3>
 						<p class="text-sm text-muted-foreground">ID: {recurrenceDay?.requisition.id}</p>
 					</div>
 
@@ -424,10 +426,10 @@
 	{/if}
 
 	<!-- Dialogs -->
-	<Dialog bind:open={inviteDialogOpen}>
+	<!-- <Dialog bind:open={inviteDialogOpen}>
 		<DialogContent>
 			<DialogHeader>
-				<DialogTitle>Invite Candidate for More Days</DialogTitle>
+				<DialogTitle>Invite Professional for More Days</DialogTitle>
 				<DialogDescription>
 					Send an invitation to {candidate?.firstName}
 					{candidate?.lastName} to work on more recurrence days for this requisition.
@@ -447,12 +449,12 @@
 				<Button on:click={handleInvite}>Send Invitation</Button>
 			</DialogFooter>
 		</DialogContent>
-	</Dialog>
-
+	</Dialog> -->
+<!--
 	<AlertDialog bind:open={blacklistDialogOpen}>
 		<AlertDialogContent>
 			<AlertDialogHeader>
-				<AlertDialogTitle>Blacklist Candidate</AlertDialogTitle>
+				<AlertDialogTitle>Blacklist Professional</AlertDialogTitle>
 				<AlertDialogDescription>
 					Are you sure you want to blacklist {candidate?.firstName}
 					{candidate?.lastName}? This action cannot be undone.
@@ -465,5 +467,5 @@
 				>
 			</AlertDialogFooter>
 		</AlertDialogContent>
-	</AlertDialog>
+	</AlertDialog> -->
 </section>

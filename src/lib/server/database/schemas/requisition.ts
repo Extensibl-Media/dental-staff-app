@@ -108,8 +108,8 @@ export const recurrenceDayTable = pgTable('recurrence_days', {
 	date: date('date').notNull(),
 	dayStart: timestamp('day_start_time', { withTimezone: true }).notNull(),
 	dayEnd: timestamp('day_end_time', { withTimezone: true }).notNull(),
-	lunchStart: timestamp('lunch_start_time', { withTimezone: true }).notNull(),
-	lunchEnd: timestamp('lunch_end_time', { withTimezone: true }).notNull(),
+	lunchStart: timestamp('lunch_start_time', { withTimezone: true }),
+	lunchEnd: timestamp('lunch_end_time', { withTimezone: true }),
 	requisitionId: integer('requisition_id').references(() => requisitionTable.id, {
 		onDelete: 'cascade',
 		onUpdate: 'cascade'

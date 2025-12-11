@@ -84,8 +84,6 @@ export const POST: RequestHandler = async ({ request }) => {
 		const profile = parsedProfile.data;
 		const profileData = {
 			...profile,
-			hourlyRateMin: profile.hourlyRateMin || 0,
-			hourlyRateMax: profile.hourlyRateMax || 0,
 			userId: user.id, // Explicitly set the user ID
 			id: crypto.randomUUID(),
 			createdAt: new Date(),

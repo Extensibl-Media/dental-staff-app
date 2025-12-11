@@ -24,6 +24,7 @@
 	// Props
 	export let requisition: Requisition;
 	export let company;
+	export let location;
 	export let form; // From parent
 
 	const { enhance, submitting } = superForm(form, {
@@ -81,9 +82,9 @@
 	}
 
 	// Derived values
-	$: operatingHours = company?.operatingHours || {};
+	$: operatingHours = location?.operatingHours || {};
 
-	$: console.log(operatingHours)
+	$: console.log({location})
 
 
 	// ✅ Let's see what formattedDateRange is producing
@@ -290,7 +291,7 @@
 			</div>
 
 			{#if multipleDays}
-				<RangeCalendar bind:value={selectedRawDateRange} class="rounded-md border w-fit" />
+				<RangeCalendar bind:value={selectedRawDateRange} class="rounded-md border w-fit"/>
 				{#if filteredDates.length}
 					<div class="mt-4 flex items-center gap-2">
 						<Checkbox bind:checked={useSameTimeForAllDates} id="useSameTime" />

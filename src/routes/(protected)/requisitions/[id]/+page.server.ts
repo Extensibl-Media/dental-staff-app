@@ -26,7 +26,8 @@ import {
 	getClientCompanyByClientId,
 	getClientProfileByStaffUserId,
 	getClientProfilebyUserId,
-	getClientStaffProfilebyUserId
+	getClientStaffProfilebyUserId,
+	getLocationByIdForCompany
 } from '$lib/server/database/queries/clients';
 import type { ClientCompanyStaffProfile } from '$lib/server/database/schemas/client';
 import { convertRecurrenceDayToUTC, getUserTimezone } from '$lib/_helpers/UTCTimezoneUtils';
@@ -53,6 +54,10 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 		const requisitionApplications = await getRequisitionApplications(idAsNum);
 		const requisitionTimesheets = await getRequisitionTimesheets(idAsNum);
 		const requisitionRecurrenceDays = await getRecurrenceDaysForRequisition(idAsNum);
+		const location = await getLocationByIdForCompany(
+			requisition.requisition.location.id,
+			company.id
+		);
 
 		return {
 			user,
@@ -62,6 +67,7 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 			editRecurrenceDayForm,
 			deleteRecurrenceDayForm,
 			company: company,
+			location,
 			requisition: requisition.requisition || null,
 			recurrenceDays: requisitionRecurrenceDays || [],
 			applications: requisitionApplications || [],
@@ -82,12 +88,14 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 		const requisitionApplications = await getRequisitionApplications(idAsNum);
 		const requisitionTimesheets = await getRequisitionTimesheets(idAsNum);
 		const requisitionRecurrenceDays = await getRecurrenceDaysForRequisition(idAsNum);
+		const location = await getLocationByIdForCompany(result.requisition.location.id, company.id);
 
 		const hasRequisitionRights = true;
 
 		return {
 			user,
 			company,
+			location,
 			hasRequisitionRights,
 			changeStatusForm,
 			recurrenceDayForm,
@@ -110,6 +118,7 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 		const requisitionApplications = await getRequisitionApplications(idAsNum);
 		const requisitionTimesheets = await getRequisitionTimesheets(idAsNum);
 		const requisitionRecurrenceDays = await getRecurrenceDaysForRequisition(idAsNum);
+		const location = await getLocationByIdForCompany(result.requisition.location.id, company.id);
 
 		const hasRequisitionRights =
 			profile?.staffRole === 'CLIENT_ADMIN' || profile?.staffRole === 'CLIENT_MANAGER';
@@ -117,6 +126,7 @@ export const load: PageServerLoad = async (event: RequestEvent) => {
 		return {
 			user,
 			company,
+			location,
 			changeStatusForm,
 			hasRequisitionRights,
 			recurrenceDayForm,

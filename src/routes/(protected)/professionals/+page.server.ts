@@ -20,6 +20,7 @@ export const load: PageServerLoad = async ({ url, locals, setHeaders }) => {
 	}
 
 	const results = await getAllCandidateProfiles(searchTerm);
+	console.log(results);
 
 	return {
 		candidates: results?.candidates || [],

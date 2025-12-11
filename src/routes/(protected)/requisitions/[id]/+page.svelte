@@ -64,7 +64,9 @@
     $: company = data.company;
     $: requisition = data.requisition;
     $: recurrenceDays = data.recurrenceDays;
+    $: location = data.location
 
+$: console.log(location)
     $: applications = data.applications;
     $: status = requisition?.status;
     $: hasRequisitionRights = data.hasRequisitionRights;
@@ -589,7 +591,7 @@
                                     <CardDescription>Manage work days for this requisition</CardDescription>
                                 </div>
                                 {#if hasRequisitionRights}
-                                    <AddRecurrenceDaysDrawer form={recurrenceDayForm} {company} {requisition}/>
+                                    <AddRecurrenceDaysDrawer {location} form={recurrenceDayForm} {company} {requisition}/>
                                 {/if}
                             </CardHeader>
                             <CardContent>
