@@ -33,6 +33,8 @@ export type RawTimesheetHours = {
 	hours: number;
 	startTime: string;
 	endTime: string;
+	lunchStartTime?: string;
+	lunchEndTime?: string;
 };
 
 export const timeCategoryEnum = pgEnum('time_category_enum', [
@@ -313,7 +315,8 @@ export const timeSheetTable = pgTable(
 			.notNull(),
 		weekBeginDate: date('week_begin_date').notNull(),
 		hoursRaw: json('hours_raw').$type<RawTimesheetHours[]>().default([]),
-		status: timesheetStatusEnum('status').default('DRAFT').notNull()
+		status: timesheetStatusEnum('status').default('DRAFT').notNull(),
+		discrepancyNote: text('discrepancy_note')
 	},
 	(table) => [
 		index('timesheet_candidate_idx').on(table.associatedCandidateId),

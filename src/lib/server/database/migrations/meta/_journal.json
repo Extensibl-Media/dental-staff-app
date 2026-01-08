@@ -78,6 +78,13 @@
       "when": 1765410604369,
       "tag": "0010_powerful_metal_master",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1767825450009,
+      "tag": "0011_funny_bishop",
+      "breakpoints": true
     }
   ]
 }

@@ -1107,57 +1107,7 @@ export async function getTimesheetsDueCount(clientId: string) {
 }
 
 //admin
-export async function getAllTimesheetDiscrepancies(): Promise<TimesheetDiscrepancy[]> {
-	const timesheets = await db
-		.select({
-			timeSheetId: timeSheetTable.id,
-			createdAt: timeSheetTable.createdAt,
-			updatedAt: timeSheetTable.updatedAt,
-			totalHoursWorked: timeSheetTable.totalHoursWorked,
-			totalHoursBilled: timeSheetTable.totalHoursBilled,
-			weekBeginDate: timeSheetTable.weekBeginDate,
-			requisitionId: requisitionTable.id,
-			clientCompanyName: clientCompanyTable.companyName,
-			validated: timeSheetTable.validated,
-			awaitingClientSignature: timeSheetTable.awaitingClientSignature,
-			hourlyRate: requisitionTable.hourlyRate, // ✅ This is correct
-			hoursRaw: timeSheetTable.hoursRaw,
-			workdayId: timeSheetTable.workdayId,
-			status: timeSheetTable.status,
-			candidate: {
-				...candidateProfileTable,
-				firstName: userTable.firstName,
-				lastName: userTable.lastName,
-				avatarUrl: userTable.avatarUrl,
-				email: userTable.email
-			}
-		})
-		.from(timeSheetTable)
-		.innerJoin(requisitionTable, eq(timeSheetTable.requisitionId, requisitionTable.id))
-		.innerJoin(clientProfileTable, eq(timeSheetTable.associatedClientId, clientProfileTable.id))
-		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
-		.leftJoin(workdayTable, eq(timeSheetTable.workdayId, workdayTable.id))
-		.leftJoin(
-			candidateProfileTable,
-			eq(timeSheetTable.associatedCandidateId, candidateProfileTable.id)
-		)
-		.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId));
-
-	const allDiscrepancies: TimesheetDiscrepancy[] = [];
-
-	for (const timesheet of timesheets) {
-		const recurrenceDays = await getRecurrenceDaysForTimesheet(timesheet);
-		const workdays = await getWorkdaysForTimesheet(timesheet);
-		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
-		allDiscrepancies.push(...discrepancies);
-	}
-
-	return allDiscrepancies;
-}
-
-export async function getClientCompanyTimesheetDiscrepancies(
-	clientProfileId: string
-): Promise<TimesheetDiscrepancy[]> {
+export async function getAllTimesheetDiscrepancies() {
 	const timesheets = await db
 		.select({
 			timeSheetId: timeSheetTable.id,
@@ -1192,18 +1142,51 @@ export async function getClientCompanyTimesheetDiscrepancies(
 			eq(timeSheetTable.associatedCandidateId, candidateProfileTable.id)
 		)
 		.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
-		.where(eq(clientProfileTable.id, clientProfileId));
+		.where(eq(timeSheetTable.status, 'DISCREPANCY'));
 
-	const allDiscrepancies: TimesheetDiscrepancy[] = [];
+	return timesheets;
+}
 
-	for (const timesheet of timesheets) {
-		const recurrenceDays = await getRecurrenceDaysForTimesheet(timesheet);
-		const workdays = await getWorkdaysForTimesheet(timesheet);
-		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
-		allDiscrepancies.push(...discrepancies);
-	}
+export async function getClientCompanyTimesheetDiscrepancies(clientProfileId: string) {
+	const timesheets = await db
+		.select({
+			timeSheetId: timeSheetTable.id,
+			createdAt: timeSheetTable.createdAt,
+			updatedAt: timeSheetTable.updatedAt,
+			totalHoursWorked: timeSheetTable.totalHoursWorked,
+			totalHoursBilled: timeSheetTable.totalHoursBilled,
+			weekBeginDate: timeSheetTable.weekBeginDate,
+			requisitionId: requisitionTable.id,
+			clientCompanyName: clientCompanyTable.companyName,
+			validated: timeSheetTable.validated,
+			awaitingClientSignature: timeSheetTable.awaitingClientSignature,
+			hourlyRate: requisitionTable.hourlyRate, // ✅ This is correct
+			hoursRaw: timeSheetTable.hoursRaw,
+			workdayId: timeSheetTable.workdayId,
+			status: timeSheetTable.status,
+			candidate: {
+				...candidateProfileTable,
+				firstName: userTable.firstName,
+				lastName: userTable.lastName,
+				avatarUrl: userTable.avatarUrl,
+				email: userTable.email
+			}
+		})
+		.from(timeSheetTable)
+		.innerJoin(requisitionTable, eq(timeSheetTable.requisitionId, requisitionTable.id))
+		.innerJoin(clientProfileTable, eq(timeSheetTable.associatedClientId, clientProfileTable.id))
+		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientProfileTable.id))
+		.leftJoin(workdayTable, eq(timeSheetTable.workdayId, workdayTable.id))
+		.leftJoin(
+			candidateProfileTable,
+			eq(timeSheetTable.associatedCandidateId, candidateProfileTable.id)
+		)
+		.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
+		.where(
+			and(eq(clientProfileTable.id, clientProfileId), eq(timeSheetTable.status, 'DISCREPANCY'))
+		);
 
-	return allDiscrepancies;
+	return timesheets;
 }
 
 export async function getWorkdaysForRecurrenceDays(recurrenceDayIds: string[]) {
@@ -1283,6 +1266,7 @@ export async function getTimesheetDetailsAdmin(timesheetId: string) {
 			hoursRaw: timeSheetTable.hoursRaw,
 			workdayId: timeSheetTable.workdayId,
 			status: timeSheetTable.status,
+			discrepancyNote: timeSheetTable.discrepancyNote,
 			candidate: {
 				...candidateProfileTable,
 				firstName: userTable.firstName,
@@ -1365,6 +1349,7 @@ export async function getTimesheetDetails(timesheetId: string, clientId: string 
 			hoursRaw: timeSheetTable.hoursRaw,
 			workdayId: timeSheetTable.workdayId,
 			status: timeSheetTable.status,
+			discrepancyNote: timeSheetTable.discrepancyNote,
 			candidate: {
 				...candidateProfileTable,
 				firstName: userTable.firstName,
@@ -2508,7 +2493,11 @@ export async function voidTimesheet(timesheetId: string, userId: string) {
 	}
 }
 
-export async function rejectTimesheet(timesheetId: string, userId: string) {
+export async function rejectTimesheet(
+	timesheetId: string,
+	userId: string,
+	discrepancyNote?: string
+) {
 	try {
 		const [original] = await db
 			.select()
@@ -2517,7 +2506,11 @@ export async function rejectTimesheet(timesheetId: string, userId: string) {
 
 		const [result] = await db
 			.update(timeSheetTable)
-			.set({ status: 'DISCREPANCY' })
+			.set({
+				status: 'DISCREPANCY',
+				updatedAt: new Date(),
+				discrepancyNote: discrepancyNote || null
+			})
 			.where(eq(timeSheetTable.id, original.id))
 			.returning();
 
@@ -2852,7 +2845,7 @@ export function convertToStripeAmount(
 	}
 
 	// Convert to cents for Stripe (multiply by 100 and round to avoid floating point issues)
-	let amountInCents = Math.round(totalAmount * 100);
+	const amountInCents = Math.round(totalAmount * 100);
 	console.log('Amount in cents:', amountInCents);
 	// Ensure the amount is a positive integer
 	if (amountInCents < 0) {

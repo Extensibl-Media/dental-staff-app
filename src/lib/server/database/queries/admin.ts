@@ -23,7 +23,6 @@ import {
 	type TimesheetDiscrepancy,
 	validateTimesheet
 } from '$lib/server/database/queries/requisitions';
-import { get } from 'svelte/store';
 import type Stripe from 'stripe';
 import { error } from '@sveltejs/kit';
 import { disciplineTable } from '../schemas/skill';
@@ -339,20 +338,10 @@ export async function getDiscrepanciesForAdminDashboard() {
 			eq(timeSheetTable.associatedCandidateId, candidateProfileTable.id)
 		)
 		.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
-		.where(ne(timeSheetTable.status, 'APPROVED'))
+		.where(ne(timeSheetTable.status, 'DISCREPANCY'))
 		.limit(DEFAULT_MAX_RECORD_LIMIT);
 
-	const allDiscrepancies: TimesheetDiscrepancy[] = [];
-
-	for (const timesheet of timesheets) {
-		const recurrenceDays = await getRecurrenceDaysForTimesheet(timesheet);
-		const workdays = await getWorkdaysForTimesheet(timesheet);
-		const discrepancies = validateTimesheet(timesheet, recurrenceDays, workdays);
-		allDiscrepancies.push(...discrepancies);
-	}
-
-	console.log('Discrepancies found:', allDiscrepancies);
-	return allDiscrepancies;
+	return timesheets;
 }
 
 export async function getNewCandidateSignupsPreview(limit: number) {

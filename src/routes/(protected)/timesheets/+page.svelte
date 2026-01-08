@@ -47,8 +47,6 @@
 		console.log('Timesheets data:', timesheets.map(ts => ({
 			id: ts.timesheet.id,
 			status: ts.timesheet.status,
-			hasValidationIssues: ts.hasValidationIssues,
-			discrepanciesCount: ts.discrepancies?.length || 0,
 			hasDiscrepanciesResult: hasDiscrepancies(ts)
 		})));
 	}
@@ -59,17 +57,6 @@
 			if (timesheet.timesheet.status === 'DISCREPANCY') {
 				return true;
 			}
-
-			// Then check validation issues flag
-			if (timesheet.hasValidationIssues === true) {
-				return true;
-			}
-
-			// Check if there are actual discrepancies array
-			if (timesheet.discrepancies && Array.isArray(timesheet.discrepancies) && timesheet.discrepancies.length > 0) {
-				return true;
-			}
-
 			return false;
 		}
 
@@ -239,8 +226,6 @@
 		noDiscrepancy: filterByDiscrepancy(timesheets, false).length,
 		discrepancy: filterByDiscrepancy(timesheets, true).length
 	};
-
-	$: console.log('Tab counts:', tabCounts);
 
 	function getSortingIcon(header: any) {
 		if (!header.column.getCanSort()) return null;

@@ -29,6 +29,8 @@ const newTimesheetSchema = z.object({
 			hours: z.number().min(1, 'Hours worked is required'),
 			startTime: z.string().min(1, 'Start time is required'),
 			endTime: z.string().min(1, 'End time is required'),
+			lunchStartTime: z.string().optional(),
+			lunchEndTime: z.string().optional(),
 			date: z.string().min(1, 'Date is required')
 		})
 	),
@@ -99,6 +101,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			hours: entry.hours,
 			startTime: entry.startTime,
 			endTime: entry.endTime,
+			lunchStartTime: entry.lunchStartTime,
+			lunchEndTime: entry.lunchEndTime,
 			date: entry.date
 		}));
 
@@ -109,7 +113,14 @@ export const POST: RequestHandler = async ({ request }) => {
 		const formattedEntries = timesheetEntries.map((entry) => ({
 			...entry,
 			startTime: createUTCDateTime(entry.date, entry.startTime, requisition!.referenceTimezone),
-			endTime: createUTCDateTime(entry.date, entry.endTime, requisition!.referenceTimezone)
+			endTime: createUTCDateTime(entry.date, entry.endTime, requisition!.referenceTimezone),
+			// ✅ Only set lunch times if they're actually provided
+			lunchStartTime: entry.lunchStartTime
+				? createUTCDateTime(entry.date, entry.lunchStartTime, requisition!.referenceTimezone)
+				: null,
+			lunchEndTime: entry.lunchEndTime
+				? createUTCDateTime(entry.date, entry.lunchEndTime, requisition!.referenceTimezone)
+				: null
 		}));
 
 		console.log('Formatted Entries:', formattedEntries);

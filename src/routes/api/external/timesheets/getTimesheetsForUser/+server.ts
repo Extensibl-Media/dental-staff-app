@@ -7,6 +7,7 @@ import {
 	workdayTable,
 	recurrenceDayTable
 } from '$lib/server/database/schemas/requisition';
+import { disciplineTable } from '$lib/server/database/schemas/skill';
 import { authenticateUser } from '$lib/server/serverUtils';
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { eq, and } from 'drizzle-orm';
@@ -40,25 +41,24 @@ export const GET: RequestHandler = async ({ request }) => {
 					awaitingClientSignature: timeSheetTable.awaitingClientSignature,
 					weekBeginDate: timeSheetTable.weekBeginDate,
 					hoursRaw: timeSheetTable.hoursRaw,
-					status: timeSheetTable.status
+					status: timeSheetTable.status,
+					discrepancyNote: timeSheetTable.discrepancyNote
 				},
 				requisition: {
 					id: requisitionTable.id,
 					title: requisitionTable.title,
-					status: requisitionTable.status
+					status: requisitionTable.status,
+					disciplineName: disciplineTable.name
 				},
 				company: {
 					id: clientCompanyTable.id,
 					name: clientCompanyTable.companyName,
 					logo: clientCompanyTable.companyLogo
-				},
-				workday: {
-					id: workdayTable.id
 				}
 			})
 			.from(timeSheetTable)
 			.leftJoin(requisitionTable, eq(timeSheetTable.requisitionId, requisitionTable.id))
-			.leftJoin(workdayTable, eq(timeSheetTable.workdayId, workdayTable.id))
+			.leftJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id))
 			.innerJoin(clientCompanyTable, eq(requisitionTable.companyId, clientCompanyTable.id))
 			.where(eq(timeSheetTable.associatedCandidateId, candidateProfile.id))
 			.orderBy(timeSheetTable.weekBeginDate);

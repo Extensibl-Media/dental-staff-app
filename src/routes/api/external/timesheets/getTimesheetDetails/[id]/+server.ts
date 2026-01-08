@@ -47,14 +47,16 @@ export const GET: RequestHandler = async ({ params, request }) => {
 					weekBeginDate: timeSheetTable.weekBeginDate,
 					hoursRaw: timeSheetTable.hoursRaw,
 					hourlyRate: requisitionTable.hourlyRate,
-					status: timeSheetTable.status
+					status: timeSheetTable.status,
+					discrepancyNote: timeSheetTable.discrepancyNote
 				},
 				requisition: {
 					id: requisitionTable.id,
 					title: requisitionTable.title,
 					status: requisitionTable.status,
 					jobDescription: requisitionTable.jobDescription,
-					hourlyRate: requisitionTable.hourlyRate
+					hourlyRate: requisitionTable.hourlyRate,
+					referenceTimezone: requisitionTable.referenceTimezone
 				},
 				company: {
 					id: clientCompanyTable.id,
@@ -63,20 +65,11 @@ export const GET: RequestHandler = async ({ params, request }) => {
 				},
 				workday: {
 					id: workdayTable.id
-				},
-				recurrenceDay: {
-					id: recurrenceDayTable.id,
-					date: recurrenceDayTable.date,
-					dayStartTime: recurrenceDayTable.dayStart,
-					dayEndTime: recurrenceDayTable.dayEnd,
-					lunchStartTime: recurrenceDayTable.lunchStart,
-					lunchEndTime: recurrenceDayTable.lunchEnd
 				}
 			})
 			.from(timeSheetTable)
 			.leftJoin(requisitionTable, eq(timeSheetTable.requisitionId, requisitionTable.id))
 			.leftJoin(workdayTable, eq(timeSheetTable.workdayId, workdayTable.id))
-			.leftJoin(recurrenceDayTable, eq(recurrenceDayTable.requisitionId, requisitionTable.id))
 			.innerJoin(clientCompanyTable, eq(requisitionTable.companyId, clientCompanyTable.id))
 			.where(
 				and(

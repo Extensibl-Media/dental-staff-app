@@ -56,6 +56,9 @@
 	let userTimezoneDisplay = formatTimezoneName(userTimezone);
 	let isOpen = false; // ✅ Track sheet state
 
+	// Recurrence day NEEDS to be based on location timezone not user timezone
+	let locationTimezone = location?.timezone || 'UTC';
+
 	// Times in local timezone
 	let sharedTimes = {
 		dayStartTime: '',
@@ -83,9 +86,6 @@
 
 	// Derived values
 	$: operatingHours = location?.operatingHours || {};
-
-	$: console.log({location})
-
 
 	// ✅ Let's see what formattedDateRange is producing
 	$: formattedDateRange = (() => {

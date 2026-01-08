@@ -59,18 +59,10 @@ export const load = async (event) => {
 				const workdays =
 					recurrenceDayIds.length > 0 ? await getWorkdaysForRecurrenceDays(recurrenceDayIds) : [];
 
-				// ✅ Now timesheet.timesheet already has hourlyRate from the query!
-				let discrepancies = [];
-				if (recurrenceDays && recurrenceDays.length > 0) {
-					discrepancies = validateTimesheet(timesheet.timesheet, recurrenceDays, workdays);
-				}
-
 				return {
 					...timesheet,
 					recurrenceDays,
-					workdays,
-					discrepancies,
-					hasValidationIssues: discrepancies.length > 0
+					workdays
 				};
 			} catch (error) {
 				console.error(`Error validating timesheet ${timesheet.timesheet.id}:`, error);
@@ -78,8 +70,7 @@ export const load = async (event) => {
 					...timesheet,
 					recurrenceDays: [],
 					workdays: [],
-					discrepancies: [],
-					hasValidationIssues: false
+					discrepancies: []
 				};
 			}
 		})

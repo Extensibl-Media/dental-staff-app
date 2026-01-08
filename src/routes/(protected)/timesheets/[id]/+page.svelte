@@ -46,6 +46,7 @@
 		Eye
 	} from 'lucide-svelte';
 	import { format, parseISO, addDays } from 'date-fns';
+  import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 	import { cn } from '$lib/utils';
 	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
@@ -60,6 +61,7 @@
 	// State variables
 	let approvalDialogOpen = false;
 	let rejectionDialogOpen = false;
+	let rejectionNote = '';
 	let activeTab = 'hours';
 	let editingDiscrepancy = null;
 	let editingHour = null;
@@ -103,47 +105,51 @@
 		return (Number(hourlyRate) * hours).toFixed(2);
 	}
 
-	function getDiscrepancyIcon(severity: string) {
-		switch (severity) {
-			case 'error':
-				return AlertTriangle;
-			case 'warning':
-				return AlertCircle;
-			case 'info':
-				return Info;
-			default:
-				return HelpCircle;
-		}
-	}
 
-	function getDiscrepancyColor(severity: string) {
-		switch (severity) {
-			case 'error':
-				return 'text-red-600';
-			case 'warning':
-				return 'text-amber-600';
-			case 'info':
-				return 'text-blue-600';
-			default:
-				return 'text-gray-600';
-		}
-	}
+ function formatTimeInReqZone(date: Date | string, formatStr: string = 'h:mm a'): string {
+    if (!date) return 'N/A';
+    try {
+      const timezone = data?.requisition?.requisition?.referenceTimezone || 'America/New_York';
+      return formatInTimeZone(new Date(date), timezone, formatStr);
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return 'N/A';
+    }
+  }
 
-	function getDiscrepancyBadgeColor(severity: string) {
-		switch (severity) {
-			case 'error':
-				return 'bg-red-100 text-red-800 border-red-200';
-			case 'warning':
-				return 'bg-amber-100 text-amber-800 border-amber-200';
-			case 'info':
-				return 'bg-blue-100 text-blue-800 border-blue-200';
-			default:
-				return 'bg-gray-100 text-gray-800 border-gray-200';
-		}
-	}
+  function formatTimeForInput(date: Date | string): string {
+    if (!date) return '';
+    try {
+      const timezone = data?.requisition?.requisition?.referenceTimezone || 'America/New_York';
+      return formatInTimeZone(new Date(date), timezone, 'HH:mm');
+    } catch (error) {
+      console.error('Error formatting time for input:', error);
+      return '';
+    }
+  }
+
+  // ✅ Parse time input and convert to UTC
+  function parseTimeToUTC(dateStr: string, timeStr: string): Date {
+    const timezone = data?.requisition?.requisition?.referenceTimezone || 'America/New_York';
+    const localDateTime = parseISO(`${dateStr}T${timeStr}:00`);
+    return fromZonedTime(localDateTime, timezone);
+  }
+
+  function calculateHoursWithLunch(start: Date, end: Date, lunchStart?: Date | null, lunchEnd?: Date | null): number {
+    if (!start || !end) return 0;
+
+    let totalMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
+
+    if (lunchStart && lunchEnd) {
+      const lunchMinutes = (lunchEnd.getTime() - lunchStart.getTime()) / (1000 * 60);
+      totalMinutes -= lunchMinutes;
+    }
+
+    return Math.round((totalMinutes / 60) * 100) / 100;
+  }
 
 	function hasDiscrepancies() {
-		return data?.discrepancies && data.discrepancies.length > 0;
+		return data?.timesheet?.status === "DISCREPANCY"
 	}
 
 	// New functions for editing
@@ -165,11 +171,27 @@
 	}
 
 	function updateHourEntry(index: number, field: string, value: any) {
-		if (editedHours[index]) {
-			editedHours[index] = { ...editedHours[index], [field]: value };
-			recalculateTotalHours();
-		}
-	}
+    if (!editedHours[index]) return;
+
+    if (field === 'startTime' || field === 'endTime' || field === 'lunchStartTime' || field === 'lunchEndTime') {
+      // Convert time string to UTC Date
+      const dateStr = editedHours[index].date;
+      editedHours[index][field] = value ? parseTimeToUTC(dateStr, value) : null;
+
+      // Recalculate hours
+      const hours = calculateHoursWithLunch(
+        editedHours[index].startTime,
+        editedHours[index].endTime,
+        editedHours[index].lunchStartTime,
+        editedHours[index].lunchEndTime
+      );
+      editedHours[index].hours = hours;
+    } else {
+      editedHours[index] = { ...editedHours[index], [field]: value };
+    }
+
+    recalculateTotalHours();
+  }
 
 	function recalculateTotalHours() {
 		const total = editedHours.reduce((sum, hour) => sum + (hour.hours || 0), 0);
@@ -229,7 +251,7 @@
 					<CardHeader>
 						<div class="flex flex-wrap items-start justify-between gap-2">
 							<div>
-								<CardTitle>{data?.requisition.title}</CardTitle>
+								<CardTitle>{data?.requisition.discipline.name}</CardTitle>
 								<CardDescription>
 									<p>
 										• Candidate: {data?.timesheet?.candidate?.firstName}
@@ -293,13 +315,6 @@
 						<TabsTrigger value="hours">Hours Detail</TabsTrigger>
 						<TabsTrigger value="discrepancies" class="relative">
 							Discrepancies
-							{#if hasDiscrepancies()}
-								<span
-									class="absolute top-0.5 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-xs font-semibold text-red-800"
-								>
-									{data.discrepancies.length}
-								</span>
-							{/if}
 						</TabsTrigger>
 						<TabsTrigger value="history" class="relative">
 							Audit History
@@ -315,216 +330,237 @@
 
 					<!-- Hours Detail Tab Content -->
 					<TabsContent value="hours" class="space-y-4 pt-4">
-						<Card>
-							<CardHeader>
-								<div class="flex items-center justify-between">
-									<div>
-										<CardTitle>Hours Detail</CardTitle>
-										<CardDescription>Manage and edit submitted hours</CardDescription>
-									</div>
-									{#if !bulkEditMode}
-										<Button
-											variant="outline"
-											class="gap-1 text-green-700 border-green-200 hover:bg-green-50"
-											on:click={enterBulkEditMode}
-											disabled={data?.timesheet?.status === 'APPROVED'}
-										>
-											<Edit class="h-4 w-4" />
-											Edit Hours
-										</Button>
-									{:else}
-										<div class="flex gap-2">
-											<Button variant="outline" class="gap-1" on:click={cancelBulkEdit}>
-												<Undo2 class="h-4 w-4" />
-												Cancel
-											</Button>
-											<form
-												method="POST"
-												action="?/adminEditTimesheet"
-												use:enhance={() => {
-													savingChanges = true;
-													return async ({ result }) => {
-														savingChanges = false;
-														if (result.type === 'success') {
-															bulkEditMode = false;
-															// Reload the page to get updated data
-															window.location.reload();
-														}
-													};
-												}}
-											>
-												<input type="hidden" name="hoursRaw" value={JSON.stringify(editedHours)} />
-												<input type="hidden" name="totalHoursWorked" value={editedTotalHours} />
-												<Button
-													type="submit"
-													class="gap-1 bg-green-700 hover:bg-green-800"
-													disabled={savingChanges}
-												>
-													<Save class="h-4 w-4" />
-													{savingChanges ? 'Saving...' : 'Save Changes'}
-												</Button>
-											</form>
-										</div>
-									{/if}
-								</div>
-							</CardHeader>
+  <Card>
+    <CardHeader>
+      <div class="flex items-center justify-between">
+        <div>
+          <CardTitle>Hours Detail</CardTitle>
+          <CardDescription>
+            {bulkEditMode ? 'Edit timesheet hours' : 'View submitted hours'}
+          </CardDescription>
+        </div>
+        {#if !bulkEditMode}
+          <Button
+            variant="outline"
+            class="gap-1 text-green-700 border-green-200 hover:bg-green-50"
+            on:click={enterBulkEditMode}
+            disabled={data?.timesheet?.status === 'APPROVED'}
+          >
+            <Edit class="h-4 w-4" />
+            Edit Hours
+          </Button>
+        {:else}
+          <div class="flex gap-2">
+            <Button variant="outline" class="gap-1" on:click={cancelBulkEdit}>
+              <Undo2 class="h-4 w-4" />
+              Cancel
+            </Button>
+            <form
+              method="POST"
+              action="?/adminEditTimesheet"
+              use:enhance={() => {
+                savingChanges = true;
+                return async ({ result }) => {
+                  savingChanges = false;
+                  if (result.type === 'success') {
+                    bulkEditMode = false;
+                    window.location.reload();
+                  }
+                };
+              }}
+            >
+              <input type="hidden" name="hoursRaw" value={JSON.stringify(editedHours)} />
+              <input type="hidden" name="totalHoursWorked" value={editedTotalHours} />
+              <Button
+                type="submit"
+                class="gap-1 bg-green-700 hover:bg-green-800"
+                disabled={savingChanges}
+              >
+                <Save class="h-4 w-4" />
+                {savingChanges ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </form>
+          </div>
+        {/if}
+      </div>
+    </CardHeader>
 
-							<CardContent>
-								{#if bulkEditMode}
-									<!-- Edit Mode -->
-									<div class="space-y-4">
-										<Alert>
-											<Info class="h-4 w-4" />
-											<AlertDescription>
-												You are now editing timesheet hours. Make your changes and click "Save
-												Changes" when done.
-											</AlertDescription>
-										</Alert>
+    <CardContent>
+      {#if bulkEditMode}
+        <!-- ✅ EDIT MODE -->
+        <div class="space-y-4">
+          <Alert>
+            <Info class="h-4 w-4" />
+            <AlertDescription>
+              Editing timesheet hours. All times are in {data?.requisition?.requisition?.referenceTimezone || 'Eastern'} timezone.
+            </AlertDescription>
+          </Alert>
 
-										<div class="divide-y">
-											<div class="py-2 grid grid-cols-12 text-sm font-medium text-gray-600">
-												<div class="col-span-2">Date</div>
-												<div class="col-span-2">Start Time</div>
-												<div class="col-span-2">End Time</div>
-												<div class="col-span-2">Scheduled Time</div>
-												<div class="col-span-2 text-right">Hours</div>
-												<div class="col-span-2 text-center">Actions</div>
-											</div>
+          {#each editedHours as hour, index}
+            {@const recurrenceDay = data.recurrenceDays.find((day) => day.date === hour.date)}
 
-											{#each editedHours as hour, index}
-												{@const recurrenceDay = data.recurrenceDays.find(
-													(day) => day.date === hour.date
-												)}
-												<div class="py-3 grid grid-cols-12 items-center gap-2">
-													<div class="col-span-2">
-														<p class="font-medium text-sm">{hour.date}</p>
-													</div>
-													<div class="col-span-2">
-														<Input
-															type="time"
-															value={formatTimeInput(new Date(hour.startTime))}
-															on:input={(e) => {
-																const newStartTime = parseTimeInput(e.target.value, hour.date);
-																updateHourEntry(index, 'startTime', newStartTime);
-															}}
-															class="text-sm"
-														/>
-													</div>
-													<div class="col-span-2">
-														<Input
-															type="time"
-															value={formatTimeInput(new Date(hour.endTime))}
-															on:input={(e) => {
-																const newEndTime = parseTimeInput(e.target.value, hour.date);
-																updateHourEntry(index, 'endTime', newEndTime);
-															}}
-															class="text-sm"
-														/>
-													</div>
-													<div class="col-span-2">
-														<p class="text-xs text-gray-600">
-															{recurrenceDay ? format(recurrenceDay.dayStart, 'hh:mm a') : 'N/A'} -
-															{recurrenceDay ? format(recurrenceDay.dayEnd, 'hh:mm a') : 'N/A'}
-														</p>
-													</div>
-													<div class="col-span-2">
-														<Input
-															type="number"
-															min="0"
-															max="24"
-															step="0.5"
-															value={hour.hours}
-															on:input={(e) =>
-																updateHourEntry(index, 'hours', parseFloat(e.target.value) || 0)}
-															class="text-right"
-														/>
-													</div>
-													<div class="col-span-2 text-center">
-														<Button
-															variant="ghost"
-															size="sm"
-															on:click={() => removeHourEntry(index)}
-															class="text-red-600 hover:text-red-800 hover:bg-red-50"
-															title="Remove this hour entry"
-														>
-															<Trash2 class="h-4 w-4" />
-														</Button>
-													</div>
-												</div>
-											{/each}
+            <div class="border rounded-lg p-4 space-y-4">
+              <!-- Date Header -->
+              <div class="flex items-center justify-between">
+                <p class="font-medium">{format(new Date(hour.date), 'EEE, MMM d, yyyy')}</p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  on:click={() => removeHourEntry(index)}
+                  class="text-red-600 hover:text-red-800 hover:bg-red-50"
+                >
+                  <Trash2 class="h-4 w-4" />
+                </Button>
+              </div>
 
-											<div class="py-3 grid grid-cols-12 items-center bg-gray-50">
-												<div class="col-span-8 font-bold">Total</div>
-												<div class="col-span-2 text-right">
-													<Input
-														type="number"
-														min="0"
-														step="0.5"
-														value={editedTotalHours}
-														on:input={(e) => (editedTotalHours = e.target.value)}
-														class="font-bold text-right"
-													/>
-												</div>
-												<div class="col-span-2">
-													<Button
-														variant="ghost"
-														size="sm"
-														on:click={recalculateTotalHours}
-														title="Recalculate from individual hours"
-														class="ml-2"
-													>
-														<RefreshCw class="h-4 w-4" />
-													</Button>
-												</div>
-											</div>
-										</div>
-									</div>
-								{:else}
-									<!-- View Mode -->
-									<div class="divide-y">
-										<div class="py-2 grid grid-cols-12 text-sm font-medium text-gray-600">
-											<div class="col-span-3">Day</div>
-											<div class="col-span-3">Time</div>
-											<div class="col-span-3">Scheduled Time</div>
-											<div class="col-span-3 text-right">Hours</div>
-										</div>
+              <!-- Work Hours -->
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <Label class="text-xs">Start Time</Label>
+                  <Input
+                    type="time"
+                    value={formatTimeForInput(hour.startTime)}
+                    on:input={(e) => updateHourEntry(index, 'startTime', e.target.value)}
+                    class="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label class="text-xs">End Time</Label>
+                  <Input
+                    type="time"
+                    value={formatTimeForInput(hour.endTime)}
+                    on:input={(e) => updateHourEntry(index, 'endTime', e.target.value)}
+                    class="mt-1"
+                  />
+                </div>
+              </div>
 
-										{#each data.timesheet?.hoursRaw || [] as hour}
-											{@const recurrenceDay = data.recurrenceDays.find(
-												(day) => day.date === hour.date
-											)}
-											<div class="py-3 grid grid-cols-12 items-center">
-												<div class="col-span-3">
-													<p class="font-medium">{hour.date}</p>
-												</div>
-												<div class="col-span-3">
-													<p class="text-sm text-gray-600">
-														{format(hour.startTime, 'hh:mm a')} - {format(hour.endTime, 'hh:mm a')}
-													</p>
-												</div>
-												<div class="col-span-3">
-													<p class="text-sm text-gray-600">
-														{recurrenceDay ? format(recurrenceDay.dayStart, 'hh:mm a') : 'N/A'} -
-														{recurrenceDay ? format(recurrenceDay.dayEnd, 'hh:mm a') : 'N/A'}
-													</p>
-												</div>
-												<div class="col-span-3 text-right">
-													<p class="font-semibold">{hour.hours} hrs</p>
-												</div>
-											</div>
-										{/each}
+              <!-- Lunch Hours -->
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <Label class="text-xs">Lunch Start (Optional)</Label>
+                  <Input
+                    type="time"
+                    value={formatTimeForInput(hour.lunchStartTime)}
+                    on:input={(e) => updateHourEntry(index, 'lunchStartTime', e.target.value)}
+                    class="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label class="text-xs">Lunch End (Optional)</Label>
+                  <Input
+                    type="time"
+                    value={formatTimeForInput(hour.lunchEndTime)}
+                    on:input={(e) => updateHourEntry(index, 'lunchEndTime', e.target.value)}
+                    class="mt-1"
+                  />
+                </div>
+              </div>
 
-										<div class="py-3 grid grid-cols-12 items-center bg-gray-50">
-											<div class="col-span-9 font-bold">Total</div>
-											<div class="col-span-3 text-right font-bold">
-												{data.timesheet?.totalHoursWorked} hrs
-											</div>
-										</div>
-									</div>
-								{/if}
-							</CardContent>
-						</Card>
-					</TabsContent>
+              <!-- Hours Display -->
+              <div class="pt-3 border-t flex items-center justify-between">
+                <span class="text-sm text-muted-foreground">Calculated Hours:</span>
+                <span class="font-semibold">{hour.hours?.toFixed(2) || '0.00'} hrs</span>
+              </div>
+
+              <!-- Scheduled Comparison -->
+              {#if recurrenceDay}
+                <div class="pt-2 border-t">
+                  <p class="text-xs text-muted-foreground">
+                    Scheduled: {formatTimeInReqZone(recurrenceDay.dayStart)} - {formatTimeInReqZone(recurrenceDay.dayEnd)}
+                    {#if recurrenceDay.lunchStart && recurrenceDay.lunchEnd}
+                      <span class="ml-2">
+                        (Lunch: {formatTimeInReqZone(recurrenceDay.lunchStart)} - {formatTimeInReqZone(recurrenceDay.lunchEnd)})
+                      </span>
+                    {/if}
+                  </p>
+                </div>
+              {/if}
+            </div>
+          {/each}
+
+          <!-- Total -->
+          <div class="border-t-2 pt-4 mt-4">
+            <div class="flex items-center justify-between">
+              <span class="font-bold">Total Hours:</span>
+              <div class="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={editedTotalHours}
+                  on:input={(e) => (editedTotalHours = e.target.value)}
+                  class="w-24 text-right font-bold"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  on:click={recalculateTotalHours}
+                  title="Recalculate from entries"
+                >
+                  <RefreshCw class="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      {:else}
+        <!-- ✅ VIEW MODE (same as client view) -->
+        {#if data?.timesheet?.hoursRaw && data.timesheet.hoursRaw.length > 0}
+          <div class="space-y-3">
+            {#each data.timesheet.hoursRaw as entry}
+              {@const recurrenceDay = data?.recurrenceDays.find((day) => day.date === entry.date)}
+
+              <div class="border rounded-lg p-4 space-y-3">
+                <div class="flex items-start justify-between">
+                  <div>
+                    <p class="font-medium text-base">{format(new Date(entry.date), 'EEE, MMM d, yyyy')}</p>
+                    <p class="text-sm text-muted-foreground mt-0.5">
+                      {formatTimeInReqZone(entry.startTime)} - {formatTimeInReqZone(entry.endTime)}
+                    </p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-lg font-bold">{entry.hours} hrs</p>
+                  </div>
+                </div>
+
+                {#if entry.lunchStartTime && entry.lunchEndTime}
+                  <div class="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t">
+                    <span class="text-base">🍽️</span>
+                    <span>Lunch: {formatTimeInReqZone(entry.lunchStartTime)} - {formatTimeInReqZone(entry.lunchEndTime)}</span>
+                  </div>
+                {/if}
+
+                {#if recurrenceDay}
+                  <div class="pt-2 border-t">
+                    <p class="text-xs text-muted-foreground">
+                      Scheduled: {formatTimeInReqZone(recurrenceDay.dayStart)} - {formatTimeInReqZone(recurrenceDay.dayEnd)}
+                      {#if recurrenceDay.lunchStart && recurrenceDay.lunchEnd}
+                        <span class="ml-2">
+                          (Lunch: {formatTimeInReqZone(recurrenceDay.lunchStart)} - {formatTimeInReqZone(recurrenceDay.lunchEnd)})
+                        </span>
+                      {/if}
+                    </p>
+                  </div>
+                {/if}
+              </div>
+            {/each}
+
+            <div class="border-t-2 pt-3 mt-4 flex items-center justify-between font-bold">
+              <span class="text-base">Total Hours</span>
+              <span class="text-lg">{data?.timesheet?.totalHoursWorked} hrs</span>
+            </div>
+          </div>
+        {:else}
+          <div class="p-8 text-center text-muted-foreground">
+            <Clipboard class="h-12 w-12 mx-auto mb-3" />
+            <p>No hours recorded for this timesheet</p>
+          </div>
+        {/if}
+      {/if}
+    </CardContent>
+  </Card>
+</TabsContent>
 
 					<!-- Discrepancies Tab Content -->
 					<TabsContent value="discrepancies" class="space-y-4 pt-4">
@@ -540,25 +576,14 @@
 
 							<CardContent>
 								{#if hasDiscrepancies()}
-									<div class="space-y-4">
-										{#each data.discrepancies as discrepancy}
-											<div class="p-4 border rounded-lg flex gap-3">
-												<div class="mt-0.5">
-													<AlertCircle class="h-5 w-5 text-amber-600" />
-												</div>
-												<div class="flex-1">
-													<div class="flex items-start justify-between">
-														<Badge
-															class="bg-amber-100 text-amber-800 border-amber-200"
-															variant="outline"
-															value={discrepancy.discrepancyType}
-														></Badge>
-													</div>
-													<p class="mt-2">{discrepancy.details}</p>
-												</div>
-											</div>
-										{/each}
-									</div>
+    								<div class="p-4 border rounded-lg flex gap-3">
+    									<div class="mt-0.5">
+    										<AlertCircle class="h-5 w-5 text-amber-600" />
+    									</div>
+    									<div class="flex-1">
+    										<p class="mt-2">{data?.timesheet?.discrepancyNote}</p>
+    									</div>
+    								</div>
 								{:else}
 									<div class="p-8 text-center">
 										<CheckCircle2 class="h-12 w-12 text-green-500 mx-auto mb-3" />
@@ -736,16 +761,6 @@
 						)}
 						value={data?.timesheet?.status}
 					></Badge>
-
-					{#if hasDiscrepancies()}
-						<Badge
-							variant="outline"
-							class="bg-amber-50 text-amber-800 border-amber-200 gap-1"
-							value={`${data.discrepancies?.length} Issue${data.discrepancies?.length > 1 ? 's' : ''}`}
-						>
-							<AlertTriangle class="h-3 w-3" />
-						</Badge>
-					{/if}
 				</div>
 				<p class="text-gray-600 flex items-center mt-1">
 					<Calendar class="h-4 w-4 mr-1" />
@@ -766,9 +781,7 @@
 				<AlertTriangle class="h-4 w-4" />
 				<AlertTitle>Attention Required</AlertTitle>
 				<AlertDescription>
-					This timesheet has {data?.discrepancies.length} issue{data?.discrepancies.length > 1
-						? 's'
-						: ''} that need{data?.discrepancies.length === 1 ? 's' : ''} your review before approval.
+					This timesheet has an issue that needs your review before approval.
 					Check the Discrepancies tab for details.
 				</AlertDescription>
 			</Alert>
@@ -782,7 +795,7 @@
 					<CardHeader>
 						<div class="flex flex-wrap items-center justify-between gap-2">
 							<div>
-								<CardTitle>{data?.requisition.title}</CardTitle>
+								<CardTitle>{data?.requisition.discipline.name} <span class="text-muted-foreground text-xs">Req#: {data?.requisition.id}</span></CardTitle>
 								<CardDescription
 									>{data?.timesheet?.candidate?.firstName}
 									{data?.timesheet?.candidate?.lastName}</CardDescription
@@ -846,13 +859,6 @@
 						<TabsTrigger value="hours">Hours Detail</TabsTrigger>
 						<TabsTrigger value="discrepancies" class="relative">
 							Discrepancies
-							{#if hasDiscrepancies()}
-								<span
-									class="absolute top-0.5 right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-xs font-semibold text-red-800"
-								>
-									{data?.discrepancies.length}
-								</span>
-							{/if}
 						</TabsTrigger>
 					</TabsList>
 
@@ -920,31 +926,14 @@
 
 							<CardContent>
 								{#if hasDiscrepancies()}
-									<div class="space-y-4">
-										{#each data.discrepancies as discrepancy}
-											<div class="p-4 border rounded-lg flex gap-3">
-												<div class="mt-0.5">
-													<svelte:component
-														this={getDiscrepancyIcon(
-															timesheetSeverityMap[discrepancy.discrepancyType]
-														)}
-														class={`h-5 w-5 ${getDiscrepancyColor(timesheetSeverityMap[discrepancy.discrepancyType])}`}
-													/>
-												</div>
-												<div class="flex-1">
-													<div class="flex items-start justify-between">
-														<Badge
-															class={getDiscrepancyBadgeColor(
-																timesheetSeverityMap[discrepancy.discrepancyType]
-															)}
-															value={discrepancy.discrepancyType}
-														/>
-													</div>
-													<p class="mt-2">{discrepancy.details}</p>
-												</div>
-											</div>
-										{/each}
-									</div>
+								<div class="p-4 border rounded-lg flex gap-3">
+    									<div class="mt-0.5">
+    										<AlertCircle class="h-5 w-5 text-amber-600" />
+    									</div>
+    									<div class="flex-1">
+    										<p class="mt-2">{data?.timesheet?.discrepancyNote}</p>
+    									</div>
+    								</div>
 								{:else}
 									<div class="p-8 text-center">
 										<CheckCircle2 class="h-12 w-12 text-green-500 mx-auto mb-3" />
@@ -1042,24 +1031,61 @@
 
 <!-- Rejection Dialog -->
 <Dialog bind:open={rejectionDialogOpen}>
-	<DialogContent>
-		<DialogHeader>
-			<DialogTitle>Reject Timesheet</DialogTitle>
-			<DialogDescription>
-				Please provide a reason for rejecting this timesheet. This will be sent to the candidate.
-			</DialogDescription>
-		</DialogHeader>
-		<DialogFooter class="mt-4">
-			<form method="POST" action="?/rejectTimesheet" use:enhance>
-				<Button type="button" variant="outline" on:click={() => (rejectionDialogOpen = false)}>
-					Cancel
-				</Button>
-				<Button type="submit" variant="destructive" on:click={() => (rejectionDialogOpen = false)}>
-					Reject Timesheet
-				</Button>
-			</form>
-		</DialogFooter>
-	</DialogContent>
+  <DialogContent>
+    <form method="POST" action="?/rejectTimesheet" use:enhance={() => {
+      return async ({ result }) => {
+        if (result.type === 'success') {
+          rejectionDialogOpen = false;
+          rejectionNote = ''; // Reset the note
+          window.location.reload();
+        }
+      };
+    }}>
+      <DialogHeader>
+        <DialogTitle>Reject Timesheet</DialogTitle>
+        <DialogDescription>
+          Please provide a reason for rejecting this timesheet. This will be sent to the candidate so they can correct the issues.
+        </DialogDescription>
+      </DialogHeader>
+
+      <div class="py-4">
+        <Label for="discrepancyNote" class="text-sm font-medium">
+          Reason for Rejection <span class="text-red-500">*</span>
+        </Label>
+        <Textarea
+          id="discrepancyNote"
+          name="discrepancyNote"
+          bind:value={rejectionNote}
+          placeholder="Explain what needs to be corrected (e.g., 'Hours worked on Jan 8 don't match scheduled shift time')"
+          class="mt-2 min-h-[100px]"
+          required
+        />
+        <p class="text-xs text-gray-500 mt-1">
+          Be specific so the candidate knows what to fix.
+        </p>
+      </div>
+
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="outline"
+          on:click={() => {
+            rejectionDialogOpen = false;
+            rejectionNote = '';
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          type="submit"
+          variant="destructive"
+          disabled={!rejectionNote.trim()}
+        >
+          Reject Timesheet
+        </Button>
+      </DialogFooter>
+    </form>
+  </DialogContent>
 </Dialog>
 
 <!-- Approval Dialog -->
