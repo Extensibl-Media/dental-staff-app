@@ -338,7 +338,7 @@ export async function getDiscrepanciesForAdminDashboard() {
 			eq(timeSheetTable.associatedCandidateId, candidateProfileTable.id)
 		)
 		.innerJoin(userTable, eq(userTable.id, candidateProfileTable.userId))
-		.where(ne(timeSheetTable.status, 'DISCREPANCY'))
+		.where(eq(timeSheetTable.status, 'DISCREPANCY'))
 		.limit(DEFAULT_MAX_RECORD_LIMIT);
 
 	return timesheets;
