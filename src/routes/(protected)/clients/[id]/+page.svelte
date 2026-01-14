@@ -229,12 +229,8 @@
             accessorFn: (original) => original.name
         },
         {
-            header: 'City',
-            accessorFn: (original) => original.city
-        },
-        {
-            header: 'State',
-            accessorFn: (original) => original.state
+            header: 'Address',
+            accessorFn: (original) => original.completeAddress
         }
     ];
 

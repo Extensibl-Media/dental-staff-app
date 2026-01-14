@@ -7,6 +7,7 @@ import {
 	workdayTable,
 	recurrenceDayTable
 } from '$lib/server/database/schemas/requisition';
+import { disciplineTable } from '$lib/server/database/schemas/skill';
 import { authenticateUser } from '$lib/server/serverUtils';
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { eq, and } from 'drizzle-orm';
@@ -56,7 +57,8 @@ export const GET: RequestHandler = async ({ params, request }) => {
 					status: requisitionTable.status,
 					jobDescription: requisitionTable.jobDescription,
 					hourlyRate: requisitionTable.hourlyRate,
-					referenceTimezone: requisitionTable.referenceTimezone
+					referenceTimezone: requisitionTable.referenceTimezone,
+					disciplineName: disciplineTable.name
 				},
 				company: {
 					id: clientCompanyTable.id,
@@ -69,6 +71,7 @@ export const GET: RequestHandler = async ({ params, request }) => {
 			})
 			.from(timeSheetTable)
 			.leftJoin(requisitionTable, eq(timeSheetTable.requisitionId, requisitionTable.id))
+			.leftJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id))
 			.leftJoin(workdayTable, eq(timeSheetTable.workdayId, workdayTable.id))
 			.innerJoin(clientCompanyTable, eq(requisitionTable.companyId, clientCompanyTable.id))
 			.where(

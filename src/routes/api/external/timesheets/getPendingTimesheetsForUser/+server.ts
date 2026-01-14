@@ -7,9 +7,11 @@ import {
 	workdayTable,
 	recurrenceDayTable
 } from '$lib/server/database/schemas/requisition';
+import { disciplineTable } from '$lib/server/database/schemas/skill';
 import { authenticateUser } from '$lib/server/serverUtils';
 import { error, json, type RequestHandler } from '@sveltejs/kit';
-import { eq, and, ne } from 'drizzle-orm';
+import { desc } from 'drizzle-orm';
+import { eq, and, ne, asc } from 'drizzle-orm';
 
 export const GET: RequestHandler = async ({ request }) => {
 	// Authenticate the user
@@ -45,7 +47,8 @@ export const GET: RequestHandler = async ({ request }) => {
 				requisition: {
 					id: requisitionTable.id,
 					title: requisitionTable.title,
-					status: requisitionTable.status
+					status: requisitionTable.status,
+					disciplineName: disciplineTable.name
 				},
 				company: {
 					id: clientCompanyTable.id,
@@ -58,6 +61,7 @@ export const GET: RequestHandler = async ({ request }) => {
 			})
 			.from(timeSheetTable)
 			.leftJoin(requisitionTable, eq(timeSheetTable.requisitionId, requisitionTable.id))
+			.leftJoin(disciplineTable, eq(requisitionTable.disciplineId, disciplineTable.id))
 			.leftJoin(workdayTable, eq(timeSheetTable.workdayId, workdayTable.id))
 			.innerJoin(clientCompanyTable, eq(requisitionTable.companyId, clientCompanyTable.id))
 			.where(
@@ -66,7 +70,7 @@ export const GET: RequestHandler = async ({ request }) => {
 					ne(timeSheetTable.status, 'APPROVED')
 				)
 			)
-			.orderBy(timeSheetTable.weekBeginDate);
+			.orderBy(desc(timeSheetTable.weekBeginDate));
 
 		return json({ success: true, data: timesheets });
 	} catch (err) {
