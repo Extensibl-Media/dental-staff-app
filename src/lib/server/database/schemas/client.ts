@@ -64,7 +64,8 @@ export const clientSubscriptionTable = pgTable('client_subscriptions', {
 		.defaultNow(),
 	status: text('subscription_status'),
 	stripeCustomerId: text('stripe_customer_id'),
-	priceId: text('price_id')
+	priceId: text('price_id'),
+	stripeCustomerSetupPending: boolean('stripe_customer_setup_pending').default(false)
 });
 
 export const clientCompanyTable = pgTable('client_companies', {

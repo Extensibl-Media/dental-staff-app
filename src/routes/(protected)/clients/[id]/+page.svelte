@@ -82,6 +82,7 @@
         InvoiceWithRelations
     } from '$lib/server/database/schemas/requisition';
     import {superForm} from 'sveltekit-superforms/client';
+    import { env } from '$env/dynamic/public';
 
     export let data: PageData;
     let initials: string = '';
@@ -93,6 +94,9 @@
     let selectedProfile: StaffProfileData | null = null;
     let tableData: StaffProfileData[] = [];
     let invoiceTableData: InvoiceWithRelations[] = [];
+   	let setupCustomerLoading = false;
+	let showSetupLinkDialog = false;
+	let setupLink = '';
 
     const {
         form: invoiceForm,
@@ -399,7 +403,49 @@
 
     // Sync items to form whenever items change
     $: $invoiceForm.items = JSON.stringify(items);
-    $: console.log(selectedProfile);
+    // Check if we need to show Setup Customer button
+	$: isInternalInstance = env.PUBLIC_APP_ENV === 'INTERNAL';
+	$: needsCustomerSetup = isInternalInstance && (
+		!data.client?.subscription?.stripeCustomerId ||
+		data.client?.subscription?.stripeCustomerSetupPending
+	);
+
+	async function handleSetupCustomer() {
+		setupCustomerLoading = true;
+		try {
+			const response = await fetch('/api/stripe/setup-customer', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ clientId: client?.profile.id })
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				throw new Error(error.message || 'Failed to create setup session');
+			}
+
+			const { url } = await response.json();
+			setupLink = url;
+			showSetupLinkDialog = true;
+		} catch (error) {
+			console.error('Error setting up customer:', error);
+			alert('Failed to create setup link. Please try again.');
+		} finally {
+			setupCustomerLoading = false;
+		}
+	}
+
+	function sendViaStripe() {
+		// Stripe will email the link to the customer automatically
+		alert('Stripe will send the setup link to ' + client.user.email);
+		showSetupLinkDialog = false;
+	}
+
+	function copySetupLink() {
+		navigator.clipboard.writeText(setupLink);
+		alert('Link copied to clipboard!');
+	}
+
 </script>
 
 {#if client}
@@ -423,38 +469,65 @@
                     </div>
 
                     <div class="flex-1">
-                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-6">
-                            <div>
-                                <h1 class="text-3xl md:text-4xl font-bold">
-                                    {client.user.firstName}
-                                    {client.user.lastName}
-                                </h1>
-                                <div class="mt-2 text-xl font-medium text-gray-700">
-                                    {client.company.companyName}
-                                </div>
-                            </div>
+	<div class="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-6">
+		<div>
+			<h1 class="text-3xl md:text-4xl font-bold">
+				{client.user.firstName}
+				{client.user.lastName}
+			</h1>
+			<div class="mt-2 text-xl font-medium text-gray-700">
+				{client.company.companyName}
+			</div>
+		</div>
 
-                            <div class="flex gap-2 mt-3 md:mt-0">
-                                <Button
-                                        variant="outline"
-                                        size="sm"
-                                        class="gap-1"
-                                        on:click={() => (showInvoiceDialog = true)}
-                                >
-                                    <CreditCard class="h-4 w-4"/>
-                                    <span>Create Invoice</span>
-                                </Button>
-                            </div>
-                        </div>
+		<div class="flex gap-2 mt-3 md:mt-0">
+			{#if needsCustomerSetup}
+				<Button
+					variant="outline"
+					size="sm"
+					class="gap-1"
+					on:click={handleSetupCustomer}
+					disabled={setupCustomerLoading}
+				>
+					<CreditCard class="h-4 w-4"/>
+					<span>
+						{#if setupCustomerLoading}
+							Creating Link...
+						{:else if data.client?.subscription?.stripeCustomerSetupPending}
+							Resend Setup Link
+						{:else}
+							Setup Customer
+						{/if}
+					</span>
+				</Button>
+			{:else}
+				<Button
+					variant="outline"
+					size="sm"
+					class="gap-1"
+					on:click={() => (showInvoiceDialog = true)}
+				>
+					<CreditCard class="h-4 w-4"/>
+					<span>Create Invoice</span>
+				</Button>
+			{/if}
+		</div>
+	</div>
 
-                        <div class="mt-4 flex flex-col sm:flex-row gap-4 text-sm">
-                            <div class="flex items-center gap-2">
-                                <Mail class="h-4 w-4 text-gray-500"/>
-                                <a href={`mailto:${client.user.email}`} class="text-blue-600 hover:underline"
-                                >{client.user.email}</a
-                                >
-                            </div>
-                        </div>
+	<div class="mt-4 flex flex-col sm:flex-row gap-4 text-sm">
+		<div class="flex items-center gap-2">
+			<Mail class="h-4 w-4 text-gray-500"/>
+			<a href={`mailto:${client.user.email}`} class="text-blue-600 hover:underline">
+				{client.user.email}
+			</a>
+		</div>
+		{#if needsCustomerSetup}
+			<div class="flex items-center gap-2">
+				<AlertCircle class="h-4 w-4 text-orange-500"/>
+				<span class="text-orange-600 font-medium">Payment method setup pending</span>
+			</div>
+		{/if}
+	</div>
                     </div>
                 </div>
             </div>
@@ -1205,6 +1278,74 @@
                 </DialogClose>
             </DialogFooter>
         </DialogContent>
+    </Dialog>
+    <Dialog bind:open={showSetupLinkDialog}>
+	<DialogContent class="sm:max-w-[550px]">
+		<DialogHeader>
+			<DialogTitle>Payment Setup Link Created</DialogTitle>
+			<DialogDescription>
+				Share this link with {client.user.firstName} {client.user.lastName} to complete payment setup
+			</DialogDescription>
+		</DialogHeader>
+
+		<div class="space-y-4 py-4">
+			<!-- Client Info -->
+			<div class="bg-gray-50 rounded-lg p-3 flex items-center gap-3">
+				<div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+					<User class="h-5 w-5 text-blue-600"/>
+				</div>
+				<div class="flex-1 min-w-0">
+					<p class="font-medium text-sm">{client.user.firstName} {client.user.lastName}</p>
+					<p class="text-xs text-gray-600 truncate">{client.user.email}</p>
+				</div>
+			</div>
+
+			<!-- Setup Link -->
+			<div class="space-y-2">
+				<Label for="setup-link" class="text-sm font-medium">Setup Link</Label>
+				<div class="flex gap-2">
+					<Input
+						id="setup-link"
+						value={setupLink}
+						readonly
+						class="font-mono text-sm"
+						on:click={(e) => e.target.select()}
+					/>
+					<Button
+						variant="outline"
+						size="icon"
+						on:click={copySetupLink}
+						title="Copy to clipboard"
+					>
+						<ClipboardList class="h-4 w-4"/>
+					</Button>
+				</div>
+				<p class="text-xs text-gray-500">
+					Click the link to select all, or click the copy button
+				</p>
+			</div>
+
+			<!-- What Happens -->
+			<div class="bg-blue-50 border border-blue-100 rounded-lg p-4">
+				<h4 class="text-sm font-medium text-blue-900 mb-2 flex items-center gap-2">
+					<CreditCard class="h-4 w-4"/>
+					<span>What happens next?</span>
+				</h4>
+				<ol class="text-xs text-blue-800 space-y-1.5 list-decimal list-inside ml-1">
+					<li>Send this link to the client via email or text</li>
+					<li>Client opens the link and enters payment information</li>
+					<li>Stripe securely saves their payment method</li>
+					<li>You can now create and charge invoices</li>
+				</ol>
+			</div>
+		</div>
+
+		<DialogFooter>
+			<Button variant="outline" on:click={() => showSetupLinkDialog = false}>
+				Done
+			</Button>
+		</DialogFooter>
+	</DialogContent>
     </Dialog>
 {:else}
     <section

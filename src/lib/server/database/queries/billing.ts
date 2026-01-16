@@ -1,7 +1,7 @@
 // lib/server/database/queries/billing.ts
 import { eq } from 'drizzle-orm';
 import db from '../drizzle';
-import { clientSubscriptionTable } from '../schemas/client';
+import { clientProfileTable, clientSubscriptionTable } from '../schemas/client';
 import { stripe } from '$lib/server/stripe';
 import { error, redirect } from '@sveltejs/kit';
 import type Stripe from 'stripe';
@@ -9,6 +9,7 @@ import { getUserByEmail } from './users';
 import { getClientProfilebyUserId } from './clients';
 import { userTable } from '../schemas/auth';
 import { USER_ROLES } from '$lib/config/constants';
+import { env } from '$env/dynamic/public';
 
 export type SubscriptionStatus =
 	| 'incomplete'
@@ -206,6 +207,59 @@ export async function handleSubscriptionDeleted(subscription: Stripe.Subscriptio
 		.where(eq(clientSubscriptionTable.id, subscription.id));
 }
 
+export async function handleCustomerSetupCompleted(session: Stripe.Checkout.Session) {
+	try {
+		const clientId = session.metadata?.clientId;
+
+		if (!clientId) {
+			console.log('No clientId in session metadata');
+			return;
+		}
+
+		// Get the setup_intent from the session
+		const setupIntent = await stripe.setupIntents.retrieve(session.setup_intent as string);
+		const customerId = setupIntent.customer as string;
+		const paymentMethodId = setupIntent.payment_method as string;
+
+		if (!customerId) {
+			console.log('No customer ID found in setup intent');
+			return;
+		}
+
+		console.log('Setup completed - Customer:', customerId, 'PaymentMethod:', paymentMethodId);
+
+		// Update the clientSubscription record
+		await db
+			.update(clientSubscriptionTable)
+			.set({
+				stripeCustomerId: customerId,
+				stripeCustomerSetupPending: false,
+				status: 'inactive', // No subscription, just payment method on file
+				updatedAt: new Date()
+			})
+			.where(eq(clientSubscriptionTable.clientId, clientId));
+
+		// Also update the user table
+		const [clientProfile] = await db
+			.select({ userId: clientProfileTable.userId })
+			.from(clientProfileTable)
+			.where(eq(clientProfileTable.id, clientId))
+			.limit(1);
+
+		if (clientProfile) {
+			await db
+				.update(userTable)
+				.set({ stripeCustomerId: customerId })
+				.where(eq(userTable.id, clientProfile.userId));
+		}
+
+		console.log('Customer setup completed successfully for client:', clientId);
+	} catch (error) {
+		console.error('Error in handleCustomerSetupCompleted:', error);
+		throw error;
+	}
+}
+
 export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 	try {
 		if (!session.customer_email) {
@@ -285,6 +339,11 @@ export async function checkCustomerSubscriptionStatus(
 export async function redirectIfNotValidCustomer(clientId: string | undefined, role: string) {
 	if (!clientId) {
 		throw error(400, 'Client ID is required');
+	}
+	// ONLY FOR INTERNAL INSTANCES TO BYPASS SUBSCRIPTION CHECK
+	if (env.PUBLIC_APP_ENV === 'INTERNAL') {
+		console.log('[SYSTEM LOG]: INTERNAL ENVIRONMENT - skipping subscription requirements');
+		return;
 	}
 	const status = await checkCustomerSubscriptionStatus(clientId);
 	switch (role) {

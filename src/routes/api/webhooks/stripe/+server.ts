@@ -10,6 +10,7 @@ import type { RequestHandler } from './$types';
 import { getClientProfilebyUserId } from '$lib/server/database/queries/clients';
 import {
 	handleCheckoutCompleted,
+	handleCustomerSetupCompleted,
 	handleSubscriptionCreated,
 	handleSubscriptionDeleted,
 	handleSubscriptionUpdated
@@ -45,7 +46,15 @@ export const POST: RequestHandler = async ({ request }) => {
 		switch (event.type) {
 			case 'checkout.session.completed':
 				console.log('Handling checkout session completed');
-				await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+				const session = event.data.object as Stripe.Checkout.Session;
+
+				// Check if this is setup mode (payment method collection)
+				if (session.mode === 'setup') {
+					await handleCustomerSetupCompleted(session);
+				} else {
+					// Existing subscription checkout logic
+					await handleCheckoutCompleted(session);
+				}
 				break;
 
 			case 'customer.subscription.created':

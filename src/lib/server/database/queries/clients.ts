@@ -203,12 +203,14 @@ export async function getClientProfileById(clientId: string) {
 				email: userTable.email,
 				avatarUrl: userTable.avatarUrl
 			},
-			company: { ...clientCompanyTable }
+			company: { ...clientCompanyTable },
+			subscription: { ...clientSubscriptionTable }
 		})
 		.from(clientProfileTable)
 		.where(eq(clientProfileTable.id, clientId))
 		.innerJoin(userTable, eq(clientProfileTable.userId, userTable.id))
-		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientId));
+		.innerJoin(clientCompanyTable, eq(clientCompanyTable.clientId, clientId))
+		.leftJoin(clientSubscriptionTable, eq(clientSubscriptionTable.clientId, clientId));
 
 	return result[0] || null;
 }

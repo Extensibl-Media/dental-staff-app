@@ -84,6 +84,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		})
 	);
 
+	console.log(result);
+
 	return result
 		? {
 				user,
@@ -91,7 +93,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 					profile: result.profile,
 					user: result.user,
 					company: result.company,
-					locations: locations
+					locations: locations,
+					subscription: result.subscription
 				},
 				requisitions,
 				supportTickets,
